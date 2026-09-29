@@ -1,44 +1,38 @@
-# Bootcamp QI Tech — projeto base da API
+# Bootcamp QI Tech — serviço de biblioteca
 
-Projeto base do Bootcamp: uma API REST em **Python + FastAPI**, com banco
-**PostgreSQL**, rodando em **Docker**.
+Um serviço-exemplo construído sobre o projeto base do Bootcamp: uma API
+REST em **Python + FastAPI**, com banco **PostgreSQL**, rodando em
+**Docker**. Ela cadastra **autores**, **estantes**, **livros** e
+**leitores**, controla o empréstimo de cada livro — e com qual leitor ele
+está — e consulta um **catálogo de ISBN** — um serviço de fora — para
+preencher os dados de cada edição.
 
-Você não precisa saber programar para começar. A API e o banco sobem
-no **Docker**, então você não instala nem um nem outro na sua máquina.
-Os **testes** rodam no seu Python — são dois comandos, e a seção 2
-mostra os dois.
+O projeto segue o mesmo desenho do projeto base, pasta por pasta. Se
+você já leu aquele, aqui você vai reconhecer tudo; o que muda é o
+domínio, e duas regras que o projeto base não tinha: a **lotação da
+estante**, que precisa ser conferida dentro de uma transação, e o
+**catálogo**, que é consultado por HTTP e testado com um mock server.
+
+A API e o banco sobem no **Docker**, então você não instala nem um nem
+outro na sua máquina. Os **testes** rodam no seu Python (seção 2).
 
 ---
 
 ## 0. O que você precisa ter instalado
 
-São três coisas.
-
 | O quê | Para quê | Como conferir |
 |---|---|---|
-| **Docker** (com o Docker Desktop no Mac/Windows) | roda a API e o banco | `docker compose version` |
-| **Git** | trazer o projeto para o seu computador | `git --version` |
+| **Docker** (com o Docker Desktop no Mac/Windows) | roda a API, o banco e o mock do catálogo | `docker compose version` |
+| **Git** | só no Windows: ele traz junto o Git Bash, o terminal onde os comandos da seção 1 funcionam | `git --version` |
 | **Python 3.11 ou mais novo** | rodar os testes (seção 2) | `python3 --version` |
 
-Abra o terminal e rode os três comandos da coluna da direita. Se todos
-responderem um número de versão, você está pronto.
-
-> **Por que o Python, se tudo roda no Docker?** Porque os testes rodam
-> FORA dele, na sua máquina, contra a API que está de pé no container.
-> O ganho é o ciclo: você salva um teste e roda na hora, sem esperar
-> imagem nenhuma ser montada. O preço está explicado na seção 2.
+Rode os três comandos da coluna da direita. Se todos responderem um
+número de versão, você está pronto.
 
 > **`docker compose version` deu erro?** Sua instalação do Docker é
 > antiga demais (ou o Docker não está ligado). No Mac e no Windows,
-> abra o **Docker Desktop** e espere a baleia parar de se mexer. Se o
-> comando continuar falhando, reinstale pelo site oficial —
-> o `docker compose` (com **espaço**) vem junto desde 2022.
-
-Nada além destes três. Se em algum momento este projeto pedir que você
-instale outro PROGRAMA, é um bug do projeto — avise a gente. (As
-bibliotecas Python que os testes usam são outra conversa: elas entram
-com um `pip install` na seção 2, dentro de uma pasta do próprio
-projeto, e somem quando você apaga essa pasta.)
+> abra o **Docker Desktop** e espere ele terminar de subir. O
+> `docker compose` (com **espaço**) vem junto desde 2022.
 
 ---
 
@@ -48,346 +42,339 @@ projeto, e somem quando você apaga essa pasta.)
 docker compose up
 ```
 
-Um comando. Só isso, e não precisa criar nem copiar arquivo nenhum
-antes: as configurações já vêm com valor padrão dentro do
-`docker-compose.yml`.
+Não precisa criar nem copiar arquivo nenhum antes: as configurações já
+vêm com valor padrão dentro do `docker-compose.yml`. Na primeira vez o
+Docker baixa as imagens e demora alguns minutos; depois, a subida leva
+uns 10 segundos.
 
-O Docker baixa o Python, sobe o banco, cria as tabelas e liga a API. Na
-primeira vez demora alguns minutos; depois é quase instantâneo.
-
-São duas coisas de pé, e vale saber o nome de cada uma:
+São três serviços de pé:
 
 | Serviço | O que é |
 |---|---|
-| `api` | a API que responde às suas requisições |
-| `db` | o banco de dados (PostgreSQL) |
+| `api` | a API da biblioteca |
+| `db` | o banco de dados (PostgreSQL), com as tabelas `author`, `shelf`, `member`, `book`, `book_status` (a lista fechada `AVAILABLE`/`BORROWED`, que nasce preenchida) e `book_status_event` (uma linha por cadastro e por transição do livro) |
+| `mock` | o catálogo de ISBN de mentira: um MockServer que responde o que os testes (ou você) ensinarem a ele — seção 5 |
 
 Quando aparecer `Application startup complete`, a API está no ar. Abra
-no navegador:
-
-### 👉 http://localhost:3000
-
-Você vai ver isto:
+http://localhost:3000 no navegador e ela responde quem é:
 
 ```json
-{"service":"bootcamp-api","id":"8"}
+{"service":"bootcamp-library-api","id":"8"}
 ```
 
-Pouca coisa, e de propósito: essa rota só diz "estou viva, e eu sou este
-serviço". Mas você acabou de fazer uma **requisição HTTP** — a mesma
-coisa que o navegador faz ao abrir qualquer site.
+### Um passeio pelas rotas
 
-### Agora as outras rotas
+As rotas de negócio exigem o cabeçalho `INTERNAL-TOKEN` (seção 6), e por
+isso não abrem no navegador. Abra um **segundo terminal** e use o
+`curl`. No Windows, use o **Git Bash**: no PowerShell, `curl` é outro
+programa, com outra sintaxe.
 
-Elas não abrem no navegador, porque exigem um cabeçalho: o
-`INTERNAL-TOKEN`, que é a senha da API (seção 6). Para mandar um
-cabeçalho a gente usa o `curl`, um programa de linha de comando que já
-vem instalado no Mac, no Linux e no Windows.
+Cada comando abaixo devolve uma chave (`author_key`, `shelf_key`,
+`book_key`) que nasce diferente a cada vez. **Copie a sua** e troque
+nos comandos seguintes.
 
-**Abra um segundo terminal** — o primeiro está ocupado rodando a API — e
-cole um comando de cada vez.
-
-> **No Windows**, use o **Git Bash**: ele veio junto com o Git da seção
-> 0. No PowerShell estes comandos não funcionam, porque lá `curl` é o
-> apelido de outro programa, com outra sintaxe.
-
-#### 1. Criar uma entidade
+#### 1. Cadastrar um autor
 
 ```bash
-curl -X POST http://localhost:3000/sample_entity \
+curl -i -X POST http://localhost:3000/author \
   -H "INTERNAL-TOKEN: default_token" \
   -H "Content-Type: application/json" \
+  -d '{"name": "Machado de Assis", "nationality": "Brazilian", "document_number": "529.982.247-25"}'
+```
+
+```
+HTTP/1.1 201 Created
+
+{"author_key":"49ac91f0-6eee-4980-84d0-263669ab4a7d"}
+```
+
+O `-i` mostra a primeira linha da resposta: o **status**. `201 Created`
+quer dizer "criei". Ele é a primeira coisa a olhar em toda resposta.
+
+#### 2. Cadastrar uma estante
+
+```bash
+curl -X POST http://localhost:3000/shelf \
+  -H "INTERNAL-TOKEN: default_token" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "A-01", "location": "Reading room, aisle 1", "capacity": 1}'
+```
+
+```json
+{"shelf_key":"2dd8ea55-d195-4f05-a257-ecef7df2c3ab"}
+```
+
+A capacidade **1** é de propósito: ela deixa a regra de lotação
+aparecer já no passo 6. O `code` não se repete — rodar o mesmo
+comando de novo responde **409** com o `QIT001014`.
+
+#### 3. Ensinar o catálogo a responder
+
+Para cadastrar um livro, a API pergunta ao catálogo de ISBN o título, o
+ano e o número de páginas. Quem faz o papel do catálogo é o `mock`, e
+ele sobe **vazio**. Este comando ensina a ele uma resposta — "quando
+perguntarem pelo ISBN 9788535910663, responda isto":
+
+```bash
+curl -X PUT http://localhost:1080/mockserver/expectation \
   -d '{
-    "hello": "world",
-    "name": "Maria da Silva",
-    "email": "maria.silva@exemplo.com.br",
-    "document_number": "529.982.247-25",
-    "birthdate": "1990-05-17"
+    "httpRequest": {"method": "GET", "path": "/catalog/isbn/9788535910663"},
+    "httpResponse": {
+      "statusCode": 200,
+      "body": {"title": "Dom Casmurro", "authors": ["Machado de Assis"], "year": 1899, "pages": 256}
+    }
   }'
 ```
 
-```json
-{"sample_entity_key":"3fbf83e9-e5fc-4e0f-8427-db6a1a50f964"}
-```
+Repare na porta: **1080** é o mock, não a API. Nos testes, este passo é
+uma linha só: `CatalogMock.GET_isbn(isbn=isbn)` (seção 5).
 
-Esse `sample_entity_key` é o endereço da entidade que você acabou de
-criar. **Copie o seu** — ele nasce diferente a cada vez, e nos comandos
-abaixo você troca o que está escrito aqui pelo seu.
-
-> **Rodou o comando duas vezes e levou 409 na segunda?** É de propósito:
-> o CPF e o e-mail não podem se repetir. Para criar uma segunda
-> entidade, troque o e-mail (qualquer um serve) e o CPF — mas o CPF tem
-> que ser **válido de verdade**, com os dois dígitos finais batendo com
-> a conta. O `529.982.247-25` acima é um CPF de teste conhecido, que
-> passa na conta e não pertence a ninguém.
->
-> **E os cinco campos são todos obrigatórios?** São. Mande `{}` e a API
-> diz qual está faltando — é o comando 6 lá embaixo.
-
-#### 2. Buscar a entidade
+#### 4. Cadastrar um livro
 
 ```bash
-curl http://localhost:3000/sample_entity/3fbf83e9-e5fc-4e0f-8427-db6a1a50f964 \
-  -H "INTERNAL-TOKEN: default_token"
-```
-
-```json
-{"hello":"world","sample_entity_key":"3fbf83e9-e5fc-4e0f-8427-db6a1a50f964","name":"Maria da Silva","email":"maria.silva@exemplo.com.br","document_number":"529.982.247-25","birthdate":"1990-05-17","status":"pending","counter":0,"status_events":[{"status":"pending","event_datetime":"2026-09-11T20:36:43.104210"}]}
-```
-
-Você mandou cinco campos e voltaram nove. Os quatro extras a API montou
-sozinha:
-
-- **`sample_entity_key`** — o endereço da entidade;
-- **`status`** — o estado inicial, `pending`;
-- **`counter`** — um contador zerado;
-- **`status_events`** — a **história**. Cada vez que o status muda, uma
-  linha nova entra aqui, com a hora. Saber onde a entidade está é uma
-  coisa; saber por onde ela passou é outra, e é essa lista que responde
-  a segunda.
-
-#### 3. Listar as entidades
-
-```bash
-curl http://localhost:3000/sample_entities \
-  -H "INTERNAL-TOKEN: default_token"
-```
-
-```json
-{"data":[{"hello":"world","sample_entity_key":"3fbf83e9-e5fc-4e0f-8427-db6a1a50f964","name":"Maria da Silva","email":"maria.silva@exemplo.com.br","document_number":"529.982.247-25","birthdate":"1990-05-17","status":"pending","counter":0}],"limit":10,"page":0,"is_last_page":true}
-```
-
-Vêm de dez em dez, da mais nova para a mais antiga. Para pedir outra
-quantidade ou outra página, acrescente `?limit=2&page=0` ao endereço —
-o `limit` vai até **100**. O `is_last_page` já responde a pergunta
-seguinte — "tem mais?" — sem custar uma segunda requisição.
-
-Repare no que **não** veio: o `status_events`. Na lista cada item vem
-resumido, porque montar a história de cada entidade custa uma consulta a
-mais por item — numa página de 100, são 100 consultas para uma
-informação que quem está varrendo não pediu. A história aparece quando
-você abre UMA entidade, no comando 2.
-
-Também dá para **filtrar**. Todos os filtros se combinam, e todos são
-opcionais:
-
-```bash
-curl "http://localhost:3000/sample_entities?name=maria&status=pending&status=failed" \
-  -H "INTERNAL-TOKEN: default_token"
-```
-
-| Filtro | Como casa |
-|---|---|
-| `name` | por **pedaço**, ignorando maiúscula/minúscula |
-| `email` | exato |
-| `document_number` | exato |
-| `birthdate_from` / `birthdate_to` | intervalo, **incluindo** as duas pontas |
-| `status` | pode repetir: `?status=pending&status=failed` traz os dois |
-
-Repare que `status` se comporta ao contrário dos outros: `name` junto
-com `email` **estreita** a busca (os dois precisam bater), mas dois
-`status` **alargam** (basta um bater). Faz sentido pelo que a pessoa
-quer dizer — "me mostra o que deu errado e o que deu certo" é um pedido
-legítimo, e uma entidade só pode estar num dos baldes.
-
-#### 4. Somar 1 no contador
-
-```bash
-curl -i -X PUT http://localhost:3000/webhook/sample_entity/3fbf83e9-e5fc-4e0f-8427-db6a1a50f964/increment_counter \
-  -H "INTERNAL-TOKEN: default_token"
-```
-
-```
-HTTP/1.1 204 No Content
-```
-
-Esta rota não responde nada — por isso o `-i`, que manda o `curl`
-mostrar também o **status** da resposta. `204` quer dizer "deu certo e
-não tenho nada a dizer". Repita o comando 2: o `counter` agora é `1`.
-
-#### 5. Mudar o status
-
-```bash
-curl -X PUT http://localhost:3000/sample_entity/3fbf83e9-e5fc-4e0f-8427-db6a1a50f964 \
-  -H "INTERNAL-TOKEN: default_token" \
-  -H "Content-Type: application/json" \
-  -d '{"status": "success"}'
-```
-
-```json
-{"sample_entity_key":"3fbf83e9-e5fc-4e0f-8427-db6a1a50f964"}
-```
-
-Repita o comando 2: o `status` virou `success`. E rode este comando 5
-mais uma vez — agora a API recusa:
-
-```json
-{"title":"Entity cannot change status","description":"Entity with status success cannot update to success.","translation":"Essa entidade não pode ser atualizada.","code":"QIT001002"}
-```
-
-Isso é uma **regra de negócio**, não um erro de digitação: entidade que
-já terminou não volta atrás. A frase que decide isso mora em
-`src/controllers/sample_entity_controller.py`, e você pode ir ler.
-
-#### 6. Mandar um JSON torto
-
-```bash
-curl -X POST http://localhost:3000/sample_entity \
-  -H "INTERNAL-TOKEN: default_token" \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-```json
-{"title":"Bad Request","description":"'hello' is a required property","translation":"Payload Inválido","code":"QIT000001"}
-```
-
-**400**, e nada foi criado. O `hello` é obrigatório, e quem recusou não
-foi a regra de negócio: foi o `src/schemas/`, antes da primeira linha da
-rota rodar. Pedido torto não chega a custar uma consulta ao banco.
-
-Repare que ele reclamou de **um** campo, e você deixou cinco de fora. É
-assim mesmo: a validação para no primeiro problema. Tire o `{}` e vá
-preenchendo um campo de cada vez para ver a reclamação andar.
-
-E existe uma fronteira aqui que vale a pena enxergar cedo. Mande um CPF
-com o formato certo e os dígitos errados:
-
-```bash
-curl -X POST http://localhost:3000/sample_entity \
+curl -i -X POST http://localhost:3000/book \
   -H "INTERNAL-TOKEN: default_token" \
   -H "Content-Type: application/json" \
   -d '{
-    "hello": "world",
-    "name": "Maria da Silva",
-    "email": "outra@exemplo.com.br",
-    "document_number": "111.111.111-11",
-    "birthdate": "1990-05-17"
+    "isbn": "9788535910663",
+    "author_key": "49ac91f0-6eee-4980-84d0-263669ab4a7d",
+    "shelf_key": "2dd8ea55-d195-4f05-a257-ecef7df2c3ab"
   }'
 ```
 
-```json
-{"title":"Invalid Document Number","description":"The document number 111.111.111-11 is not a valid CPF.","translation":"O CPF informado não é válido.","code":"QIT001003"}
+```
+HTTP/1.1 201 Created
+
+{"book_key":"62c08a06-38df-429f-bed6-4025917f9c9f","status":"AVAILABLE"}
 ```
 
-Agora é **422**, não 400. A diferença não é capricho: 400 quer dizer
-"não consegui ler o seu pedido"; 422 quer dizer "li, entendi, e esse
-valor não pode existir". O schema sabe contar pontos e traços — ele não
-sabe fazer a conta dos dois últimos dígitos. Quem sabe é o
-`src/utils/document_number.py`, e por isso essa recusa vem de dentro,
-com código próprio.
+Você mandou três campos. Busque o livro e veja o que a API guardou:
+
+```bash
+curl http://localhost:3000/book/62c08a06-38df-429f-bed6-4025917f9c9f \
+  -H "INTERNAL-TOKEN: default_token"
+```
+
+```json
+{"book_key":"62c08a06-38df-429f-bed6-4025917f9c9f","title":"Dom Casmurro","isbn":"9788535910663","year":1899,"pages":256,"author_key":"49ac91f0-6eee-4980-84d0-263669ab4a7d","shelf_key":"2dd8ea55-d195-4f05-a257-ecef7df2c3ab","status":"AVAILABLE","member_key":null,"status_events":[{"status":"AVAILABLE","event_datetime":"2026-09-25T14:02:11.418203"}]}
+```
+
+`title`, `year` e `pages` vieram do catálogo, e o `status` nasce
+`AVAILABLE`. O `status_events` é o histórico do livro: o cadastro já
+deixa a primeira linha. O `shelf_key` é opcional no cadastro: sem ele, o livro
+nasce com `"shelf_key": null`.
+
+#### 5. Os três desfechos ruins do cadastro
+
+Rode o comando 4 de novo, com o mesmo ISBN:
+
+```json
+{"title":"ISBN already registered","description":"There is already a book with the ISBN 9788535910663.","translation":"Já existe um livro cadastrado com este ISBN.","code":"QIT001016"}
+```
+
+**409**, e o catálogo não foi consultado: a API confere o próprio banco
+antes de atravessar a fronteira.
+
+Troque o ISBN por `9780000000001`, que ninguém ensinou ao mock:
+
+```json
+{"title":"ISBN not found in catalog","description":"The ISBN catalog has no record of 9780000000001.","translation":"O catálogo de ISBN não conhece este ISBN.","code":"QIT001018"}
+```
+
+**404** com o código `QIT001018`. O mock responde 404 para tudo que não
+foi ensinado, e a API lê isso como "o catálogo não conhece este ISBN".
+
+Por último, derrube o catálogo e tente mais uma vez:
+
+```bash
+docker compose stop mock
+```
+
+```json
+{"title":"ISBN catalog unavailable","description":"The ISBN catalog did not give a usable answer: no response.","translation":"O catálogo de ISBN não respondeu. Tente novamente em instantes.","code":"QIT001019"}
+```
+
+**502**, não 500: o problema está do outro lado da fronteira. Suba o
+mock de novo com `docker compose start mock` — ele volta vazio, e o
+passo 3 precisa ser repetido.
+
+#### 6. Mover um livro de estante — e a estante lotada
+
+Cadastre um segundo livro (ensine outro ISBN ao mock, como no passo 3,
+e faça o POST **sem** `shelf_key`). Depois tente pô-lo na estante
+`A-01`:
+
+```bash
+curl -i -X PUT http://localhost:3000/book/<book_key do segundo livro>/shelf \
+  -H "INTERNAL-TOKEN: default_token" \
+  -H "Content-Type: application/json" \
+  -d '{"shelf_key": "2dd8ea55-d195-4f05-a257-ecef7df2c3ab"}'
+```
+
+```
+HTTP/1.1 409 Conflict
+
+{"title":"Shelf is full","description":"The shelf A-01 is full (capacity: 1).","translation":"A estante A-01 está lotada (capacidade: 1).","code":"QIT001017"}
+```
+
+A estante tem capacidade 1 e já guarda o primeiro livro. Numa estante
+com vaga, a mesma rota responde **200** com `{book_key, status}`; quem
+quiser conferir o `shelf_key` novo faz o GET do livro depois. Pedir a
+estante onde o livro já está responde **409**
+com o `QIT001025`, antes de qualquer conta de lotação. A conta de lotação é o ponto mais delicado do
+projeto: ela acontece com a estante **travada**, dentro da mesma
+transação que grava o livro, e o porquê está na docstring do
+`_check_capacity`, em `src/controllers/book_controller.py`.
+
+#### 7. Emprestar e devolver
+
+Emprestar pede **para quem**. Cadastre um leitor primeiro — o `email`
+não se repete, e repetir responde **409** com o `QIT001022`:
+
+```bash
+curl -X POST http://localhost:3000/member \
+  -H "INTERNAL-TOKEN: default_token" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Capitu Pádua", "email": "capitu@example.com", "document_number": "111.444.777-35"}'
+```
+
+```json
+{"member_key":"7f3b2c10-5a8e-4f7d-9c61-2e4b8a0d1f95"}
+```
+
+E empreste o livro para ele:
+
+```bash
+curl -X PUT http://localhost:3000/book/62c08a06-38df-429f-bed6-4025917f9c9f/borrow \
+  -H "INTERNAL-TOKEN: default_token" \
+  -H "Content-Type: application/json" \
+  -d '{"member_key": "7f3b2c10-5a8e-4f7d-9c61-2e4b8a0d1f95"}'
+```
+
+A resposta é `{"book_key": "...", "status": "BORROWED"}`; quem quiser
+conferir o `member_key` do leitor faz o GET do livro depois. Um
+`member_key` que não existe responde **404** com o
+`QIT001021`, e o livro continua disponível. Rode o mesmo comando de
+novo:
+
+```json
+{"title":"Invalid book status transition","description":"Book 62c08a06-38df-429f-bed6-4025917f9c9f is BORROWED and cannot change to BORROWED.","translation":"O livro está BORROWED e não pode passar para BORROWED.","code":"QIT001020"}
+```
+
+**409**: emprestar só parte de `AVAILABLE`, e o leitor do primeiro
+empréstimo não é trocado. O `/return` (sem corpo) faz o caminho de
+volta, só parte de `BORROWED` e deixa o livro sem leitor — o GET depois
+mostra `"member_key": null`.
+O livro emprestado continua contando na lotação da estante: a vaga fica
+reservada pra quando ele voltar.
+
+Dois empréstimos do mesmo livro ao mesmo tempo não passam os dois: a
+linha do livro é travada (`SELECT ... FOR UPDATE`) antes da conferência
+do status, e o porquê está na docstring do `_get_locked_book`, em
+`src/controllers/book_controller.py`.
+
+Cada cadastro e cada transição deixa uma linha em `book_status_event`,
+na mesma transação que muda o livro. O histórico vem dentro do próprio
+GET do livro, no campo `status_events`:
+
+```bash
+curl http://localhost:3000/book/62c08a06-38df-429f-bed6-4025917f9c9f \
+  -H "INTERNAL-TOKEN: default_token"
+```
+
+```json
+{"book_key":"62c08a06-38df-429f-bed6-4025917f9c9f","title":"Dom Casmurro","isbn":"9788535910663","year":1899,"pages":256,"author_key":"49ac91f0-6eee-4980-84d0-263669ab4a7d","shelf_key":"2dd8ea55-d195-4f05-a257-ecef7df2c3ab","status":"BORROWED","member_key":"7f3b2c10-5a8e-4f7d-9c61-2e4b8a0d1f95","status_events":[{"status":"AVAILABLE","event_datetime":"2026-09-25T14:02:11.418203"},{"status":"BORROWED","event_datetime":"2026-09-25T14:05:37.902114"}]}
+```
+
+A listagem `GET /books` devolve o livro sem o `status_events`, como na
+base: montar a trilha de cada livro da página custaria uma consulta por
+livro.
+
+Um pedido recusado com 409 não deixa linha. O evento guarda o status e
+o instante, não o leitor: quem está com o livro agora é o `member_key`
+do GET.
+
+#### 8. Mandar um JSON torto
+
+```bash
+curl -X POST http://localhost:3000/book \
+  -H "INTERNAL-TOKEN: default_token" \
+  -H "Content-Type: application/json" \
+  -d '{"isbn": "978853591066", "author_key": "49ac91f0-6eee-4980-84d0-263669ab4a7d"}'
+```
+
+```json
+{"title":"Bad Request","description":"'978853591066' does not match '^\\\\d{13}$' in isbn","translation":"Payload Inválido","code":"QIT000001"}
+```
+
+**400**, com doze dígitos no lugar de treze. Quem recusou foi o
+`src/schemas/post_book.json`, antes da primeira linha da rota rodar:
+pedido torto não chega ao banco nem ao catálogo.
 
 #### Esqueceu o `-H "INTERNAL-TOKEN: ..."`?
 
-A API responde **403** e nem chega a olhar o resto:
-
-```json
-{"title":"Forbidden","description":"Request must be internal","translation":"Requisição precisa ser interna","code":"QIT000002"}
-```
+A API responde **403** com o `QIT000002` e nem olha o resto.
 
 #### Toda resposta vem com um número de protocolo
 
-Repare no `-i` deste comando: ele mostra os **cabeçalhos** da resposta,
-não só o corpo.
+O cabeçalho `x-request-id` da resposta (`curl -i` mostra) é o nome
+único da sua requisição. Procure por ele no log:
 
 ```bash
-curl -i "http://localhost:3000/sample_entities?limit=1" \
-  -H "INTERNAL-TOKEN: default_token"
+docker compose logs api | grep <o seu x-request-id>
 ```
 
-```
-HTTP/1.1 200 OK
-content-type: application/json
-x-request-id: 8f3c1e42-1b0d-4f77-9a55-2e4c9d1f0abc
-...
-```
-
-Esse `x-request-id` é o **número de protocolo** da sua requisição: um
-nome único, criado no instante em que ela chegou. Copie o seu e procure
-por ele no log:
-
-```bash
-docker compose logs api | grep 8f3c1e42
-```
-
-```
-[INFO] bootcamp-api.middlewares.request_logger [8f3c1e42-...] - ENTROU GET /sample_entities?limit=1
-[INFO] bootcamp-api.middlewares.request_logger [8f3c1e42-...] - SAIU 200 GET /sample_entities - 2.9 ms
-```
-
-Duas linhas, o mesmo nome nas duas — e nenhuma outra requisição usa esse
-nome. Serve para o dia em que alguém disser "deu erro por volta das
-14h30": sem o número, você abre o log e encontra mil linhas parecidas, de
-mil requisições diferentes, embaralhadas, porque a API atende várias ao
-mesmo tempo e o log é um só. Com o número, achar a agulha é um `grep`.
-
-Se quem chamou já mandar um `x-request-id`, a API **respeita o que veio**
-e usa o mesmo — é assim que se segue um único pedido atravessando vários
-sistemas:
-
-```bash
-curl -i "http://localhost:3000/sample_entities?limit=1" \
-  -H "INTERNAL-TOKEN: default_token" \
-  -H "X-Request-ID: meu-teste-1"
-```
-
-Experimente mandar um valor esquisito nesse cabeçalho — com espaços, ou
-bem comprido. A API não devolve o que você mandou: ela troca por um novo.
-O porquê está em `src/utils/request_context.py`, e é uma das poucas
-lições de segurança que cabem em cinco linhas.
-
-> Só o `/` e o `/health_check` não aparecem no log: o Docker consulta o
-> health check a cada três segundos, e sem essa exceção o log seria
-> quase só isso. Eles ganham o `x-request-id` como todo mundo — o que
-> não ganham é a linha de log.
+Aparecem as linhas daquela requisição, e só dela — inclusive as
+`OUTGOING REQUEST` e `INCOMING RESPONSE` da ida ao catálogo. Se quem
+chamou já mandar um `X-Request-ID`, a API usa o mesmo; um valor
+esquisito (com espaço, comprido demais) é trocado por um novo, e o
+porquê está em `src/utils/request_context.py`.
 
 ### Todas as rotas
 
-Sete endereços — este é o mapa inteiro da API:
-
 | Método e rota | O que faz | Responde |
 |---|---|---|
-| `GET /` | diz qual serviço é este | `200` + nome e id |
-| `GET /health_check` | diz se a API está de pé | `204`, sem corpo |
-| `POST /sample_entity` | cria uma entidade | `201` + o `sample_entity_key` |
-| `GET /sample_entity/{key}` | busca uma entidade | `200` + a entidade |
-| `GET /sample_entities` | lista, de dez em dez, com filtros | `200` + a página |
-| `PUT /sample_entity/{key}` | muda o status (`success` ou `failed`) | `202` + o `sample_entity_key` |
-| `PUT /webhook/sample_entity/{key}/increment_counter` | soma 1 no contador | `204`, sem corpo |
+| `GET /` | diz qual serviço é este | `200` |
+| `GET /health_check` | diz se a API está de pé | `204` |
+| `POST /author` | cadastra um autor; `document_number` (CPF, `000.000.000-00`) é obrigatório | `201` + `author_key`; `400` `QIT000001` (inclusive sem `document_number`); `409` `QIT001024`; `422` `QIT001023` |
+| `GET /author/{author_key}` | busca um autor | `200`; `404` `QIT001012` |
+| `GET /authors` | lista, de dez em dez | `200` + a página |
+| `POST /shelf` | cadastra uma estante | `201` + `shelf_key`; `400` `QIT000001`; `409` `QIT001014` |
+| `GET /shelf/{shelf_key}` | busca uma estante | `200`; `404` `QIT001013` |
+| `GET /shelves` | lista, de dez em dez | `200` + a página |
+| `POST /member` | cadastra um leitor; `document_number` (CPF, `000.000.000-00`) é obrigatório | `201` + `member_key`; `400` `QIT000001` (inclusive sem `document_number`); `409` `QIT001022`/`QIT001024`; `422` `QIT001023` |
+| `GET /member/{member_key}` | busca um leitor | `200`; `404` `QIT001021` |
+| `GET /members` | lista, de dez em dez | `200` + a página |
+| `POST /book` | cadastra um livro a partir do ISBN, consultando o catálogo | `201` + `{book_key, status}`; `400` `QIT000001`; `404` `QIT001012`/`QIT001013`/`QIT001018`; `409` `QIT001016`/`QIT001017`; `502` `QIT001019` |
+| `GET /book/{book_key}` | busca um livro, com o histórico (`status_events`, do cadastro em diante, em ordem) | `200`; `404` `QIT001015` |
+| `GET /books` | lista, de dez em dez; filtra por `?shelf_key=` | `200` + a página; `404` `QIT001013` |
+| `PUT /book/{book_key}/shelf` | move o livro para a estante do corpo | `200` + `{book_key, status}`; `404` `QIT001015`/`QIT001013`; `409` `QIT001017`/`QIT001025` |
+| `PUT /book/{book_key}/borrow` | `AVAILABLE` → `BORROWED`, para o `member_key` do corpo | `200` + `{book_key, status}`; `400` `QIT000001`; `404` `QIT001015`/`QIT001021`; `409` `QIT001020` |
+| `PUT /book/{book_key}/return` | `BORROWED` → `AVAILABLE`, e o livro fica sem leitor | `200` + `{book_key, status}`; `404` `QIT001015`; `409` `QIT001020` |
 
-As cinco de baixo exigem o `INTERNAL-TOKEN` (seção 6). As duas de cima
-são abertas — a primeira você já usou: foi ela que respondeu no
-navegador.
-
-Os parâmetros da listagem, todos opcionais e combináveis:
-`?limit=` (padrão 10, teto 100) · `?page=` (padrão 0) · `?status=`
-(repetível) · `?name=` · `?email=` · `?document_number=` ·
-`?birthdate_from=` · `?birthdate_to=`. Qualquer outro nome a API
-**recusa** com 400 — é o `src/schemas/get_sample_entities.json` que
-decide, e ele não aceita o que não conhece. Vale a pena errar de
-propósito uma vez:
-
-```bash
-curl "http://localhost:3000/sample_entities?stauts=pending" \
-  -H "INTERNAL-TOKEN: default_token"
-```
-
-Sem essa recusa, um `stauts` com a letra trocada viraria uma lista
-inteira devolvida como se o filtro tivesse funcionado — o pior tipo de
-bug, o que não reclama.
+As duas primeiras são abertas; as outras quinze exigem o `INTERNAL-TOKEN`.
+O livro (no GET e nas listagens) traz o `member_key` de quem está com
+ele, ou `null` quando está disponível. O `GET /book/{book_key}` traz
+também o `status_events`, a trilha do cadastro em diante e em ordem; a
+listagem `GET /books` não traz, e nem as respostas do `POST` e dos três
+`PUT`, que trazem só `{book_key, status}` — quem quiser o livro
+inteiro pede o GET depois. O autor e o leitor sempre trazem o `document_number`: o CPF
+é obrigatório no cadastro, e sem ele a API responde 400. O CPF é único
+dentro de cada tabela: o mesmo CPF pode estar num autor e num leitor.
+As quatro listagens aceitam `?limit=` (padrão 10, teto 100) e `?page=`
+(padrão 0), e devolvem `data`, `limit`, `page` e `is_last_page`.
+Parâmetro com nome desconhecido é recusado com 400 — é o schema da
+listagem (`src/schemas/get_*.json`) que decide.
 
 Para desligar tudo: `Ctrl+C` no terminal da API e depois
-
-```bash
-docker compose down
-```
+`docker compose down`.
 
 ---
 
 ## 2. Rodando os testes
 
 Os testes rodam **na sua máquina**, contra a API que está de pé no
-Docker. Então são dois passos: um de uma vez só, outro toda vez.
+Docker.
 
 **Uma vez só — instalar as dependências de teste:**
 
@@ -397,10 +384,7 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-O `.venv` é uma pasta com um Python só deste projeto. Ele existe pra que
-instalar algo aqui não mexa no Python da sua máquina — e pra que apagar a
-pasta desfaça tudo. No Windows, a segunda linha é
-`.venv\Scripts\activate`.
+No Windows, a segunda linha é `.venv\Scripts\activate`.
 
 **Toda vez — com a API de pé, em outro terminal:**
 
@@ -408,140 +392,105 @@ pasta desfaça tudo. No Windows, a segunda linha é
 pytest
 ```
 
-A API precisa estar respondendo antes. Se você acabou de dar
-`docker compose up`, espere o `(healthy)` aparecer — é o healthcheck do
-`docker-compose.yml` dizendo que a porta já atende. Sem isso, o primeiro
-teste bate numa porta que ainda não responde.
-
-O resultado sai assim:
+Antes do primeiro `pytest`, confira com `docker compose ps` que a `api`
+e o `db` aparecem como `(healthy)`. O resultado de hoje:
 
 ```
-tests/integration/test_healthcheck.py::TestHealthCheck::test_home PASSED
-...
-============================== 35 passed in 1.54s ==============================
+============================== 54 passed in 3.87s ==============================
 ```
 
-Para rodar só um arquivo (ou só um teste), acrescente o caminho:
+| Arquivo | Testes | O que cobre |
+|---|---|---|
+| `tests/integration/test_healthcheck.py` | 6 | raiz, health check, 403, 404, 405 e o acento das mensagens |
+| `tests/integration/author/test_author.py` | 8 | cadastro, sem CPF (400), CPF inválido, CPF sem máscara, CPF repetido, 404, corpo vazio, paginação |
+| `tests/integration/shelf/test_shelf.py` | 4 | cadastro, 404, capacidade abaixo de 1, código repetido |
+| `tests/integration/member/test_member.py` | 10 | cadastro, 404, e-mail repetido, e-mail torto, sem CPF (400), CPF inválido, CPF sem máscara, CPF repetido, mesmo CPF em autor e leitor, paginação |
+| `tests/integration/book/test_book_create.py` | 8 | o cadastro e cada resposta do catálogo |
+| `tests/integration/book/test_book_get.py` | 3 | 404 e o filtro por estante (a listagem sai sem `status_events`) |
+| `tests/integration/book/test_book_shelf.py` | 6 | mover, estante lotada, mesma estante (409, inclusive cheia), 404 |
+| `tests/integration/book/test_book_status.py` | 9 | emprestar com leitor, devolver, as transições inválidas, leitor inexistente, corpo sem leitor, o evento do cadastro, um evento por transição e em ordem, transição recusada sem evento |
+
+Para rodar um arquivo só: `pytest -v tests/integration/book/test_book_create.py`.
+
+O conferidor de estilo roda assim, e hoje o projeto passa sem nenhum
+apontamento:
 
 ```bash
-pytest -v tests/integration/test_healthcheck.py
+python3 -m flake8 .
 ```
 
+Os testes conversam com a API **por HTTP**, como um cliente de verdade
+faria, e nenhum deles importa nada de `src/` (`grep -rn "from src"
+tests/` não volta nada). A única exceção é o `tests/utils/db_utils.py`,
+que fala com o banco direto — não para montar cenário, só para
+**zerar** o banco antes de um teste que conta linhas. O cenário sempre
+nasce pela API, com `POST`.
+
 Os testes leem o seu `.env` sozinhos (é o `tests/conftest.py` que faz
-isso). Trocou a porta da API ali, os testes passam a bater na porta nova
-— você não configura a mesma coisa em dois lugares.
+isso): trocou a porta da API ou do mock ali, os testes passam a bater
+na porta nova.
 
-Os testes conversam com a API **por HTTP**, exatamente como um cliente de
-verdade faria. Eles não espiam o código por dentro: nenhum deles importa
-nada de `src/`. Só sabem: "mandei isso, tem que voltar aquilo".
-
-> Uma exceção, e ela é honesta: `tests/utils/db_utils.py` fala com o
-> banco direto, por SQLAlchemy. Mas não para **montar** cenário — só
-> para **zerar** o banco entre testes que não podem se atrapalhar. O
-> cenário continua nascendo pela API, com `POST`.
-
-Isso tem uma consequência bonita: **este projeto inteiro já foi reescrito
-de um framework para outro, e nenhum teste precisou mudar.** Quando o
-teste descreve o combinado em vez de descrever o código, ele sobrevive à
-reforma.
+---
 
 ## 3. Quando dá errado
 
-Os tropeços mais comuns, com a mensagem que você vai ver:
-
 ### `port is already allocated`
 
-```
-Bind for 0.0.0.0:5432 failed: port is already allocated
-```
-
-Outro programa da sua máquina já usa aquela porta (é comum ter um
-Postgres instalado ocupando a 5432). Não precisa descobrir qual: escolha
-outras portas livres. É pra isto que serve o `.env` —
+Outro programa da sua máquina já usa aquela porta. Escolha outras
+portas livres no `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-— e, dentro dele, tire o `#` da frente destas duas linhas e troque os
-números:
+Dentro dele, tire o `#` da frente destas linhas e troque os números:
 
 ```
 API_PORT=3001
 DB_PORT=5433
+MOCK_PORT=1081
 ```
 
-Mexeu no `DB_PORT`? Então mude **também** a porta da `DATABASE_URL`, no
-mesmo arquivo:
-
-```
-DATABASE_URL=postgresql+psycopg2://bootcamp:bootcamp@localhost:5433/bootcamp
-```
-
-São dois lugares porque são dois pontos de vista. O `DB_PORT` diz em
-que porta **da sua máquina** o banco aparece; a `DATABASE_URL` é o
-endereço que os testes usam para chegar nele de fora do Docker. A API
-lá dentro não usa nenhuma das duas — para ela o banco é `db:5432`, e
-por isso essa linha está fixa no `docker-compose.yml`.
-
-Suba de novo. Agora a API atende em http://localhost:3001 — e nos
-comandos `curl` da seção 1 você troca `3000` por `3001`.
+Mexeu no `DB_PORT`? Mude **também** a porta da `DATABASE_URL`, no
+mesmo arquivo. O `DB_PORT` diz em que porta **da sua máquina** o banco
+aparece; a `DATABASE_URL` é o endereço que os testes usam para chegar
+nele de fora do Docker. A API lá dentro não usa nenhuma das duas — para
+ela o banco é `db:5432` e o catálogo é `mock:1080`, fixos no
+`docker-compose.yml`.
 
 ### `failed to connect to the docker API`
 
-```
-failed to connect to the docker API at unix:///var/run/docker.sock;
-check if the path is correct and if the daemon is running
-```
-
-O Docker não está ligado. Abra o **Docker Desktop** (Mac/Windows) e
-espere ficar verde. No Linux: `sudo systemctl start docker`.
+O Docker não está ligado. Abra o **Docker Desktop** (Mac/Windows). No
+Linux: `sudo systemctl start docker`.
 
 ### `Não consegui falar com a API` / `Não consegui falar com o banco`
 
-Só aparece no atalho local (fora do Docker). Quer dizer que a API ou o
-banco não estão de pé, ou que a porta no seu `.env` não é a que eles
-estão usando. Suba com `docker compose up` e confira as portas.
+A API ou o banco não estão de pé, ou a porta no seu `.env` não é a que
+eles estão usando. Suba com `docker compose up` e confira as portas.
 
 ### `relation "..." does not exist`
 
-```
-psycopg2.errors.UndefinedTable: relation "minha_tabela" does not exist
-```
-
 Você mexeu no `database/database.sql`, e o banco não ficou sabendo.
-Aquele arquivo roda **uma vez só: quando o banco nasce.** Depois disso o
-Postgres nunca mais olha para ele — subir de novo com `docker compose
-up` não adianta, e `docker compose restart db` também não.
-
-Repare no que a mensagem faz com você: ela não diz "seu SQL não rodou",
-diz que a tabela não existe. Você vai reler o seu SQL procurando um erro
-de digitação que não está lá.
-
-Para o banco nascer de novo, já com o schema novo:
+Aquele arquivo roda **uma vez só: quando o banco nasce**. Para o banco
+nascer de novo, já com o schema novo:
 
 ```bash
 docker compose down -v
 docker compose up
 ```
 
-O `-v` é o que apaga o volume — o disco do banco. **Ele leva junto tudo
-que você tinha criado na mão**, as entidades dos `curl` da seção 1. Não
-tem meio-termo: ou o banco nasce de novo com o schema novo, ou continua
-com o antigo. (Em sistema de verdade é outra história — lá ninguém apaga
-o banco, e a mudança de schema entra por um comando aplicado no deploy.)
+O `-v` apaga o volume do banco, e **leva junto tudo que você criou na
+mão**. (O `pytest` também faz o schema novo valer: o
+`DbUtils.rollback()` reaplica o `database.sql` a cada vez que um teste o
+chama.)
 
-### Nada disso resolveu?
+### O `POST /book` responde `QIT001018` para um ISBN que você ensinou
 
-Este comando desliga e limpa **este** projeto (containers, rede e o
-banco com tudo dentro) para você recomeçar do zero:
-
-```bash
-docker compose down -v
-docker compose up
-```
-
-Para ver o que a API está dizendo enquanto roda: `docker compose logs -f api`.
+O mock não bateu a requisição com nada que foi ensinado, e respondeu o
+404 sem corpo dele. Confira o endereço da expectativa: ele precisa
+começar com `/catalog/isbn/`, e o mock precisa ter sido ensinado
+**depois** do último `docker compose up` ou `Mock().clear()` — os dois
+esvaziam o que ele sabia.
 
 ---
 
@@ -550,12 +499,10 @@ Para ver o que a API está dizendo enquanto roda: `docker compose logs -f api`.
 ```
 src/
   app.py           ← liga tudo: rotas, middlewares e tratamento de erro
-  database.py      ← onde a sessão de banco mora (quem cuida do ciclo
-                     dela é middlewares/session_manager.py)
+  database.py      ← onde a sessão de banco mora
   constants.py     ← as configurações, lidas do ambiente
 
   resources/       ← recebe a requisição HTTP e devolve a resposta
-                     (quem liga cada endereço a um resource é o app.py)
   schemas/         ← o formato do que entra: o JSON do corpo e os
                      parâmetros do endereço
   controllers/     ← as regras de negócio: o que pode e o que não pode
@@ -564,7 +511,7 @@ src/
   dtos/            ← traduz o objeto do banco no JSON que sai
   errors/          ← os erros da API, cada um com seu código
   middlewares/     ← o que acontece com TODA requisição
-  connectors/      ← as conversas com outros serviços
+  connectors/      ← as conversas com outros serviços (o catálogo)
   utils/           ← as ferramentas que não são de nenhuma camada
 
 database/
@@ -573,33 +520,26 @@ database/
 tests/             ← os testes
 ```
 
-### Por que tanta pasta?
-
-Porque cada uma tem **um trabalho só**, e só conversa com a vizinha:
+Cada pasta tem **um trabalho só**, e só conversa com a vizinha:
 
 ```
 requisição → resource → controller → repository → banco
-                 ↑           ↑
-             valida o     decide o
-              formato     que pode
+                            ↓
+                        connector → catálogo de ISBN
 ```
 
 O resource não sabe SQL. O repository não sabe o que é uma regra de
-negócio. Um teste rápido para saber se uma linha está na pasta certa:
-**nenhum `raise` mora em `resources/`** — quem recusa é o schema, antes,
-ou o controller, depois. Confira você mesmo:
+negócio. O connector não decide o que um 404 do catálogo significa —
+quem decide é o controller. E **nenhum `raise` mora em `resources/`**
+(`grep -rn "raise" src/resources/` não volta nada).
 
-```bash
-grep -rn "raise" src/resources/
-```
-
-Não volta nada, e isso é de propósito. Quando você precisa trocar o banco, mexe numa pasta. Quando a
-regra muda, mexe na outra. É isso que permite um time inteiro trabalhar
-no mesmo projeto sem pisar no pé um do outro.
+O mapa completo — o que cada pasta pode e não pode, o caminho de uma
+requisição e o "onde eu mexo quando quero..." — está em
+[`docs/como-o-projeto-e-organizado.md`](docs/como-o-projeto-e-organizado.md).
 
 ---
 
-## 5. Configuração e senhas
+## 5. Configuração, o catálogo e o mock server
 
 Toda configuração entra por **variável de ambiente** — nunca escrita no
 meio do código.
@@ -612,14 +552,60 @@ meio do código.
 - `.env.example` → vai para o Git, e é a cópia de onde você parte. Só
   tem valor de mentirinha.
 
-Essa separação não é frescura. Senha commitada em repositório é uma das
-formas mais comuns de vazamento de dados no mundo real, e não tem
-desfazer: uma vez no histórico, está lá para sempre.
+Valor padrão de senha em arquivo versionado só vale porque aqui é um
+projeto de estudo. Em sistema de verdade, segredo não tem padrão: ele
+falta, e a aplicação se recusa a subir sem ele.
 
-Uma ressalva honesta: valor padrão de senha em arquivo versionado só
-vale porque aqui é um projeto de estudo, sem dado de ninguém. Em
-sistema de verdade, segredo não tem padrão — ele falta, e a aplicação
-se recusa a subir sem ele.
+### O catálogo de ISBN
+
+O `src/connectors/catalog_connector.py` fala com o catálogo. Ele tem
+um método:
+
+| Método | Chamada | Espera de volta |
+|---|---|---|
+| `get_by_isbn(isbn)` | `GET {CATALOG_API_URL}/isbn/{isbn}` | `200` com `{"title", "authors": [...], "year", "pages"}`, ou `404` quando não conhece o ISBN |
+
+O connector devolve a resposta como veio; quem decide o que cada
+status significa é o `BookController`: 200 vira livro, 404 vira
+`QIT001018`, qualquer outro status — ou nenhuma resposta, com a conexão
+caída ou o timeout de 5 segundos estourado — vira `502` `QIT001019`.
+
+O endereço segue a mesma regra do banco:
+
+- dentro do compose, a API encontra o catálogo em
+  `http://mock:1080/catalog`, fixo no `docker-compose.yml`. O
+  `/catalog` é o prefixo deste serviço dentro do mock;
+- na sua máquina, o mock atende na porta `1080` (troque com `MOCK_PORT`
+  no `.env`). É por ela que os testes o ensinam.
+
+### O mock server
+
+O `mock` é a imagem oficial do [MockServer](https://www.mock-server.com/),
+na versão fixa `5.11.1`. Ele sobe **vazio**; quem ensina o que ele
+responde é o teste, antes de chamar a API, por dois arquivos de
+`tests/utils/`:
+
+| Arquivo | O que tem |
+|---|---|
+| `mock_utils.py` | `Mock`, o cliente do mock: `clear()` esquece tudo, `add_expectations()` ensina uma resposta, `retrieve_requests()` e `verify()` contam o que ele recebeu |
+| `mock_generator.py` | `CatalogMock`, uma resposta pronta por caso: `GET_isbn()` (200), `GET_isbn_not_found()` (404), `GET_isbn_server_error()` (500) e `GET_isbn_connection_dropped()` (conexão derrubada) |
+
+O ritual de um teste que passa pelo catálogo é sempre este:
+
+```python
+Mock().clear()
+CatalogMock.GET_isbn(isbn=isbn)
+status, response = RequestGenerator.POST_book(payload)
+received_requests = Mock().retrieve_requests("GET", f"/catalog/isbn/{isbn}")
+```
+
+O `clear()` vem primeiro porque o mock guarda o que o teste anterior
+ensinou. O `retrieve_requests()` prova a fronteira nos dois sentidos:
+`len(received_requests) == 1` diz que a API consultou o catálogo, e
+`received_requests == []` diz que ela parou antes — é assim que o teste
+do ISBN repetido prova que o catálogo não foi incomodado.
+
+---
 
 ## 6. Autenticação
 
@@ -630,65 +616,72 @@ INTERNAL-TOKEN: default_token
 ```
 
 Sem ele, a API responde **403**. `default_token` é o valor padrão; para
-trocar, ponha `INTERNAL_TOKEN=outra_coisa` no seu `.env`.
+trocar, ponha `INTERNAL_TOKEN=outra_coisa` no seu `.env`. Ficam abertas
+só a rota raiz e o `/health_check`, que o próprio Docker consulta.
 
-Ficam abertas, de propósito, só duas: a rota raiz e o `/health_check`
-— esta última porque quem a consulta é o próprio Docker, que não tem
-como mandar cabeçalho.
+O connector faz o mesmo na outra direção: toda chamada ao catálogo leva
+o `INTERNAL-TOKEN` de `CATALOG_API_INTERNAL_TOKEN`, e o primeiro teste
+de `test_book_create.py` confere que ele foi mandado.
 
 ---
 
 ## 7. Os códigos de erro
 
-Todo erro da API responde no mesmo formato, com um código próprio:
+Todo erro da API responde no mesmo formato:
 
 ```json
 {
-  "title": "Bad Request",
-  "description": "'hello' is a required property",
-  "translation": "Payload Inválido",
-  "code": "QIT000001"
+  "title": "Shelf is full",
+  "description": "The shelf A-01 is full (capacity: 1).",
+  "translation": "A estante A-01 está lotada (capacidade: 1).",
+  "code": "QIT001017"
 }
 ```
 
-| Código      | Quando acontece                                  |
-|-------------|--------------------------------------------------|
-| `QIT000001` | o JSON enviado está fora do formato              |
-| `QIT000002` | faltou o `INTERNAL-TOKEN`, ou ele está errado    |
-| `QIT000010` | os parâmetros do endereço se contradizem         |
-| `QIT000404` | essa rota não existe                             |
-| `QIT000405` | a rota existe, mas não aceita esse método        |
-| `QIT000500` | erro inesperado (o time é avisado)               |
-| `QIT001001` | a entidade procurada não existe                  |
-| `QIT001002` | a entidade já está num status final              |
-| `QIT001003` | o CPF tem o formato certo, mas não é um CPF      |
-| `QIT001004` | já existe um cadastro com esse CPF               |
-| `QIT001005` | já existe um cadastro com esse e-mail            |
-| `QIT001006` | a pessoa é menor de idade                        |
-| `QIT001007` | a data de nascimento não existe no calendário    |
+| Código      | HTTP | Quando acontece                                        |
+|-------------|------|--------------------------------------------------------|
+| `QIT000001` | 400  | o JSON ou a query string estão fora do formato         |
+| `QIT000002` | 403  | faltou o `INTERNAL-TOKEN`, ou ele está errado          |
+| `QIT000404` | 404  | essa rota não existe                                   |
+| `QIT000405` | 405  | a rota existe, mas não aceita esse método              |
+| `QIT000500` | 500  | erro inesperado                                        |
+| `QIT001012` | 404  | o autor não existe                                     |
+| `QIT001013` | 404  | a estante não existe                                   |
+| `QIT001014` | 409  | já existe uma estante com esse código                  |
+| `QIT001015` | 404  | o livro não existe                                     |
+| `QIT001016` | 409  | já existe um livro com esse ISBN                       |
+| `QIT001017` | 409  | a estante está lotada                                  |
+| `QIT001018` | 404  | o catálogo de ISBN não conhece esse ISBN               |
+| `QIT001019` | 502  | o catálogo de ISBN não respondeu, ou respondeu errado  |
+| `QIT001020` | 409  | o status do livro não permite essa transição           |
+| `QIT001021` | 404  | o leitor não existe                                    |
+| `QIT001022` | 409  | já existe um leitor com esse e-mail                    |
+| `QIT001023` | 422  | o CPF (do autor ou do leitor) tem a máscara certa e não existe |
+| `QIT001024` | 409  | já existe um autor com esse CPF, ou um leitor com esse CPF |
+| `QIT001025` | 409  | o livro já está na estante para onde se pediu movê-lo  |
 
-Um código estável vale mais que uma mensagem bonita: quem integra com a
-API programa em cima do código, não do texto.
+Quem integra com a API programa em cima do `code`, não do texto: o texto
+pode melhorar, o código não muda.
 
-Os números não são sorteados. Eles vêm em duas faixas:
+Os números vêm em duas faixas:
 
-- **`QIT000…`** — os erros que **toda** API tem: JSON errado, sem token,
-  rota inexistente. Estão em `src/errors/base_error.py` e você não
-  precisa mexer neles.
-- **`QIT001…`** — os erros das **regras deste projeto**. Estão em
-  `src/errors/custom_errors.py`, e é aí que os seus entram: o próximo
-  livre é o `QIT001008`.
+- **`QIT000…`** — os erros que **toda** API tem, em
+  `src/errors/base_error.py`. O `QIT000010` também mora lá, pronto para
+  recusar parâmetros que se contradizem; nenhuma rota da biblioteca o
+  usa hoje.
+- **`QIT001…`** — os erros das **regras deste projeto**, em
+  `src/errors/custom_errors.py`. A biblioteca começa no `QIT001012`
+  porque os números anteriores ficaram com o projeto base. O próximo
+  livre é o **`QIT001026`**.
 
-Não repita um número. Se repetir, a API **não sobe** — tem uma checagem
-no start (`error_verification`, em `src/errors/base_error.py`) que
-procura código repetido e derruba a aplicação de propósito. Parecer
-chato agora é melhor que dois erros diferentes chegarem ao cliente com o
-mesmo código.
+Não repita um número: a checagem `error_verification`, em
+`src/errors/base_error.py`, derruba a API no start se dois erros usarem
+o mesmo código.
 
 ---
 
 ## 8. A licença
 
 Este projeto é **MIT** — pode usar, copiar, modificar e levar para o seu
-portfólio, inclusive em trabalho pago. O único pedido é manter o arquivo
-`LICENSE` junto quando você distribuir o código.
+portfólio. O único pedido é manter o arquivo `LICENSE` junto quando você
+distribuir o código.

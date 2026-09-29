@@ -1,0 +1,20 @@
+{
+  "title": "GetBooks",
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "string",
+      "pattern": "^(100|[1-9]?[0-9])$"
+    },
+    "page": {
+      "type": "string",
+      "pattern": "^[0-9]{1,9}$"
+    },
+    "shelf_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    }
+  },
+  "additionalProperties": false
+}
