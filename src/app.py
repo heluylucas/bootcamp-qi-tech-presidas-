@@ -141,7 +141,7 @@ def create_app() -> FastAPI:
     )
 
     application.add_api_route("/author", author_resource.on_post, methods=["POST"])
-    application.add_api_route("/author/{author_key}", author_resource.on_get_by_key, methods=["GET"])
+    application.add_api_route("/author/{author_key}", author_resource.on_get_by_key, methods=["POST"])
     application.add_api_route("/authors", author_resource.on_get_list, methods=["GET"])
 
     application.add_api_route("/shelf", shelf_resource.on_post, methods=["POST"])
