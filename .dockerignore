@@ -6,6 +6,8 @@
 
 .git
 .gitignore
+# O .github ainda nao existe aqui. Esta na lista de proposito: e mais
+# barato ignorar antes do que descobrir depois que o build engordou.
 .github
 
 # Ambiente virtual e caches do Python: a imagem instala tudo do zero.

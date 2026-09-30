@@ -6,3 +6,8 @@
 pytest==7.4.4
 pytest-cov==4.1.0
 python-dotenv==1.0.1
+
+# O conferidor de estilo. As regras deste projeto estao no .flake8, na
+# raiz — sem esta linha aqui, aquele arquivo seria um combinado que
+# ninguem tem como cobrar. Roda com:  python3 -m flake8 .
+flake8==7.3.0

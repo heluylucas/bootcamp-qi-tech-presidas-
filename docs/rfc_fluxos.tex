@@ -1,0 +1,241 @@
+% =====================================================================
+%  RFC -- secao "Fluxos" (Implementacao)
+%  Arquivo compilavel sozinho para revisao. Para levar para a RFC,
+%  copie o trecho entre "INICIO DA SECAO" e "FIM DA SECAO".
+%  Pacotes necessarios na RFC: amssymb, enumitem, tikz (arrows.meta), url, underscore
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{\usepackage{mathptmx}\usepackage{courier}}
+\IfFileExists{portuguese.ldf}{\usepackage[brazil]{babel}}{}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\usepackage[strings]{underscore}
+
+\newcommand{\tb}[1]{\texttt{#1}}
+\newcommand{\rs}{R\$\,}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{3pt}
+\emergencystretch=3em
+\setlist[enumerate]{itemsep=1pt,topsep=2pt,leftmargin=1.6em}
+\setlist[itemize]{itemsep=1pt,topsep=2pt,leftmargin=1.4em}
+
+\begin{document}
+
+% ======================= INICIO DA SECAO =============================
+\subsection*{Fluxos}
+
+\textbf{Esqueleto comum.} Toda operação que move dinheiro segue a mesma ordem:
+\emph{ler $\to$ travar $\to$ checar idempotência $\to$ decidir $\to$ escrever $\to$ \tb{commit}}.
+Nenhuma escrita acontece antes da última verificação, então uma recusa não tem nada a desfazer.
+Se uma exceção surge depois da primeira escrita, o middleware de sessão dá \tb{rollback} e o
+cliente recebe 500 com o banco intacto. O \tb{commit} é a última linha do controller antes do
+\tb{return}.
+
+% ---------------------------------------------------------------------
+\subsubsection*{Abrir conta --- caminho feliz}
+\begin{enumerate}
+  \item Busca \tb{customer} pelo \tb{customer_key} do caminho.
+  \item Trava a linha do cliente (\tb{SELECT ... FOR UPDATE}).
+  \item Conta as contas do cliente com status diferente de \tb{CLOSED}: zero.
+  \item Cria \tb{account} com \tb{balance = 0}. Conta: \tb{ACTIVE}.
+  \item Grava \tb{account_status_event} (\tb{null} $\to$ \tb{ACTIVE}).
+  \item \tb{commit}; 201 com \tb{account_key}.
+\end{enumerate}
+
+\textbf{Abrir conta --- falha: dois pedidos simultâneos para o mesmo cliente.} Sem o passo 2, os dois
+contariam zero no passo 3 e o cliente ficaria com duas contas. Com ele, o segundo pedido espera a
+trava, conta uma conta ao ser liberado e recebe 409 (\tb{BNK002002}) sem ter escrito nada.
+
+% ---------------------------------------------------------------------
+\subsubsection*{Transferência --- caminho feliz}
+\begin{enumerate}
+  \item O schema exige \tb{type}, \tb{amount}, \tb{destination_account_key} e o cabeçalho
+        \tb{Idempotency-Key}.
+  \item Busca a conta de origem pelo \tb{account_key} e confere \tb{account.customer_id} = cliente
+        do caminho. Se não for, 404, a mesma resposta de conta inexistente.
+  \item Busca a conta de destino. Confere que é diferente da origem.
+  \item Trava as duas linhas de \tb{account} com \tb{FOR UPDATE}, sempre em ordem crescente de
+        \tb{id}.
+  \item Procura \tb{transaction} com (\tb{requester_account_id}, \tb{idempotency_key}) e não
+        encontra.
+  \item Com as linhas travadas, confere as duas contas \tb{ACTIVE} e origem com
+        \tb{balance} $\geq$ \tb{amount} + 200.
+  \item Grava \tb{transaction} (\tb{TRANSFER}, \tb{fee_amount = 200}, \tb{request_hash}).
+  \item Grava três \tb{ledger_entry}, cada uma com \tb{balance_after}:
+        \tb{DEBIT/PRINCIPAL} e \tb{DEBIT/FEE} na origem, \tb{CREDIT/PRINCIPAL} no destino.
+  \item Atualiza \tb{account.balance} das duas contas.
+  \item \tb{commit}, que libera as travas; 201 com \tb{transaction_key} e o novo saldo.
+\end{enumerate}
+
+\textbf{Transferência --- falha: saldo insuficiente (a mais provável).} O passo 6 recusa. Nenhuma
+escrita aconteceu, então o \tb{rollback} só libera as travas. O cliente recebe 409
+(\tb{BNK003003}) e os dois saldos continuam iguais.
+
+\textbf{Transferência --- falha: duas transferências da mesma conta ao mesmo tempo (a mais cara).}
+A conta tem \rs 100 e chegam dois pedidos de \rs 80.
+
+\begin{center}
+\begin{tikzpicture}[>=Stealth, font=\small,
+  head/.style={draw,thick,minimum width=3.3cm,minimum height=0.9cm,align=center},
+  msg/.style={->,thick},
+  ret/.style={->,dashed},
+  lbl/.style={font=\footnotesize,fill=white,inner sep=1pt}]
+  \def\xa{0} \def\xd{6.4} \def\xb{12.8}
+  % cabecas
+  \node[head] at (\xa,0) {Pedido A\\(\rs 80)};
+  \node[head] at (\xd,0) {PostgreSQL\\(conta X, \rs 100)};
+  \node[head] at (\xb,0) {Pedido B\\(\rs 80)};
+  % linhas de vida
+  \foreach \x in {\xa,\xd,\xb} \draw[dashed,gray] (\x,-0.45) -- (\x,-8.9);
+  % A trava
+  \draw[msg] (\xa,-1.1) -- node[lbl,above] {\tb{SELECT ... FOR UPDATE}} (\xd,-1.1);
+  \draw[ret] (\xd,-1.6) -- node[lbl,above] {trava concedida; saldo 100} (\xa,-1.6);
+  % B tenta travar
+  \draw[msg] (\xb,-2.3) -- node[lbl,above] {\tb{SELECT ... FOR UPDATE}} (\xd,-2.3);
+  \fill[black] (\xb-0.08,-2.45) rectangle (\xb+0.08,-5.75);
+  \node[font=\footnotesize,align=right,anchor=east] at (\xb-0.25,-4.1) {B fica parado,\\esperando a trava};
+  % A decide e escreve
+  \node[font=\footnotesize,anchor=west] at (\xa+0.15,-3.0) {$100 \geq 80 + 2$: sim};
+  \draw[msg] (\xa,-3.7) -- node[lbl,above] {grava \tb{transaction} + 3 \tb{ledger_entry}} (\xd,-3.7);
+  \draw[msg] (\xa,-4.5) -- node[lbl,above] {\tb{balance = 18}; \tb{COMMIT}} (\xd,-4.5);
+  \node[font=\footnotesize,anchor=west] at (\xa+0.15,-5.1) {responde 201};
+  % B recebe a trava
+  \draw[ret] (\xd,-5.9) -- node[lbl,above] {trava concedida; saldo 18} (\xb,-5.9);
+  \node[font=\footnotesize,anchor=east] at (\xb-0.15,-6.6) {$18 \geq 80 + 2$: não};
+  \draw[msg] (\xb,-7.3) -- node[lbl,above] {\tb{ROLLBACK} (nada foi escrito)} (\xd,-7.3);
+  \node[font=\footnotesize,anchor=east] at (\xb-0.15,-8.0) {responde 409 (\tb{BNK003003})};
+\end{tikzpicture}
+\end{center}
+
+Sem a trava, A e B leriam \rs 100, os dois aprovariam e \rs 160 sairiam de uma conta que tinha
+\rs 100. Esse é o \emph{lost update}. O \tb{CHECK (balance >= 0)} do banco ainda barraria o
+segundo, mas com um 500, que é um ramo que ninguém desenhou.
+
+\textbf{Transferência --- falha: o cliente reenvia o mesmo pedido (retentativa).} O reenvio passa
+pelos passos 1 a 4. Se o original ainda está em andamento, o reenvio espera a trava no passo 4. No
+passo 5 ele encontra a \tb{transaction} já gravada:
+\begin{itemize}
+  \item com o mesmo \tb{request_hash}, devolve 200 com o corpo original e não executa os passos 6
+        a 10, então nada é debitado de novo;
+  \item com um hash diferente (mesma chave, corpo diferente), devolve 409 (\tb{BNK000004}).
+\end{itemize}
+A checagem de idempotência fica \emph{depois} da trava de propósito. Se viesse antes, um reenvio
+simultâneo passaria pela checagem (o original ainda não gravou), esperaria a trava e, ao ver o saldo
+já debitado, receberia um falso ``saldo insuficiente'' em vez da resposta original. O \tb{UNIQUE(requester_account_id, idempotency_key)} fica como
+rede de segurança.
+
+\textbf{Transferência --- falha: transferências cruzadas (A $\to$ B e B $\to$ A ao mesmo
+tempo).} Se cada pedido travasse primeiro a própria origem, cada um seguraria uma conta e esperaria
+a outra para sempre (\emph{deadlock}). Travando sempre na ordem crescente de \tb{id}, os dois
+disputam a mesma primeira trava: um passa e o outro espera.
+
+% ---------------------------------------------------------------------
+\subsubsection*{Aplicação --- caminho feliz}
+\begin{enumerate}
+  \item O schema exige \tb{product_key}, \tb{side = APPLY}, \tb{amount} e \tb{Idempotency-Key}.
+  \item Busca o cliente e a sua conta não encerrada. Se não tiver, 409 (\tb{BNK006007}).
+  \item Busca \tb{product}. Confere \tb{is_active} e que o vencimento não passou.
+  \item Busca a \tb{suitability_assessment} mais recente. Confere \tb{valid_until} $>$ agora,
+        \tb{risk_level} $\leq$ \tb{max_risk_level} do perfil e \tb{amount} $\geq$
+        \tb{min_application}.
+  \item Busca o preço do dia: o \tb{product_price} de maior \tb{reference_date} $\leq$ hoje.
+  \item Trava a conta. Depois trava a \tb{position} (cliente, produto), ou a cria com
+        \tb{quantity = 0} se ainda não existir.
+  \item Procura \tb{investment_order} com (\tb{customer_id}, \tb{idempotency_key}) e não encontra.
+  \item Confere a conta \tb{ACTIVE} e \tb{balance} $\geq$ \tb{amount}.
+  \item Calcula \tb{quantity = amount / unit_price}, truncada em 8 casas.
+  \item Grava \tb{transaction} \tb{INVESTMENT_APPLY} e um \tb{ledger_entry} \tb{DEBIT}, e
+        atualiza \tb{balance}.
+  \item Grava \tb{investment_order} com \tb{quantity}, \tb{unit_price} e \tb{transaction_id}.
+        Ordem: \tb{EXECUTED}.
+  \item Soma \tb{quantity} e \tb{amount} em \tb{position.quantity} e
+        \tb{position.invested_amount}.
+  \item \tb{commit}; 201 com \tb{order_key}, \tb{quantity} e \tb{unit_price}.
+\end{enumerate}
+
+A ordem das travas é sempre \emph{conta, depois posição}. Como cada cliente tem uma só conta
+aberta, a trava da conta enfileira todas as ordens daquele cliente. Por isso a posição pode ser
+criada no passo 6 sem risco de duas ordens simultâneas tentarem criá-la.
+
+\textbf{Aplicação --- falha: produto acima do perfil (a mais provável).} O passo 4 recusa antes de
+qualquer trava ou escrita. O cliente recebe 422 (\tb{BNK006003}). Perfil vencido ou inexistente
+recusa no mesmo passo, com 409 (\tb{BNK004004} / \tb{BNK004005}).
+
+\textbf{Aplicação --- falha: exceção entre os passos 10 e 12 (a mais cara).} O débito já está na
+sessão, mas a ordem ou a posição não foram gravadas. O \tb{rollback} desfaz débito, lançamento e
+ordem juntos, e o cliente recebe 500 com o saldo intacto. É isso que garante que \emph{dinheiro
+nunca sai da conta sem virar posição}.
+
+% ---------------------------------------------------------------------
+\subsubsection*{Resgate --- o que muda em relação à aplicação}
+\begin{itemize}
+  \item \textbf{Sem checagem de perfil no passo 4.} O cliente sempre pode tirar o dinheiro, mesmo
+        com perfil vencido. No lugar dela: produto com \tb{liquidity = AT_MATURITY} e hoje $<$
+        \tb{maturity_date} dá 422 (\tb{BNK006005}).
+  \item \textbf{No passo 8,} com a posição travada, confere
+        \tb{position.quantity} $\geq$ quantidade a resgatar, sendo essa quantidade
+        \tb{amount / unit_price} ou toda a posição se \tb{redeem_all}.
+  \item \textbf{Passos 10 a 12 invertidos:} \tb{INVESTMENT_REDEEM} com \tb{ledger_entry}
+        \tb{CREDIT}. A posição perde a quantidade resgatada, e \tb{invested_amount} cai na mesma
+        proporção. Uma posição zerada fica com \tb{quantity = 0} e não é apagada.
+\end{itemize}
+
+\textbf{Resgate --- falha: valor maior que a posição.} O passo 8 recusa com a posição travada, e
+nada foi escrito. O cliente recebe 409 (\tb{BNK006004}).
+
+% ---------------------------------------------------------------------
+\subsubsection*{Suitability --- caminho feliz}
+\begin{enumerate}
+  \item Busca o cliente pelo \tb{customer_key}.
+  \item Confere sete respostas, uma por \tb{suitability_question}, cada \tb{option} pertencendo à
+        sua pergunta.
+  \item Soma os \tb{points}. Se Q3 ou Q5 tiver a opção 1, o perfil é \tb{CONSERVATIVE} com
+        \tb{forced_by_rule = true}. Se não, o perfil sai da faixa de pontos em
+        \tb{investor_profile}.
+  \item Grava a \tb{suitability_assessment} (\tb{valid_until} = agora + 24 meses) e as sete
+        \tb{suitability_answer}.
+  \item \tb{commit}; 201 com perfil, pontuação e validade.
+\end{enumerate}
+A avaliação anterior não é alterada. Ela vira histórico porque o perfil vigente é sempre a
+avaliação mais recente.
+
+\textbf{Suitability --- falha: resposta faltando ou repetida.} O passo 2 recusa antes de qualquer
+escrita. O cliente recebe 422 (\tb{BNK004002}).
+
+% ---------------------------------------------------------------------
+\bigskip
+\hrule
+\medskip
+\textbf{Principal desafio}
+
+\textbf{Qual é:} mover dinheiro entre contas, e entre conta e investimento, sem criar,
+duplicar ou sumir com um centavo.
+
+\textbf{Por que é difícil:} cada operação são de três a cinco escritas em tabelas diferentes. A
+solução óbvia (ler o saldo, checar, escrever) quebra em três cenários. Com dois pedidos
+simultâneos, os dois leem o mesmo saldo (\rs 160 saem de \rs 100). Com o cliente reenviando após um
+timeout, a transferência sai duas vezes. Com uma falha no meio, o débito é gravado sem a posição.
+
+\textbf{Como o desenho resolve:}
+\begin{itemize}
+  \item Uma transação de banco por operação, com \tb{commit} só na última linha: tudo ou nada.
+  \item \tb{SELECT ... FOR UPDATE} nas linhas lidas para decidir, sempre na mesma ordem: contas
+        por \tb{id} crescente, depois posição.
+  \item Idempotência checada \emph{sob a trava}, com o \tb{UNIQUE(requester_account_id,
+        idempotency_key)} como rede de segurança.
+  \item O invariante \tb{account.balance} $= \Sigma$ créditos $- \Sigma$ débitos de
+        \tb{ledger_entry}, verificado por teste depois de cada cenário acima.
+\end{itemize}
+\hrule
+% ========================= FIM DA SECAO ==============================
+
+\end{document}

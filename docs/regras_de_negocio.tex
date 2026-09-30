@@ -1,0 +1,1730 @@
+% =====================================================================
+%  Pre-RFC: Documento de Regras de Negocio
+%  Desafio Bootcamp QI Tech 2026 -- banco de investimentos
+%  Compilar com pdflatex (duas vezes, por causa do sumario e das tabelas longas)
+% =====================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=2.2cm,headheight=14pt]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% Fonte: Latin Modern se existir (Overleaf tem); senao, Times.
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{\usepackage{mathptmx}\usepackage{courier}}
+
+% Idioma: portugues se existir; senao, so traduz os titulos automaticos.
+\IfFileExists{portuguese.ldf}{%
+  \usepackage[brazil]{babel}%
+}{%
+  \renewcommand{\contentsname}{Sumário}%
+  \renewcommand{\tablename}{Tabela}%
+  \renewcommand{\figurename}{Figura}%
+  \renewcommand{\appendixname}{Apêndice}%
+}
+
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{array,longtable,booktabs,tabularx}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\usepackage[strings]{underscore}
+
+% ---------------------------------------------------------------------
+% Macros do documento
+% ---------------------------------------------------------------------
+\newcommand{\banco}{Quant Bank}            % nome provisorio do banco -- troquem aqui
+\newcommand{\fundo}{FGV Quant Capital}     % fundo ficticio da entidade
+\newcommand{\obr}{\textbf{[OBR]}}          % obrigatorio pelo desafio
+\newcommand{\dec}{\textbf{[DEC]}}          % decisao nossa (pode mudar)
+\newcommand{\ext}{\textbf{[EXT]}}          % incremento para se destacar
+\newcommand{\rs}{R\$\,}
+\DeclareUrlCommand\rota{\urlstyle{tt}}     % caminhos de rota: \rota|/customer/{customer_key}|
+\newcommand{\tb}[1]{\texttt{#1}}           % nomes de tabela/coluna/codigo
+
+% Lista de regras: "RN-XXX-00  texto"
+\newlist{regras}{description}{1}
+\setlist[regras]{style=nextline,leftmargin=1.2cm,font=\normalfont\bfseries,itemsep=4pt}
+
+\setlist[itemize]{itemsep=2pt,topsep=4pt}
+\setlist[enumerate]{itemsep=2pt,topsep=4pt}
+
+% Blocos de codigo (somente ASCII dentro deles)
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  frame=single,
+  framesep=4pt,
+  xleftmargin=6pt,
+  xrightmargin=6pt,
+  showstringspaces=false
+}
+
+% Caixa simples em preto e branco para avisos
+\newenvironment{aviso}[1]{%
+  \par\medskip\noindent\tabularx{\linewidth}{|X|}\hline
+  \textbf{#1}\par\smallskip}{%
+  \\\hline\endtabularx\par\medskip}
+
+% Cabecalho e rodape
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small Pré-RFC --- Regras de Negócio do \banco}
+\rhead{\small Bootcamp QI Tech 2026}
+\cfoot{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.8em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.8em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.8em}{}
+
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\emergencystretch=3em
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.25}
+\setcounter{tocdepth}{2}
+
+% =====================================================================
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{3cm}
+{\large Bootcamp QI Tech 2026 --- Projeto prático\par}
+\vspace{1.2cm}
+{\Huge\bfseries Documento de Regras de Negócio\par}
+\vspace{0.4cm}
+{\Large (pré-RFC)\par}
+\vspace{1.2cm}
+{\Large \banco: uma API de banco digital\\ com módulo de investimentos\par}
+\vspace{2cm}
+\begin{tabular}{ll}
+\textbf{Time:} & \textless nome 1\textgreater{} · \textless nome 2\textgreater{} · \textless nome 3\textgreater \\
+\textbf{Versão:} & 0.3 (com enunciado da Aula 1 e modelo de receita) \\
+\textbf{Data:} & 29/09/2026 \\
+\textbf{Entrega do projeto:} & 12/10/2026, até 12h (repositório + RFC em PDF) \\
+\textbf{Avaliação:} & 14 e 15/10 (banca) · 16/10 (finalistas) \\
+\textbf{Fase 2:} & 17 e 18/10/2026, presencial, com um desafio que complementa o primeiro \\
+\end{tabular}
+\vfill
+{\small Este documento não é a RFC oficial. Ele é o ``mapa'' do time: tudo o que o sistema faz,
+barra e guarda, escrito antes de qualquer linha de código. A RFC (2 a 4 páginas, no modelo da
+organização) será um resumo técnico deste material.\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{Para que serve este documento}
+% =====================================================================
+
+A ordem de trabalho que o time combinou é: \textbf{(1)} regras de negócio $\to$
+\textbf{(2)} RFC $\to$ \textbf{(3)} código. Este documento é a etapa (1). Ele responde, em
+linguagem simples, três perguntas:
+
+\begin{enumerate}
+  \item \textbf{O que o sistema oferece?} (serviços, rotas)
+  \item \textbf{O que o sistema permite e o que ele barra?} (regras de negócio, erros)
+  \item \textbf{O que o sistema guarda?} (tabelas do banco de dados)
+\end{enumerate}
+
+A regra de ouro das aulas vale aqui: \emph{regra de negócio é um \texttt{if} no controller, e cada
+\texttt{if} nasce de um teste vermelho}. Por isso toda regra deste documento tem um código
+(ex.: \textbf{RN-CON-03}) --- cada código deve virar pelo menos um teste automatizado.
+
+\subsection*{Legenda usada em todo o documento}
+
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\obr & Obrigatório: exigido pelo enunciado (as 5 entregas e as restrições R1--R8) ou indispensável para garantir o dinheiro. \\
+\dec & Decisão nossa: escolhemos assim, mas dá para mudar se o time preferir. \\
+\ext & Incremento: não é necessário para entregar; serve para nos destacar. \\
+\end{tabularx}
+
+\begin{aviso}{O que o enunciado (Aula 1) exige e o que ele deixa livre}
+\textbf{Obrigatório:} (1) cadastro de cliente; (2) conta vinculada a um cliente; (3) transação com
+controle de saldo; (4) tarifa na transferência; (5) extrato paginado.\\
+\textbf{Livre (e por isso precisa ser defendido na RFC):} quantas entidades existem, como o saldo é
+controlado, como a tarifa é cobrada, como o dinheiro é representado, rotas, verbos e formato, e a
+quantidade de testes.\\
+Tudo o que vai além das cinco entregas --- o módulo de investimentos inteiro, o valor da tarifa, o
+limite de contas, saque e depósito --- é decisão nossa.
+\end{aviso}
+
+% =====================================================================
+\section{Contexto}
+% =====================================================================
+
+\subsection{Quem é a QI Tech (e por que isso importa para nós)}
+
+A QI Tech é uma empresa de \emph{infraestrutura financeira}: em vez de ter clientes pessoa
+física, ela vende, por meio de APIs, a ``tubulação'' que outras empresas usam para oferecer
+produtos financeiros. Foi a primeira Sociedade de Crédito Direto autorizada pelo Banco
+Central (2018) e hoje atua em quatro frentes principais: \emph{Banking as a Service}
+(contas digitais, Pix, pagamentos), \emph{Lending as a Service} (emissão de crédito),
+soluções de risco (KYC, antifraude, motor de crédito) e uma DTVM que faz
+\textbf{administração e custódia de fundos de investimento}.
+
+Duas consequências práticas para o nosso projeto:
+
+\begin{itemize}
+  \item A banca vai olhar com lupa o \textbf{núcleo bancário}: consistência do saldo,
+        transações que não duplicam, erros bem explicados, identificadores seguros. É o
+        dia a dia deles. Nosso diferencial não pode enfraquecer esse núcleo.
+  \item O módulo de investimentos conversa diretamente com a vertical de
+        \textbf{administração e custódia de fundos} da QI Tech. Um banco que registra cotas
+        de um fundo, publica valor de cota e controla posição dos cotistas é um ótimo
+        ``gancho'' para a apresentação final.
+\end{itemize}
+
+\subsection{O desafio}
+
+Construir a API de um banco a partir do repositório-base \tb{bootcamp-base-api}
+(Python 3.11 + FastAPI + PostgreSQL 16 + SQLAlchemy + Docker). A entrega é o
+\textbf{repositório} e a \textbf{apresentação em PDF} (slides ou documento, seguindo a lógica de
+uma RFC), até \textbf{12/10/2026 às 12h} (a Aula 1 dizia 13/10; a data foi antecipada na Aula 3).
+O que estiver no repositório nessa data é o que a banca vê. Pontos práticos do enunciado:
+\begin{itemize}
+  \item repositório \textbf{público no GitHub} no dia da entrega (pode ficar privado até lá);
+  \item sobe com \tb{docker compose}, testes com \tb{pytest}, e roda na máquina do jurado com
+        \textbf{Linux};
+  \item a apresentação precisa \textbf{mostrar o ecossistema} e explicar a regra de negócio: o
+        que o sistema permite, o que barra e por quê;
+  \item times de até 3 pessoas;
+  \item a fase 2 (17 e 18/10) traz um desafio que \emph{complementa} o primeiro, então vale manter o
+        código organizado por módulos, fácil de estender.
+\end{itemize}
+A avaliação também cobra as restrições R1 a R8 (Seção~\ref{sec:restricoes}).
+
+\subsection{A nossa proposta: um banco de investimentos}
+
+Além do núcleo obrigatório (clientes, contas, depósitos, saques, transferências com tarifa e
+extrato), o \banco{} oferece uma jornada de investimento completa, porém simulada:
+
+\begin{enumerate}
+  \item \textbf{Perfil do investidor (suitability):} o cliente responde um questionário
+        inspirado nas regras de suitability da ANBIMA e da Resolução CVM 30, e recebe um perfil
+        (Conservador, Moderado ou Arrojado).
+  \item \textbf{Carteira sugerida:} para cada perfil existe uma carteira-modelo; o sistema
+        diz ``com \rs 10.000 você colocaria tanto em cada produto''.
+  \item \textbf{Aplicação e resgate simulados:} o dinheiro sai de verdade da conta corrente
+        do cliente (dentro do nosso sistema) e vira \emph{posição} em títulos de renda fixa ou
+        em cotas do fundo fictício \textbf{\fundo}.
+  \item \textbf{Acompanhamento:} posição, valor atualizado e rentabilidade.
+  \item \textbf{Modelo de receita:} o banco ganha com a taxa de administração do fundo, o spread
+        dos títulos que ele mesmo emite, o dinheiro parado em conta e a tarifa de transferência
+        (Seção~\ref{sec:receita}).
+\end{enumerate}
+
+\subsubsection*{Resposta à dúvida do time: ``vários ativos é complexo demais?''}
+
+A complexidade \textbf{não está no número de ativos}, e sim no número de \emph{regras de preço}
+diferentes. Se todo produto seguir o mesmo modelo --- uma linha na tabela \tb{product} e um
+preço unitário por dia na tabela \tb{product_price} --- então oferecer 3 ou 10 produtos custa o
+mesmo: adicionar produto é inserir linhas no banco, não escrever código novo. Por isso a
+proposta deste documento é:
+
+\begin{itemize}
+  \item \dec{} MVP com \textbf{5 produtos de renda fixa + 1 fundo} (\fundo), todos com preço
+        unitário diário tabelado (Seção~\ref{sec:produtos}).
+  \item \dec{} \textbf{Não} oferecer ações, cripto ou ativos com preço de mercado em tempo
+        real: exigiriam um serviço externo de cotação e regras de pregão.
+  \item \ext{} Se sobrar tempo, trocar o preço tabelado por um \emph{connector} que busca o preço
+        em um serviço externo simulado (Mockserver), como ensinado na Aula 3.
+\end{itemize}
+
+\subsection{O que está dentro e fora do escopo}
+
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Dentro do escopo} & \textbf{Fora do escopo (desta entrega)} \\
+\midrule
+Cadastro de clientes (pessoa física) & Pessoa jurídica, conta conjunta \\
+Uma conta corrente por cliente & Cartão, crédito, cheque especial \\
+Depósito, saque e transferência interna simulados & Pix/TED reais, integração com outros bancos \\
+Tarifa de transferência & Login, senha e autenticação do cliente final \\
+Extrato paginado e comprovante & Front-end (a entrega é a API) \\
+Suitability, carteira sugerida, aplicação e resgate & Ações, cripto, derivativos, preço em tempo real \\
+Posição e rentabilidade simuladas & Imposto de renda e IOF (ficam como \ext) \\
+\bottomrule
+\end{tabularx}
+
+% =====================================================================
+\section{Glossário rápido}
+% =====================================================================
+
+Para quem está começando agora, estes são os termos que aparecem no resto do documento.
+
+\begin{longtable}{@{}P{3.6cm}P{12.5cm}@{}}
+\toprule
+\textbf{Termo} & \textbf{O que significa, em português claro} \\
+\midrule
+\endhead
+API & O ``balcão'' do banco: um programa que recebe pedidos pela internet (HTTP) e devolve respostas em JSON. Não tem tela. \\
+Rota (endpoint) & Um endereço do balcão + um verbo. Ex.: \tb{POST /customer} cria um cliente. \\
+Método HTTP & A intenção do pedido: \tb{GET} lê, \tb{POST} cria, \tb{PATCH} altera um pedaço. \\
+Status HTTP & O ``resultado'' em número: 2xx deu certo, 4xx o pedido tem problema, 5xx nós falhamos. \\
+JSON & O formato de texto usado nos corpos de pedido e resposta. \\
+Tabela / linha / coluna & Como uma planilha: cada aba é uma tabela, cada linha é um registro. \\
+Chave primária (\tb{id}) & Número interno que identifica a linha. \textbf{Nunca sai da API.} \\
+Chave estrangeira (FK) & Coluna que aponta para uma linha de outra tabela (ex.: a conta aponta para o cliente). \\
+\tb{..._key} (UUID) & Identificador externo, aleatório, de 36 caracteres. É o que aparece na URL e nas respostas. \\
+Enumerador (status) & Lista fixa de estados que mora numa tabela (ex.: ACTIVE, BLOCKED, CLOSED). \\
+Transação de banco (ACID) & Várias escritas que valem juntas: ou todas acontecem (\tb{commit}) ou nenhuma (\tb{rollback}). \\
+Lock (\tb{FOR UPDATE}) & ``Pegar a ficha da gaveta'': trava uma linha para que duas operações não mexam nela ao mesmo tempo. \\
+Idempotência & Repetir o mesmo pedido não repete o efeito. Dois cliques em ``transferir'' = uma transferência. \\
+Resource & Camada que recebe o HTTP e devolve a resposta. Não decide regra. \\
+Controller & Camada que decide ``pode ou não pode'' e dá o \tb{commit}. É onde moram as regras. \\
+Repository & Camada que busca e grava no banco. Devolve dado ou nada; não decide. \\
+Model & Descrição da tabela em Python. \\
+Schema & Arquivo JSON que diz a forma do que \emph{entra} (campos obrigatórios, tipos). \\
+DTO & O formato do que \emph{sai} na resposta (quais campos, com que nome). \\
+Connector & ``Telefone'' para falar com um serviço de fora. Não decide nada. \\
+Seed & Dados iniciais inseridos quando o banco nasce (status, produtos, perguntas). \\
+Teste black box & Teste que conversa com a API só por HTTP, sem importar nada de \tb{src/}. \\
+Centavos & Todo dinheiro é guardado como número inteiro de centavos: \rs 200,00 = \tb{20000}. \\
+Suitability & Processo de verificar se um investimento é adequado ao perfil do cliente. \\
+Cota & ``Fatia'' de um fundo. Valor da posição = quantidade de cotas $\times$ valor da cota do dia. \\
+Posição & Quanto o cliente tem de cada produto (quantidade e custo). \\
+Taxa de administração & Percentual ao ano que o fundo cobra sobre o patrimônio, já descontado da cota. \\
+Spread & Diferença entre o que o banco ganha aplicando um dinheiro e o que paga a quem o emprestou. \\
+Float & Rendimento que o banco obtém aplicando o saldo parado nas contas dos clientes. \\
+pb (ponto-base) & Um centésimo de 1\%: 100 pb = 1\%. Usado para guardar taxas sem casas decimais. \\
+\bottomrule
+\end{longtable}
+
+% =====================================================================
+\section{Restrições técnicas obrigatórias (R1 a R8)}\label{sec:restricoes}
+% =====================================================================
+
+Estas restrições são cobradas pela rubrica. Cada uma vira um compromisso concreto do time.
+
+\begin{longtable}{@{}P{0.7cm}P{5.0cm}P{10.0cm}@{}}
+\toprule
+\textbf{} & \textbf{O que a restrição diz} & \textbf{Como o \banco{} cumpre} \\
+\midrule
+\endhead
+R1 & Nenhum arquivo de teste importa código de dentro da aplicação. & Todos os testes são \emph{black box}: sobem a API com Docker e fazem requisições HTTP (pytest). Nenhum \tb{import src...} em \tb{tests/}. \\
+R2 & A entrega sobe e roda com um comando só, na máquina limpa do avaliador. & \tb{docker compose up} sobe API + PostgreSQL; o \tb{database/database.sql} cria todas as tabelas \textbf{e} insere os seeds (status, produtos, preços, perguntas, carteiras-modelo). Teste final: clonar o repositório numa máquina de outro colega e rodar. \\
+R3 & Um status HTTP sozinho não basta: todo erro tem um código próprio. & Todo erro devolve \tb{title}, \tb{description}, \tb{translation} e \tb{code} (catálogo completo na Seção~\ref{sec:erros}). \\
+R4 & Nada que entrou deixa de existir. & Não existe \tb{DELETE} de dado de negócio. Conta encerrada muda de status; perfil novo não apaga o antigo; posição zerada continua na tabela; preço publicado não é reescrito. Toda mudança de estado gera evento. \\
+R5 & Nenhum identificador devolvido é o número que o banco gerou. & Toda entidade tem \tb{id} (interno, inteiro) e \tb{..._key} (UUID gerado no repository). Só a \tb{key} aparece em URL e resposta. \\
+R6 & Dinheiro não é \tb{FLOAT}. & Valores em centavos, tipo \tb{BIGINT}. Quantidade de cotas e preço unitário em \tb{NUMERIC} (decimal exato), nunca \tb{FLOAT}. A API recebe e devolve centavos inteiros. \\
+R7 & A RFC mostra as decisões tomadas \emph{e} as descartadas. & Seção~\ref{sec:decisoes} já traz as alternativas com o preço de cada uma, no formato do modelo de RFC. \\
+R8 & Autorização: ``esse recurso é seu?'' (IDOR). & Toda rota de recurso de cliente é aninhada em \rota|/customer/{customer_key}/...|. Se a conta, transação ou ordem não pertence àquele cliente, a resposta é \textbf{404} (e não 403), para não revelar que o recurso existe. \\
+\bottomrule
+\end{longtable}
+
+Além disso, o repositório-base já exige o cabeçalho \tb{INTERNAL-TOKEN} em toda rota, exceto
+a raiz e o \tb{/health_check} (sem ele: \textbf{403}). Mantemos isso.
+
+% =====================================================================
+\section{Visão geral da aplicação}
+% =====================================================================
+
+\subsection{Os módulos}
+
+\begin{longtable}{@{}P{3.6cm}P{12.5cm}@{}}
+\toprule
+\textbf{Módulo} & \textbf{O que faz} \\
+\midrule
+\endhead
+1. Clientes & Cadastra pessoas físicas (nome, CPF, nascimento) e as consulta. \\
+2. Contas & Abre a conta corrente do cliente, consulta saldo, bloqueia, desbloqueia e encerra. \\
+3. Movimentações & Depósito, saque e transferência entre contas do \banco, com tarifa, extrato e comprovante. \\
+4. Suitability & Questionário, cálculo do perfil do investidor e histórico de perfis. \\
+5. Produtos e preços & Catálogo de produtos (renda fixa + \fundo) e o preço unitário de cada dia. \\
+6. Carteira sugerida & Carteiras-modelo por perfil e a divisão de um valor entre os produtos. \\
+7. Ordens e posição & Aplicação e resgate (dinheiro sai/entra na conta corrente), posição e rentabilidade. \\
+8. Modelo de receita & Quanto o banco ganhou (tarifas) e quanto estima ganhar (fundo, spread, float). \\
+Transversal & Formato de erro, idempotência, travas de concorrência, paginação, seeds, testes. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Como as peças se encaixam}
+
+\begin{center}
+\begin{tikzpicture}[
+  box/.style={draw,thick,minimum width=3.2cm,minimum height=0.9cm,align=center,font=\small},
+  >=Stealth]
+  \node[box] (cli) {Cliente da API\\(app, teste, Postman)};
+  \node[box,right=1.1cm of cli] (res) {resources/\\(HTTP)};
+  \node[box,right=1.1cm of res] (ctl) {controllers/\\(regras + commit)};
+  \node[box,below=1.1cm of ctl] (rep) {repositories/\\(busca e grava)};
+  \node[box,right=1.1cm of rep] (db) {PostgreSQL\\(tabelas)};
+  \node[box,below=1.1cm of res] (err) {errors/\\(catálogo de erros)};
+  \draw[->,thick] (cli) -- node[above,font=\scriptsize]{JSON} (res);
+  \draw[->,thick] (res) -- (ctl);
+  \draw[->,thick] (ctl) -- (rep);
+  \draw[->,thick] (rep) -- (db);
+  \draw[->,dashed] (ctl) -- (err);
+\end{tikzpicture}
+\end{center}
+
+E o caminho do dinheiro:
+
+\begin{center}
+\begin{tikzpicture}[
+  box/.style={draw,thick,minimum width=3.4cm,minimum height=1cm,align=center,font=\small},
+  >=Stealth]
+  \node[box] (ext) {``Mundo de fora''\\(simulado)};
+  \node[box,right=2.2cm of ext] (cc) {Conta corrente\\(\tb{account.balance})};
+  \node[box,right=2.2cm of cc] (inv) {Posição investida\\(\tb{position})};
+  \node[box,below=1.2cm of cc] (cc2) {Outra conta\\do \banco};
+  \draw[->,thick] ([yshift=4pt]ext.east) -- node[above,font=\scriptsize]{depósito} ([yshift=4pt]cc.west);
+  \draw[<-,thick] ([yshift=-4pt]ext.east) -- node[below,font=\scriptsize]{saque} ([yshift=-4pt]cc.west);
+  \draw[->,thick] ([yshift=4pt]cc.east) -- node[above,font=\scriptsize]{aplicação} ([yshift=4pt]inv.west);
+  \draw[<-,thick] ([yshift=-4pt]cc.east) -- node[below,font=\scriptsize]{resgate} ([yshift=-4pt]inv.west);
+  \draw[->,thick] (cc) -- node[right,font=\scriptsize]{transferência (+ tarifa)} (cc2);
+\end{tikzpicture}
+\end{center}
+
+\textbf{Ideia central:} o dinheiro só existe em dois lugares --- saldo da conta corrente e
+posição investida. Toda seta do desenho acima é uma operação atômica que grava, na mesma
+transação de banco, o movimento no extrato e a mudança de saldo/posição.
+
+\subsection{A jornada do cliente, do começo ao fim}
+
+\begin{enumerate}
+  \item Cria o cadastro (\tb{POST /customer}) e recebe um \tb{customer_key}.
+  \item Abre a conta corrente e recebe um \tb{account_key}.
+  \item Faz um depósito simulado e passa a ter saldo.
+  \item Consulta as perguntas do suitability, responde e recebe seu perfil.
+  \item Pede uma sugestão de carteira para um valor (ex.: \rs 10.000).
+  \item Aplica nos produtos (um por vez; ou todos de uma vez, como \ext).
+  \item Acompanha a posição: quantidade, valor de hoje, ganho ou perda.
+  \item Resgata quando quiser (respeitando a liquidez do produto); o dinheiro volta para a conta.
+  \item Pode transferir para outro cliente do \banco{} ou sacar.
+\end{enumerate}
+
+\subsection{Níveis de entrega (o que fazer primeiro)}
+
+\begin{tabularx}{\linewidth}{@{}P{2.4cm}X@{}}
+\toprule
+\textbf{Nível} & \textbf{Conteúdo} \\
+\midrule
+Nível 1 & \textbf{Núcleo bancário} (módulos 1, 2 e 3) + formato de erro + testes. Sem isso, não há entrega. \\
+Nível 2 & \textbf{Investimentos MVP} (módulos 4 a 8) com preço tabelado. É o nosso diferencial. \\
+Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pelo tempo que sobrar. \\
+\bottomrule
+\end{tabularx}
+
+% =====================================================================
+\section{Convenções gerais (valem para o sistema inteiro)}
+% =====================================================================
+
+\begin{regras}
+  \item[RN-GER-01 \obr] \textbf{Dinheiro em centavos.} Todo valor monetário é inteiro em
+  centavos (\tb{BIGINT}) no banco \emph{e} na API. \tb{"amount": 20000} significa \rs 200,00.
+  Valor com casas decimais no JSON é recusado pelo schema (400).
+  \item[RN-GER-02 \obr] \textbf{Identificadores.} Toda tabela de entidade tem \tb{id} interno e
+  \tb{..._key} UUID (gerado no repository, com \tb{uuid4}). Só a \tb{key} sai.
+  \item[RN-GER-03 \dec] \textbf{Datas.} Tudo em \tb{TIMESTAMPTZ}, gravado em UTC e devolvido no
+  formato ISO 8601. Exemplo: \tb{2026-10-01T13:02:11Z}. Datas sem hora (nascimento, data do
+  preço) em \tb{DATE}.
+  \item[RN-GER-04 \obr] \textbf{Nada é apagado.} Não existe rota \tb{DELETE}. Encerrar, bloquear e
+  refazer perfil são mudanças de estado ou linhas novas.
+  \item[RN-GER-05 \obr] \textbf{Formato de erro único.} Todo erro devolve
+  \tb{\{title, description, translation, code\}} (ver Seção~\ref{sec:erros}).
+  \item[RN-GER-06 \obr] \textbf{Token interno.} Toda rota exige o cabeçalho \tb{INTERNAL-TOKEN};
+  sem ele, 403. O erro (\tb{ForbiddenNotInternal}) e as exceções (a raiz e o
+  \tb{/health_check}) já vêm prontos no repositório-base.
+  \item[RN-GER-07 \obr] \textbf{Dono do recurso (R8).} Se a \tb{key} existe mas pertence a outro
+  cliente, a resposta é 404 --- idêntica à de uma \tb{key} inexistente.
+  \item[RN-GER-08 \obr] \textbf{Idempotência.} Toda rota que movimenta dinheiro
+  (\tb{POST .../transaction} e \tb{POST .../investment_order}) exige o cabeçalho
+  \tb{Idempotency-Key} (um UUID criado pelo cliente da API):
+  \begin{itemize}
+    \item mesma chave + mesmo corpo $\to$ devolve a resposta original, \textbf{sem} movimentar de novo;
+    \item mesma chave + corpo diferente $\to$ 409 (\tb{BNK000004});
+    \item a checagem acontece \emph{depois} de travar as linhas envolvidas (RN-GER-12), para que
+          um reenvio simultâneo receba a resposta original, e não um falso ``saldo insuficiente'';
+    \item sem o cabeçalho $\to$ 400 (\tb{BNK000003}).
+  \end{itemize}
+  \item[RN-GER-09 \dec] \textbf{Nomes de rota.} Em inglês, substantivos, identificados pela
+  \tb{key}; singular para o item (\tb{/account/\{key\}}) e plural para listas
+  (\tb{/transactions}). Filtros e paginação na \emph{query string}.
+  \item[RN-GER-10 \dec] \textbf{Dado sensível não volta.} O CPF entra completo, mas nunca sai
+  completo: as respostas mostram \tb{***.456.789-**}.
+  \item[RN-GER-11 \dec] \textbf{Paginação.} Listas aceitam \tb{page} (padrão 1) e \tb{limit}
+  (padrão 20, máximo 100) e devolvem \tb{\{items, page, limit, total\}}.
+  \item[RN-GER-12 \obr] \textbf{Concorrência.} Toda operação que lê um saldo/posição para decidir
+  e depois escreve com base nele trava a linha (\tb{SELECT ... FOR UPDATE}) dentro da mesma
+  transação. Quando há duas contas, trava sempre na ordem crescente de \tb{id} (evita
+  \emph{deadlock}).
+\end{regras}
+
+\subsection*{Quando usar cada status HTTP}
+
+\begin{tabularx}{\linewidth}{@{}P{1.4cm}X@{}}
+\toprule
+\textbf{Status} & \textbf{Quando sai} \\
+\midrule
+200 & Leitura bem-sucedida; alteração (PATCH) bem-sucedida; repetição idempotente de um pedido já feito. \\
+201 & Algo foi criado (cliente, conta, transação, perfil, ordem, preço). Devolve a \tb{key}. \\
+400 & Corpo ou cabeçalho mal formado: falta campo, tipo errado, valor fora do \emph{enum}, falta \tb{Idempotency-Key}. Barrado no schema, antes de qualquer regra. \\
+403 & Falta o \tb{INTERNAL-TOKEN}. \\
+404 & A \tb{key} do caminho não existe \textbf{ou} não pertence ao cliente do caminho (R8). \\
+409 & O pedido é válido, mas o \textbf{estado atual} não permite: CPF já cadastrado, conta não ativa, saldo insuficiente, perfil vencido, transição de status proibida, chave de idempotência reutilizada. \\
+422 & O pedido está bem formado, mas o \textbf{conteúdo} viola uma regra de negócio: CPF com dígito errado, menor de idade, valor zero ou acima do limite, produto fora do perfil, resgate antes do vencimento. \\
+500 & Algo que ninguém desenhou. Todo 500 é um ramo que faltou no fluxo. \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+\textit{Obs.: confirmar no \tb{src/errors/custom_errors.py} do repositório-base qual status ele usa
+para CPF inválido (o slide da Aula 3 usa 422 como exemplo). E lembrar que o FastAPI devolve 422
+por padrão quando a query string é inválida --- decidir se vamos padronizar isso em 400.}
+
+% =====================================================================
+\section{Módulo 1 --- Clientes}
+% =====================================================================
+
+\textbf{Dados do cliente:} nome, CPF (\tb{document_number}), data de nascimento.
+\textbf{Estados:} \dec{} no MVP o cliente não tem ciclo de vida próprio (ele existe e pronto); quem
+tem estado é a conta.
+
+\begin{regras}
+  \item[RN-CLI-01 \obr] Os campos \tb{name}, \tb{document_number} e \tb{birth_date} são
+  obrigatórios (400 se faltar ou vier com tipo errado).
+  \item[RN-CLI-02 \obr] O CPF precisa ser válido (dígitos verificadores). Usar o validador que já
+  existe em \tb{src/utils/document_number.py}. Inválido $\to$ 422 (\tb{BNK001003}).
+  \item[RN-CLI-03 \obr] Não pode existir dois clientes com o mesmo CPF. Repetido $\to$ 409
+  (\tb{BNK001002}). Garantido também no banco com \tb{UNIQUE(document_number)}.
+  \item[RN-CLI-04 \dec] Seguindo o repositório-base, o CPF entra \textbf{só no formato}
+  \tb{000.000.000-00}: o schema recusa qualquer outro com 400 (padrão \tb{pattern}), e ele é
+  gravado assim mesmo, em \tb{CHAR(14)}. Como só um formato entra, não há risco de o mesmo CPF
+  aparecer escrito de dois jeitos.
+  \item[RN-CLI-04b \dec] Os schemas usam \tb{"additionalProperties": false}: campo que não está no
+  contrato é recusado com 400.
+  \item[RN-CLI-05 \dec] Idade mínima de 18 anos na data do cadastro. Menor $\to$ 422
+  (\tb{BNK001004}). Data de nascimento no futuro também $\to$ 422.
+  \item[RN-CLI-06 \dec] Nome com 3 a 120 caracteres, sem espaços sobrando nas pontas.
+  \item[RN-CLI-07 \obr] A resposta de criação é 201 com \tb{customer_key}; nunca o \tb{id}.
+  \item[RN-CLI-08 \dec] O CPF volta mascarado (RN-GER-10).
+\end{regras}
+
+% =====================================================================
+\section{Módulo 2 --- Contas}
+% =====================================================================
+
+\textbf{Estados da conta:} \tb{ACTIVE} (ativa), \tb{BLOCKED} (bloqueada) e \tb{CLOSED}
+(encerrada, estado final).
+
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{De $\downarrow$ \quad Para $\to$} & \tb{ACTIVE} & \tb{BLOCKED} & \tb{CLOSED} \\
+\midrule
+(nascimento) & sim & não & não \\
+\tb{ACTIVE}  & --- (409) & sim & sim, se vazia \\
+\tb{BLOCKED} & sim & --- (409) & sim, se vazia \\
+\tb{CLOSED}  & não (409) & não (409) & --- (409) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{regras}
+  \item[RN-CON-01 \obr] A conta pertence a um cliente que precisa existir. \tb{customer_key}
+  inexistente $\to$ 404 (\tb{BNK001001}). Como a \tb{key} está no caminho, é 404 e não 422.
+  \item[RN-CON-02 \dec] \textbf{Limite de contas:} cada cliente pode ter no máximo
+  \textbf{uma} conta não encerrada. Tentar abrir outra $\to$ 409 (\tb{BNK002002}). (Esta é a
+  ``regra que mais some'' segundo a Aula 2.) A linha do cliente é travada (\tb{FOR UPDATE})
+  antes de contar, para que dois pedidos simultâneos não abram duas contas.
+  \item[RN-CON-03 \dec] A conta nasce \tb{ACTIVE} com saldo 0, e o nascimento já gera um evento
+  (\tb{from_status = null}, \tb{to_status = ACTIVE}).
+  \item[RN-CON-04 \obr] O saldo nunca fica negativo (não existe cheque especial). Garantido no
+  controller \emph{e} no banco (\tb{CHECK (balance >= 0)}).
+  \item[RN-CON-05 \obr] Toda mudança de status gera uma linha em \tb{account_status_event} com
+  status de origem, de destino, motivo e data.
+  \item[RN-CON-06 \dec] Bloquear e encerrar exigem um motivo (\tb{reason}); sem motivo $\to$ 422
+  (\tb{BNK002006}).
+  \item[RN-CON-07 \obr] Transições fora da tabela acima $\to$ 409 (\tb{BNK002003}). \tb{CLOSED} é
+  final.
+  \item[RN-CON-08 \dec] Só se encerra conta \textbf{vazia}: saldo zero e nenhuma posição de
+  investimento com quantidade maior que zero. Caso contrário $\to$ 409 (\tb{BNK002004}).
+  \item[RN-CON-09 \dec] Conta \tb{BLOCKED} ou \tb{CLOSED} não movimenta nada: não
+  recebe depósito nem transferência, não faz saque, não aplica, não resgata $\to$ 409
+  (\tb{BNK002005}). Consultas (saldo, extrato) continuam funcionando.
+  \item[RN-CON-10 \obr] Consultar uma conta de outro cliente $\to$ 404 (R8).
+\end{regras}
+
+% =====================================================================
+\section{Módulo 3 --- Movimentações e extrato}
+% =====================================================================
+
+\subsection{Os tipos de operação}
+
+\begin{tabularx}{\linewidth}{@{}P{3.6cm}P{2.6cm}X@{}}
+\toprule
+\textbf{Tipo (\tb{type})} & \textbf{Tarifa} \dec & \textbf{Efeito} \\
+\midrule
+\tb{DEPOSIT} & grátis & Dinheiro ``entra de fora'' na conta (simula um Pix recebido). \\
+\tb{WITHDRAWAL} & grátis & Dinheiro ``sai para fora'' (simula um saque). \\
+\tb{TRANSFER} & \rs 2,00 & Sai da conta de origem, entra na de destino; a tarifa é cobrada da origem. \\
+\tb{INVESTMENT_APPLY} & grátis & Criado pelo módulo 7: sai da conta e vira posição. \\
+\tb{INVESTMENT_REDEEM} & grátis & Criado pelo módulo 7: sai da posição e volta para a conta. \\
+\bottomrule
+\end{tabularx}
+
+Os dois últimos \textbf{não} podem ser pedidos pela rota de transação; eles só nascem dentro de
+uma ordem de investimento (400 se alguém tentar, porque o schema só aceita os três primeiros).
+
+\subsection{Como uma operação é guardada: ``pedido'' + ``lançamentos''}
+
+\dec{} Cada operação gera \textbf{uma} linha em \tb{transaction} (o pedido: o que o cliente pediu)
+e \textbf{uma ou mais} linhas em \tb{ledger_entry} (os lançamentos: o que aconteceu em cada conta).
+Exemplo --- a conta A transfere \rs 200,00 para a conta B:
+
+\begin{center}
+\begin{tabular}{@{}llllrr@{}}
+\toprule
+\textbf{Tabela} & \textbf{Conta} & \textbf{Direção} & \textbf{Categoria} & \textbf{Valor} & \textbf{Saldo depois} \\
+\midrule
+\tb{transaction} & A $\to$ B & --- & TRANSFER & 20000 & --- \\
+\tb{ledger_entry} & A & DEBIT & PRINCIPAL & 20000 & 79800 \\
+\tb{ledger_entry} & A & DEBIT & FEE & 200 & 79600 \\
+\tb{ledger_entry} & B & CREDIT & PRINCIPAL & 20000 & 70000 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+(supondo A com \rs 1.000,00 e B com \rs 500,00 antes). Isso garante a propriedade mais
+importante do sistema:
+
+\begin{aviso}{Invariante do extrato (o que nunca pode quebrar)}
+Para toda conta: \quad \tb{account.balance} $=\ \Sigma$ créditos $-\ \Sigma$ débitos de
+\tb{ledger_entry} daquela conta.\\
+E o \tb{balance_after} do último lançamento é igual ao saldo atual. Ou seja: o extrato
+\emph{sempre} reconstrói o saldo.
+\end{aviso}
+
+\subsection{Regras}
+
+\begin{regras}
+  \item[RN-MOV-01 \obr] Valor (\tb{amount}) inteiro e maior que zero. Zero ou negativo $\to$ 422
+  (\tb{BNK003004}).
+  \item[RN-MOV-02 \dec] Limites por operação: depósito até \rs 1.000.000,00; saque até
+  \rs 5.000,00; transferência até \rs 50.000,00. Acima $\to$ 422 (\tb{BNK003005}).
+  \item[RN-MOV-03 \obr] A conta do caminho precisa ser do cliente do caminho (senão 404) e estar
+  \tb{ACTIVE} (senão 409).
+  \item[RN-MOV-04 \obr] Saque e transferência exigem saldo suficiente \textbf{para o valor mais a
+  tarifa}. Faltou $\to$ 409 (\tb{BNK003003}), e nada é gravado.
+  \item[RN-MOV-05 \obr] Na transferência, a conta de destino (\tb{destination_account_key}) precisa
+  existir (404, \tb{BNK003002}) e estar \tb{ACTIVE} (409, \tb{BNK003007}). O destino pode ser de
+  outro cliente --- é assim que se paga alguém.
+  \item[RN-MOV-06 \obr] Origem igual a destino $\to$ 422 (\tb{BNK003006}).
+  \item[RN-MOV-07 \obr] \textbf{Atomicidade:} débito, crédito, tarifa, atualização dos dois saldos
+  e a linha de \tb{transaction} acontecem na mesma transação de banco. O \tb{commit} é a última
+  linha antes do \tb{return}; qualquer erro no meio desfaz tudo.
+  \item[RN-MOV-08 \obr] \textbf{Concorrência:} antes de verificar saldo, as contas envolvidas são
+  travadas com \tb{FOR UPDATE}, em ordem crescente de \tb{id}. Duas transferências simultâneas
+  da mesma conta nunca gastam o mesmo dinheiro duas vezes.
+  \item[RN-MOV-09 \obr] \textbf{Idempotência} conforme RN-GER-08. No banco:
+  \tb{UNIQUE(requester_account_id, idempotency_key)} em \tb{transaction}, junto com um
+  \tb{request_hash} (hash do corpo) para detectar ``mesma chave, corpo diferente''.
+  \item[RN-MOV-10 \dec] Tarifa de transferência fixa de \rs 2,00 (200 centavos), guardada numa
+  constante do controller. O valor cobrado fica registrado em \tb{transaction.fee_amount} e no
+  lançamento \tb{FEE} --- se a tarifa mudar amanhã, o histórico não muda.
+  \item[RN-MOV-11 \dec] Descrição opcional (\tb{description}, até 140 caracteres) aparece no extrato.
+  \item[RN-MOV-12 \obr] \textbf{Extrato:} lista os lançamentos da conta, do mais novo para o mais
+  antigo, paginado, com filtros opcionais \tb{from}, \tb{to} (datas) e \tb{type}. Cada linha
+  mostra: \tb{transaction_key}, tipo, direção, categoria, valor, \tb{balance_after}, descrição,
+  contraparte (a \tb{account_key} da outra conta, quando houver) e data.
+  \item[RN-MOV-13 \obr] \textbf{Comprovante:} \tb{GET .../transaction/\{transaction_key\}} devolve
+  uma transação da qual essa conta participa (origem ou destino). Transação que não envolve a
+  conta $\to$ 404 (R8).
+  \item[RN-MOV-14 \obr] Nenhuma transação é apagada ou editada. Um estorno, se existir um dia, será
+  uma transação nova no sentido contrário (\ext).
+\end{regras}
+
+% =====================================================================
+\section{Módulo 4 --- Suitability (perfil do investidor)}
+% =====================================================================
+
+\subsection{Base regulatória, em uma frase}
+
+No Brasil, a Resolução CVM 30/2021 obriga quem recomenda investimentos a verificar se o produto
+é adequado a três coisas do cliente: \textbf{objetivos} (prazo, finalidade, tolerância a risco),
+\textbf{situação financeira} (renda, patrimônio, necessidade de dinheiro) e
+\textbf{conhecimento} (experiência e formação). As regras de suitability da ANBIMA pedem que as
+instituições tenham pelo menos três perfis, do mais avesso ao mais tolerante a risco. O nosso
+questionário é uma \textbf{simplificação acadêmica} dessas regras: não tem valor regulatório, mas
+segue a mesma lógica.
+
+\subsection{O questionário proposto \dec}
+
+Sete perguntas, cada opção vale de 1 a 4 pontos. As perguntas e opções moram em tabelas do banco
+(seed), não no código.
+
+\begin{longtable}{@{}P{0.9cm}P{4.6cm}P{10.2cm}@{}}
+\toprule
+\textbf{Cód.} & \textbf{Pergunta (dimensão)} & \textbf{Opções e pontos} \\
+\midrule
+\endhead
+Q1 & Por quanto tempo pretende deixar o dinheiro investido? \emph{(objetivo)} & (1) menos de 1 ano; (2) 1 a 3 anos; (3) 3 a 5 anos; (4) mais de 5 anos \\
+Q2 & Qual o principal objetivo? \emph{(objetivo)} & (1) preservar o dinheiro; (2) reserva com algum ganho; (3) crescer o patrimônio; (4) maximizar o retorno aceitando oscilações \\
+Q3 & Se seus investimentos caíssem 10\% em um mês, você\ldots \emph{(tolerância)} & (1) resgataria tudo; (2) resgataria uma parte; (3) manteria; (4) aplicaria mais \\
+Q4 & Quanto da sua renda mensal sobra para investir? \emph{(situação financeira)} & (1) quase nada; (2) até 10\%; (3) 10\% a 30\%; (4) mais de 30\% \\
+Q5 & Você pode precisar deste dinheiro de repente? \emph{(liquidez)} & (1) sim, a qualquer momento; (2) provavelmente em até 1 ano; (3) dificilmente; (4) não \\
+Q6 & Em quais produtos você já investiu? \emph{(experiência)} & (1) nenhum ou só poupança; (2) Tesouro/CDB; (3) fundos multimercado ou de ações; (4) ações, derivativos ou cripto \\
+Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1) nenhum; (2) básico; (3) intermediário (entendo risco e retorno); (4) avançado (formação ou atuação na área) \\
+\bottomrule
+\end{longtable}
+
+\subsection{Do questionário ao perfil}
+
+\begin{center}
+\begin{tabular}{@{}lccl@{}}
+\toprule
+\textbf{Perfil} & \textbf{Pontos} & \textbf{Risco máx.} & \textbf{Resumo} \\
+\midrule
+\tb{CONSERVATIVE} (Conservador) & 7 a 13 & 2 & segurança e liquidez \\
+\tb{MODERATE} (Moderado) & 14 a 20 & 3 & aceita oscilação moderada \\
+\tb{AGGRESSIVE} (Arrojado) & 21 a 28 & 5 & busca retorno, aceita perdas \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{regras}
+  \item[RN-SUI-01 \obr] Só um cliente existente responde o questionário (404 se não existir).
+  \item[RN-SUI-02 \obr] Todas as sete perguntas precisam de exatamente uma resposta. Falta pergunta,
+  pergunta repetida $\to$ 422 (\tb{BNK004002}). Opção que não pertence à pergunta $\to$ 422
+  (\tb{BNK004003}).
+  \item[RN-SUI-03 \dec] Perfil = faixa da soma dos pontos (tabela acima).
+  \item[RN-SUI-04 \dec] \textbf{Trava de segurança:} quem responde (1) na Q3 (``resgataria tudo'')
+  ou (1) na Q5 (``preciso a qualquer momento'') é \textbf{Conservador}, qualquer que seja a soma. A
+  resposta guarda o motivo (\tb{forced_by_rule = true}).
+  \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until}). Vencido, o cliente
+  não faz novas aplicações nem pede sugestão até refazer (409, \tb{BNK004004}).
+  \item[RN-SUI-06 \obr] Refazer o questionário cria uma avaliação \textbf{nova}; as antigas continuam
+  guardadas (R4). O perfil atual é sempre a avaliação mais recente.
+  \item[RN-SUI-07 \dec] Cada avaliação guarda as respostas escolhidas (\tb{suitability_answer}),
+  para que dê para explicar depois por que o cliente recebeu aquele perfil.
+  \item[RN-SUI-08 \dec] Consultar o perfil de quem nunca respondeu $\to$ 404 (\tb{BNK004001}).
+\end{regras}
+
+% =====================================================================
+\section{Módulo 5 --- Produtos, preços e o \fundo}\label{sec:produtos}
+% =====================================================================
+
+\subsection{O modelo genérico de produto}
+
+Todo produto, seja título ou fundo, é descrito pelos mesmos campos: nome, tipo, emissor,
+indexador, nível de risco (1 a 5), liquidez (\tb{DAILY} = resgate a qualquer dia;
+\tb{AT_MATURITY} = só no vencimento), data de vencimento (se houver) e aplicação mínima. O valor
+do investimento é sempre \textbf{quantidade $\times$ preço unitário do dia}. Para o \fundo{} o
+preço unitário é o \textbf{valor da cota}; para os títulos, é o preço unitário do papel.
+
+\subsection{Catálogo do MVP \dec}
+
+\begin{longtable}{@{}P{3.9cm}P{2.3cm}P{0.9cm}P{2.0cm}P{1.7cm}P{3.6cm}@{}}
+\toprule
+\textbf{Produto} & \textbf{Tipo} & \textbf{Risco} & \textbf{Liquidez} & \textbf{Mínimo} & \textbf{Rendimento (fictício)} \\
+\midrule
+\endhead
+Tesouro Selic 2031 & Título público & 1 & diária & \rs 50,00 & 100\% da Selic \\
+CDB \banco{} Liquidez & Título privado & 2 & diária & \rs 50,00 & 95\% do CDI \\
+LCI \banco{} 2027 & Título privado & 2 & no vencimento & \rs 100,00 & 93\% do CDI, isento \\
+Tesouro Prefixado 2029 & Título público & 2 & diária & \rs 50,00 & taxa fixa ao ano \\
+Tesouro IPCA+ 2035 & Título público & 3 & diária & \rs 50,00 & IPCA + taxa fixa \\
+\fundo{} FIM & Fundo multimercado & 3 & diária (D+0) & \rs 100,00 & varia com a cota \\
+\bottomrule
+\end{longtable}
+
+\textit{Obs.: prazos de liquidação reais (D+1, cotização D+30 etc.) foram simplificados para
+D+0. Liquidez com prazo real fica como \ext.}
+
+\subsection{Regras de produto e preço}
+
+\begin{regras}
+  \item[RN-PRO-01 \dec] Os produtos são criados pelo seed do \tb{database.sql}. Não há rota para
+  criar produto no MVP (\ext: rota interna de cadastro).
+  \item[RN-PRO-02 \obr] Todo produto tem \tb{product_key} (UUID) e só ela sai na API.
+  \item[RN-PRO-03 \dec] Produto inativo (\tb{is_active = false}) ou com vencimento já passado não
+  aceita aplicação $\to$ 409 (\tb{BNK005002}).
+  \item[RN-PRO-04 \dec] O preço do dia é o registro de \tb{product_price} com a maior
+  \tb{reference_date} menor ou igual a hoje. Se não existir nenhum $\to$ 409
+  (\tb{BNK005003}) e a operação não acontece.
+  \item[RN-PRO-05 \dec] \textbf{Publicação de preço/cota:} \tb{POST /product/\{key\}/price} grava o
+  preço de uma data. Preço menor ou igual a zero, ou data no futuro $\to$ 422 (\tb{BNK005005}).
+  Já existe preço para aquela data $\to$ 409 (\tb{BNK005004}) --- preço publicado não se
+  reescreve (R4), garantido por \tb{UNIQUE(product_id, reference_date)}.
+  \item[RN-PRO-06 \dec] O seed gera preços para os últimos 30 dias de cada produto usando juros
+  compostos com a taxa fictícia do produto:
+  $P_t = P_0 \times (1+i)^{\,d/252}$, em que $d$ é o número de dias úteis desde a data inicial.
+  Para o \fundo, a cota do seed pode oscilar (sobe e desce), para mostrar ganho e perda.
+  \item[RN-PRO-07 \obr] Preço unitário em \tb{NUMERIC(20,8)}, nunca \tb{FLOAT} (R6).
+  \item[RN-PRO-08 \dec] O catálogo pode ser filtrado por tipo e por risco máximo
+  (\tb{GET /products?max_risk=2}) --- útil para mostrar ``o que cabe no meu perfil''.
+\end{regras}
+
+% =====================================================================
+\section{Módulo 6 --- Carteira sugerida}
+% =====================================================================
+
+\subsection{Carteiras-modelo por perfil \dec}
+
+Pesos guardados em \textbf{pontos-base} (1\% = 100 pb; a carteira soma 10.000 pb), para evitar
+casas decimais.
+
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Produto} & \textbf{Conservador} & \textbf{Moderado} & \textbf{Arrojado} \\
+\midrule
+Tesouro Selic 2031 & 50\% & 25\% & 10\% \\
+CDB \banco{} Liquidez & 30\% & 20\% & --- \\
+LCI \banco{} 2027 & 20\% & --- & --- \\
+Tesouro Prefixado 2029 & --- & 20\% & 20\% \\
+Tesouro IPCA+ 2035 & --- & 20\% & 30\% \\
+\fundo{} FIM & --- & 15\% & 40\% \\
+\midrule
+\textbf{Total} & 100\% & 100\% & 100\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Conferência: todo produto de cada carteira tem risco menor ou igual ao máximo do perfil
+(Conservador $\le 2$, Moderado $\le 3$).
+
+\subsection{Regras}
+
+\begin{regras}
+  \item[RN-CAR-01 \obr] Só sugere carteira para cliente com perfil válido. Sem perfil $\to$ 409
+  (\tb{BNK004005}); perfil vencido $\to$ 409 (\tb{BNK004004}).
+  \item[RN-CAR-02 \dec] Valor mínimo para sugestão: \rs 1.000,00 (garante que cada fatia respeite a
+  aplicação mínima do produto). Abaixo $\to$ 422 (\tb{BNK006006}).
+  \item[RN-CAR-03 \dec] \textbf{Cálculo:} para cada item, \tb{valor = floor(total} $\times$
+  \tb{peso / 10000)}. Os centavos que sobram do arredondamento vão para o item de maior peso.
+  Assim a soma dos itens é \emph{exatamente} o valor pedido.
+  \item[RN-CAR-04 \dec] A sugestão é só uma simulação: \textbf{não} movimenta dinheiro e
+  \textbf{não} é gravada (\tb{GET}). Ela devolve, para cada item, a \tb{product_key}, o nome, o
+  peso e o valor --- tudo que o cliente precisa para mandar as ordens.
+  \item[RN-CAR-05 \dec] A sugestão \emph{não} depende do saldo: o cliente pode simular um valor
+  maior do que tem. Quem barra falta de saldo é a ordem (RN-ORD-05).
+\end{regras}
+
+\textbf{Exemplo 1.} Moderado, \rs 10.000,00 (= 1.000.000 centavos): Selic 250.000; CDB 200.000;
+Prefixado 200.000; IPCA+ 200.000; \fundo{} 150.000. Soma: 1.000.000.
+
+\textbf{Exemplo 2 (arredondamento).} Moderado, \rs 1.000,01 (= 100.001 centavos): 25\% dá 25.000,25
+$\to$ 25.000; cada 20\% dá 20.000,2 $\to$ 20.000; 15\% dá 15.000,15 $\to$ 15.000. Soma: 100.000.
+Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
+
+% =====================================================================
+\section{Módulo 7 --- Ordens de investimento e posição}
+% =====================================================================
+
+\subsection{Conceitos}
+
+\begin{itemize}
+  \item \textbf{Ordem} (\tb{investment_order}): o pedido de aplicar (\tb{APPLY}) ou resgatar
+  (\tb{REDEEM}) um produto. No simulador ela é executada na hora (status \tb{EXECUTED}).
+  \item \textbf{Posição} (\tb{position}): uma linha por cliente e produto, com a quantidade atual
+  e o custo investido (\tb{invested_amount}).
+  \item O dinheiro sempre passa pela \textbf{conta ativa do cliente}: a aplicação gera uma
+  transação \tb{INVESTMENT_APPLY} (débito) e o resgate uma \tb{INVESTMENT_REDEEM} (crédito).
+\end{itemize}
+
+\subsection{Regras de aplicação}
+
+\begin{regras}
+  \item[RN-ORD-01 \obr] O cliente precisa existir (404) e ter uma conta \tb{ACTIVE} (409,
+  \tb{BNK006007} se não tiver conta; \tb{BNK002005} se ela estiver bloqueada).
+  \item[RN-ORD-02 \obr] Precisa ter perfil de suitability válido (409, \tb{BNK004005} ou
+  \tb{BNK004004}).
+  \item[RN-ORD-03 \obr] O produto precisa existir (404, \tb{BNK005001}), estar disponível (409,
+  \tb{BNK005002}) e ter preço do dia (409, \tb{BNK005003}).
+  \item[RN-ORD-04 \obr] \textbf{Adequação ao perfil:} risco do produto $\le$ risco máximo do perfil.
+  Senão $\to$ 422 (\tb{BNK006003}). \dec{} No MVP a regra \textbf{bloqueia}; aceitar com ``termo
+  de ciência'' fica como \ext.
+  \item[RN-ORD-05 \obr] Valor $\ge$ aplicação mínima do produto (422, \tb{BNK006002}) e saldo da
+  conta $\ge$ valor (409, \tb{BNK003003}).
+  \item[RN-ORD-06 \dec] \textbf{Quantidade:} \tb{quantidade = valor / preço unitário}, truncada
+  em 8 casas decimais. O valor debitado da conta é exatamente o valor pedido.
+  \item[RN-ORD-07 \obr] \textbf{Atomicidade (4 escritas, 1 commit):} (a) trava a conta; (b) trava
+  (ou cria) a posição; (c) grava a transação \tb{INVESTMENT_APPLY} + lançamento de débito e
+  atualiza o saldo; (d) grava a ordem com a quantidade e o preço usados; (e) soma quantidade e
+  custo na posição. Qualquer falha desfaz tudo.
+  \item[RN-ORD-08 \obr] \textbf{Idempotência} conforme RN-GER-08, com
+  \tb{UNIQUE(customer_id, idempotency_key)} em \tb{investment_order}.
+\end{regras}
+
+\subsection{Regras de resgate}
+
+\begin{regras}
+  \item[RN-ORD-09 \dec] \textbf{Resgate não depende do perfil.} Mesmo com perfil vencido, o cliente
+  sempre pode tirar o dinheiro (princípio de proteção ao cliente).
+  \item[RN-ORD-10 \obr] Precisa existir posição com quantidade suficiente; senão $\to$ 409
+  (\tb{BNK006004}).
+  \item[RN-ORD-11 \dec] Produto com liquidez \tb{AT_MATURITY} só pode ser resgatado na data de
+  vencimento ou depois. Antes $\to$ 422 (\tb{BNK006005}).
+  \item[RN-ORD-12 \dec] O resgate pode ser por valor (\tb{amount}) ou total
+  (\tb{redeem_all: true}). Por valor: \tb{quantidade = valor / preço}, truncada em 8 casas. Total:
+  quantidade = toda a posição e valor = \tb{floor(quantidade} $\times$ \tb{preço)} em centavos.
+  \item[RN-ORD-13 \dec] \textbf{Custo médio:} no resgate parcial, o \tb{invested_amount} diminui na
+  mesma proporção da quantidade resgatada. Isso permite calcular o ganho da parte que ficou.
+  \item[RN-ORD-14 \obr] Posição que zera \textbf{não é apagada} (R4); fica com quantidade 0.
+  \item[RN-ORD-15 \obr] Mesma atomicidade e idempotência da aplicação, com a transação
+  \tb{INVESTMENT_REDEEM} creditando a conta.
+\end{regras}
+
+\subsection{Posição e rentabilidade}
+
+\begin{regras}
+  \item[RN-POS-01 \dec] \tb{GET /customer/\{key\}/positions} devolve, por produto: quantidade,
+  preço do dia, \textbf{valor atual} (\tb{floor(quantidade} $\times$ \tb{preço)}), custo
+  investido, \textbf{resultado} (valor atual $-$ custo) e \textbf{rentabilidade} (resultado /
+  custo, em pontos-base). E um total consolidado.
+  \item[RN-POS-02 \dec] Rentabilidade é bruta (sem IR e IOF). Impostos ficam como \ext.
+  \item[RN-POS-03 \dec] Posições com quantidade 0 não aparecem na lista, a menos que se peça
+  \tb{?include_closed=true}.
+\end{regras}
+
+\textbf{Exemplo.} O cliente aplica \rs 1.500,00 no \fundo{} com cota de \rs 1,23456789.
+Quantidade: $1500 / 1{,}23456789 = 1215{,}00001105$ cotas (truncado). No dia seguinte a cota vai
+a \rs 1,24000000: valor atual $= 1215{,}00001105 \times 1{,}24 = $ \rs 1.506,60; resultado
+\rs 6,60; rentabilidade 44 pb (0,44\%). Se ele resgatar \rs 500,00 nesse dia, saem
+$500 / 1{,}24 = 403{,}22580645$ cotas; ficam $811{,}77420460$ cotas e o custo cai
+proporcionalmente para cerca de \rs 1.002,19.
+
+% =====================================================================
+\section{Módulo 8 --- Modelo de receita (como o banco ganha dinheiro)}\label{sec:receita}
+% =====================================================================
+
+\subsection{A tese}
+
+O \banco{} atrai o cliente com conta gratuita e Tesouro Direto sem taxa. O suitability e a carteira
+sugerida levam parte do patrimônio desse cliente para os produtos da casa --- o \fundo{} e os
+títulos que o próprio banco emite (CDB e LCI) ---, que é onde está a margem. O dinheiro parado nas
+contas e a tarifa de transferência completam a receita. Em uma frase: \emph{o produto gratuito traz
+o cliente; a recomendação leva o dinheiro para onde o banco ganha.}
+
+\subsection{As fontes de receita}
+
+\begingroup\small
+\begin{longtable}{@{}P{2.9cm}P{5.6cm}P{4.6cm}P{2.1cm}@{}}
+\toprule
+\textbf{Fonte} & \textbf{Como funciona} & \textbf{Onde aparece no sistema} & \textbf{Tipo} \\
+\midrule
+\endhead
+Tarifa de transferência & \rs 2,00 por transferência, cobrados da conta de origem. & Lançamentos \tb{FEE} em \tb{ledger_entry}. & Realizada (valor exato) \\
+Taxa de administração do fundo & 1\% ao ano sobre o patrimônio do \fundo, descontada todo dia do valor da cota. & \tb{product.admin_fee_bps}; a cota publicada já é líquida. & Estimada \\
+Spread dos títulos próprios & O banco paga 95\% do CDI no CDB e 93\% na LCI e aplica o dinheiro captado em títulos públicos, que rendem cerca de 100\% do CDI. & \tb{product.own_issue} e \tb{product.cdi_percentage_bps}; CDI em \tb{reference_rate}. & Estimada \\
+Float & O saldo parado na conta corrente não rende nada para o cliente; o banco o aplica em títulos públicos. & Soma de \tb{account.balance} $\times$ Selic de \tb{reference_rate}. & Estimada \\
+Tesouro Direto & Sem taxa para o cliente: é o produto de atração. & --- & Nenhuma \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+\textbf{Por que ``estimada''?} No simulador, só a tarifa movimenta dinheiro de verdade. As outras
+três são o que o banco \emph{ganharia} com o dinheiro que está sob sua guarda; o relatório as calcula,
+mas não grava nem movimenta nada. Separar as duas coisas é o que torna o número defensável na banca.
+
+\subsection{Regras}
+
+\begin{regras}
+  \item[RN-REC-01 \dec] \textbf{Realizada vs.\ estimada.} O relatório de receita separa sempre o que
+  foi cobrado (tarifas) do que é estimativa (fundo, spread, float). Estimativas nunca gravam linhas
+  nem alteram saldos.
+  \item[RN-REC-02 \dec] \textbf{Tarifas.} Receita de tarifa no período $=$ soma dos
+  \tb{ledger_entry} com \tb{category = FEE} e \tb{created_at} no período. Não existe uma ``conta de
+  receitas'' com saldo (ver Seção~\ref{sec:decisoes}): o próprio extrato já é o registro da receita.
+  \item[RN-REC-03 \obr] \textbf{Conservação do dinheiro.} Para o sistema inteiro:
+  $\Sigma$ saldos $=\ \Sigma$ depósitos $-\ \Sigma$ saques $-\ \Sigma$ tarifas $-\ \Sigma$
+  aplicações $+\ \Sigma$ resgates. É o que a rota de reconciliação confere, e é o que prova que a
+  tarifa saiu de algum lugar e foi para o banco, sem sumir.
+  \item[RN-REC-04 \dec] \textbf{Taxa de administração.} Só o fundo tem \tb{admin_fee_bps}
+  (\tb{100} = 1\% ao ano). A cota publicada é \emph{líquida}, como no mercado: o seed gera a série
+  com $P_t = P_{t-1} \times (1 + r_t) \times (1 - \text{taxa})^{1/252}$, em que $r_t$ é o retorno
+  bruto do dia.
+  \item[RN-REC-05 \dec] \textbf{Estimativa da taxa de administração} no período $=$ patrimônio do
+  fundo hoje $\times$ taxa $\times$ dias corridos $/ 365$, com patrimônio $= \Sigma$
+  \tb{position.quantity} $\times$ cota do dia. É uma aproximação linear, suficiente para o
+  relatório.
+  \item[RN-REC-06 \dec] \textbf{Títulos próprios.} CDB e LCI têm \tb{own_issue = true} e guardam o
+  percentual do CDI que pagam em \tb{cdi_percentage_bps} (\tb{9500} = 95\%). Spread estimado $=
+  \Sigma$ \tb{position.invested_amount} nesses produtos $\times$ CDI $\times$ (1 $-$ percentual
+  pago) $\times$ dias $/ 365$.
+  \item[RN-REC-07 \dec] \textbf{Float} estimado $= \Sigma$ \tb{account.balance} das contas
+  \tb{ACTIVE} e \tb{BLOCKED} hoje $\times$ Selic $\times$ dias $/ 365$. Saldo em conta corrente não
+  é remunerado para o cliente.
+  \item[RN-REC-08 \dec] \textbf{Taxas de referência.} CDI e Selic anuais (fictícios) ficam na
+  tabela \tb{reference_rate}, preenchida pelo seed. O seed de preços e o relatório de receita usam
+  os mesmos números, para que tudo seja coerente.
+  \item[RN-REC-09 \dec] \textbf{Relatório.} \tb{GET /internal/revenue?from=\&to=} devolve as
+  duas partes, em centavos. Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
+  intervalo maior que 366 dias $\to$ 400 (\tb{BNK000005}). A rota é interna (não pertence a
+  nenhum cliente) e fica protegida pelo \tb{INTERNAL-TOKEN}; num banco real ela exigiria perfil de
+  administrador, o que está fora do escopo.
+  \item[RN-REC-10 \dec] Tesouro Direto não tem taxa para o cliente.
+\end{regras}
+
+\subsection{Exemplo: um mês de operação}
+
+Premissas fictícias: 2.000 transferências no mês; \rs 5 milhões no fundo; \rs 3 milhões em CDB
+a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI e Selic de 14\% ao ano; 30 dias.
+
+\begin{center}
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Fonte} & \textbf{Conta} & \textbf{Receita} \\
+\midrule
+Tarifas (realizada) & $2.000 \times \rs 2{,}00$ & \rs 4.000,00 \\
+Taxa de administração & $5.000.000 \times 1\% \times 30/365$ & \rs 4.109,59 \\
+Spread do CDB & $3.000.000 \times 14\% \times 5\% \times 30/365$ & \rs 1.726,03 \\
+Float & $2.000.000 \times 14\% \times 30/365$ & \rs 23.013,70 \\
+\midrule
+\textbf{Total} & & \textbf{\rs 32.849,32} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A lição do exemplo, boa para a apresentação: a maior receita não é a tarifa que o cliente vê, e sim
+o float, que ele não vê. E a taxa de administração cresce junto com o patrimônio que a carteira
+sugerida leva para o fundo.
+
+% =====================================================================
+\section{Banco de dados: as tabelas}
+% =====================================================================
+
+Convenções: toda tabela tem \tb{id SERIAL PRIMARY KEY}; tabelas de entidade têm
+\tb{..._key CHAR(36) NOT NULL UNIQUE}, \tb{created_at} e (quando mudam) \tb{updated_at}. Tabelas
+de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colunas que importam.
+
+\subsection{Núcleo bancário}
+
+\begin{longtable}{@{}P{3.4cm}P{12.7cm}@{}}
+\toprule
+\textbf{Tabela} & \textbf{Colunas principais e restrições} \\
+\midrule
+\endhead
+\tb{customer} & \tb{customer_key}; \tb{name TEXT NOT NULL}; \tb{document_number CHAR(14) NOT NULL UNIQUE}; \tb{birth_date DATE NOT NULL}; \tb{created_at}. \\
+\tb{account_status} & Enumerador: \tb{ACTIVE}, \tb{BLOCKED}, \tb{CLOSED}. \\
+\tb{account} & \tb{account_key}; \tb{customer_id} FK $\to$ customer (NOT NULL); \tb{status_id} FK $\to$ account_status; \tb{balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0)}; \tb{created_at}, \tb{updated_at}. \ext: índice único parcial \tb{UNIQUE(customer_id) WHERE status <> CLOSED} para o banco também barrar a segunda conta. \\
+\tb{account_status_event} & \tb{account_id} FK; \tb{from_status_id} FK (nulo no nascimento); \tb{to_status_id} FK NOT NULL; \tb{reason VARCHAR(255)}; \tb{created_at}. \\
+\tb{transaction_type} & Enumerador: \tb{DEPOSIT}, \tb{WITHDRAWAL}, \tb{TRANSFER}, \tb{INVESTMENT_APPLY}, \tb{INVESTMENT_REDEEM}. \\
+\tb{transaction} & \tb{transaction_key}; \tb{type_id} FK; \tb{requester_account_id} FK NOT NULL (quem pediu); \tb{origin_account_id} FK (nulo no depósito e no resgate); \tb{destination_account_id} FK (nulo no saque e na aplicação); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{fee_amount BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0)}; \tb{description VARCHAR(140)}; \tb{idempotency_key CHAR(36) NOT NULL}; \tb{request_hash CHAR(64) NOT NULL}; \tb{created_at}. \tb{UNIQUE(requester_account_id, idempotency_key)}. \\
+\tb{ledger_entry} & \tb{entry_key}; \tb{transaction_id} FK NOT NULL; \tb{account_id} FK NOT NULL; \tb{direction} (\tb{DEBIT}/\tb{CREDIT}, com \tb{CHECK}); \tb{category} (\tb{PRINCIPAL}/\tb{FEE}); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{balance_after BIGINT NOT NULL CHECK (balance_after >= 0)}; \tb{created_at}. Índice em \tb{(account_id, created_at)} para o extrato. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Investimentos}
+
+\begin{longtable}{@{}P{3.9cm}P{12.2cm}@{}}
+\toprule
+\textbf{Tabela} & \textbf{Colunas principais e restrições} \\
+\midrule
+\endhead
+\tb{suitability_question} & \tb{code} (Q1..Q7) UNIQUE; \tb{text}; \tb{dimension} (objetivo, situação financeira, conhecimento); \tb{position} (ordem de exibição). \\
+\tb{suitability_option} & \tb{question_id} FK; \tb{code} (1..4); \tb{text}; \tb{points SMALLINT}. \tb{UNIQUE(question_id, code)}. \\
+\tb{investor_profile} & Enumerador com dados: \tb{CONSERVATIVE}, \tb{MODERATE}, \tb{AGGRESSIVE}; \tb{min_score}, \tb{max_score}, \tb{max_risk_level}. \\
+\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{profile_id} FK; \tb{score SMALLINT}; \tb{forced_by_rule BOOLEAN}; \tb{valid_until TIMESTAMPTZ}; \tb{created_at}. (Uma linha por vez que o cliente responde; nunca é editada.) \\
+\tb{suitability_answer} & \tb{assessment_id} FK; \tb{question_id} FK; \tb{option_id} FK. \tb{UNIQUE(assessment_id, question_id)}. \\
+\tb{product_type} & Enumerador: \tb{PUBLIC_BOND}, \tb{PRIVATE_BOND}, \tb{FUND}. \\
+\tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (nulo no fundo); \tb{min_application BIGINT}; \tb{is_active BOOLEAN}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo). \\
+\tb{reference_rate} & \tb{code} (\tb{CDI}, \tb{SELIC}) UNIQUE; \tb{annual_rate_bps INTEGER CHECK (> 0)}. Taxas fictícias usadas no seed de preços e no relatório de receita. \\
+\tb{product_price} & \tb{product_id} FK; \tb{reference_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, reference_date)}. \\
+\tb{model_portfolio} & \tb{profile_id} FK UNIQUE; \tb{name}. \\
+\tb{model_portfolio_item} & \tb{model_portfolio_id} FK; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(model_portfolio_id, product_id)}. A soma de 10.000 é conferida por um teste. \\
+\tb{investment_order} & \tb{order_key}; \tb{customer_id} FK; \tb{account_id} FK; \tb{product_id} FK; \tb{side} (\tb{APPLY}/\tb{REDEEM}); \tb{amount BIGINT CHECK (> 0)}; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{transaction_id} FK $\to$ transaction (o movimento de dinheiro); \tb{status} (\tb{EXECUTED}); \tb{idempotency_key}; \tb{request_hash}; \tb{created_at}. \tb{UNIQUE(customer_id, idempotency_key)}. \\
+\tb{position} & \tb{customer_id} FK; \tb{product_id} FK; \tb{quantity NUMERIC(24,8) NOT NULL CHECK (>= 0)}; \tb{invested_amount BIGINT NOT NULL CHECK (>= 0)}; \tb{updated_at}. \tb{UNIQUE(customer_id, product_id)}. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Como as tabelas se relacionam}
+
+\begin{itemize}
+  \item \textbf{customer 1:N account} --- ``um cliente tem várias contas'' (ao longo do tempo); só uma não encerrada.
+  \item \textbf{account 1:N account_status_event} --- a trilha de estados.
+  \item \textbf{account 1:N ledger_entry} e \textbf{transaction 1:N ledger_entry} --- cada pedido gera lançamentos em uma ou duas contas.
+  \item \textbf{customer 1:N suitability_assessment 1:N suitability_answer N:1 suitability_option N:1 suitability_question}.
+  \item \textbf{investor_profile 1:1 model_portfolio 1:N model_portfolio_item N:1 product} --- carteira-modelo é um N:N entre perfil e produto, com o peso na tabela do meio.
+  \item \textbf{product 1:N product_price}.
+  \item \textbf{customer N:N product} via \textbf{position} (com a quantidade na tabela do meio) e via \textbf{investment_order} (histórico).
+  \item \textbf{investment_order 1:1 transaction} --- toda ordem aponta para o movimento de dinheiro que ela gerou.
+\end{itemize}
+
+O diagrama no formato \emph{mermaid} (que o modelo de RFC usa) está no Apêndice~\ref{ap:mermaid}.
+
+\subsection{O que o seed (\tb{database.sql}) precisa inserir}
+
+\begin{enumerate}
+  \item Enumeradores: \tb{account_status}, \tb{transaction_type}, \tb{product_type}, \tb{investor_profile}.
+  \item As 7 perguntas e 28 opções do questionário.
+  \item As taxas de referência (CDI e Selic) e os 6 produtos com seus preços dos últimos 30 dias
+        (a cota do fundo já líquida da taxa de administração).
+  \item As 3 carteiras-modelo e seus itens.
+\end{enumerate}
+
+Lembrete da Aula 3: o \tb{database.sql} só roda quando o banco nasce. Mudou o schema?
+\tb{docker compose down -v} e sobe de novo.
+
+% =====================================================================
+\section{Rotas da API}
+% =====================================================================
+
+Todas exigem \tb{INTERNAL-TOKEN} (403 se faltar), menos o \tb{/health_check}. ``Idem.'' = rota idempotente pelo cabeçalho
+\tb{Idempotency-Key}. \texttt{ck} = \tb{customer_key}, \texttt{ak} = \tb{account_key}.
+
+\begingroup\small
+\begin{longtable}{@{}P{1.1cm}P{5.0cm}P{4.0cm}P{5.2cm}@{}}
+\toprule
+\textbf{Mét.} & \textbf{Caminho} & \textbf{O que faz / entrada} & \textbf{Saídas} \\
+\midrule
+\endhead
+\multicolumn{4}{@{}l}{\textbf{Infra}} \\
+GET & \rota|/health_check| & API e banco de pé (já existe). & 200. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Clientes}} \\
+POST & \rota|/customer| & Cria cliente. \tb{name}, \tb{document_number}, \tb{birth_date}. & 201 \tb{customer_key}; 400 schema; 409 CPF já existe; 422 CPF inválido ou menor de idade. \\
+GET & \rota|/customer/{ck}| & Lê cliente (CPF mascarado). & 200; 404. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Contas}} \\
+POST & \rota|/customer/{ck}/account| & Abre a conta corrente. & 201 \tb{account_key}; 404 cliente; 409 já tem conta não encerrada. \\
+GET & \rota|/customer/{ck}/account/{ak}| & Saldo e status. & 200; 404 (inexistente ou de outro cliente). \\
+PATCH & \rota|/customer/{ck}/account/{ak}| & Muda status. \tb{status}, \tb{reason}. & 200; 400 status fora do enum; 404; 409 transição proibida ou conta não vazia; 422 sem motivo. \\
+GET & \rota|/customer/{ck}/account/{ak}/status_events| & Histórico de status. & 200; 404. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Movimentações}} \\
+POST & \rota|/customer/{ck}/account/{ak}/transaction| & Depósito, saque ou transferência. \tb{type}, \tb{amount}, \tb{destination_account_key} (só transferência), \tb{description}. \textbf{Idem.} & 201 \tb{transaction_key} e saldo; 200 repetição idempotente; 400 schema/sem chave; 404 conta ou destino; 409 conta/destino não ativos, saldo insuficiente, chave reutilizada; 422 valor inválido, acima do limite, origem = destino. \\
+GET & \rota|/customer/{ck}/account/{ak}/transactions| & Extrato. Query: \tb{page}, \tb{limit}, \tb{from}, \tb{to}, \tb{type}. & 200 lista paginada; 400 filtro inválido; 404. \\
+GET & \rota|/customer/{ck}/account/{ak}/transaction/{transaction_key}| & Comprovante. & 200; 404 (inexistente ou não envolve a conta). \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Suitability}} \\
+GET & \rota|/suitability_questions| & Perguntas e opções (sem os pontos). & 200. \\
+POST & \rota|/customer/{ck}/suitability| & Envia respostas. \tb{answers: [\{question_code, option_code\}]}. & 201 perfil, pontuação, validade; 400 schema; 404 cliente; 422 respostas incompletas ou opção inválida. \\
+GET & \rota|/customer/{ck}/suitability| & Perfil atual. & 200; 404 cliente ou sem perfil. \\
+GET & \rota|/customer/{ck}/suitabilities| & Histórico de avaliações. & 200; 404. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Produtos e preços}} \\
+GET & \rota|/products| & Catálogo. Query: \tb{type}, \tb{max_risk}. & 200. \\
+GET & \rota|/product/{product_key}| & Detalhe + preço do dia. & 200; 404. \\
+GET & \rota|/product/{product_key}/prices| & Histórico de preços. Query: \tb{from}, \tb{to}. & 200; 404. \\
+POST & \rota|/product/{product_key}/price| & Publica preço/cota de uma data (uso interno). \tb{reference_date}, \tb{unit_price}. & 201; 404; 409 já existe preço na data; 422 preço $\le 0$ ou data futura. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Carteira sugerida}} \\
+GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Ordens e posição}} \\
+POST & \rota|/customer/{ck}/investment_order| & Aplica ou resgata. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço; 200 repetição idempotente; 400 schema/sem chave; 404 cliente ou produto; 409 sem conta ativa, sem perfil válido, saldo ou posição insuficiente, produto indisponível, sem preço, chave reutilizada; 422 abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
+GET & \rota|/customer/{ck}/investment_orders| & Histórico de ordens. Query: \tb{page}, \tb{limit}, \tb{product_key}. & 200; 404. \\
+GET & \rota|/customer/{ck}/investment_order/{order_key}| & Detalhe da ordem. & 200; 404 (inclusive de outro cliente). \\
+GET & \rota|/customer/{ck}/positions| & Posição consolidada e rentabilidade. & 200; 404. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Receita}} \\
+GET & \rota|/internal/revenue| & Receita realizada e estimada. Query: \tb{from}, \tb{to}. & 200; 400 período inválido. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Incrementos (\ext)}} \\
+POST & \rota|/customer/{ck}/portfolio_application| & Aplica a carteira sugerida inteira numa só transação. \tb{amount}. \textbf{Idem.} & 201 lista de ordens; mesmos erros da ordem. \\
+GET & \rota|/internal/reconciliation| & Confere, para todas as contas, se saldo = soma do extrato. & 200 relatório. \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+\textbf{Por que as rotas são aninhadas em \tb{/customer/\{ck\}}?} Porque é o jeito mais simples de
+cumprir a R8: o controller sempre confere ``essa conta/ordem é deste cliente?'' antes de qualquer
+coisa, e responde 404 se não for.
+
+% =====================================================================
+\section{Catálogo de erros}\label{sec:erros}
+% =====================================================================
+
+Formato do corpo (RN-GER-05). \tb{title} e \tb{description} em inglês, \tb{translation} em
+português, \tb{code} = \tb{BNK} + módulo (3 dígitos) + número (3 dígitos). Troquem o prefixo
+\tb{BNK} pelo nome final do banco.
+
+\begin{lstlisting}
+HTTP/1.1 409 Conflict
+{
+  "title": "Insufficient Balance",
+  "description": "The account does not have enough balance for amount plus fee.",
+  "translation": "Saldo insuficiente para o valor mais a tarifa.",
+  "code": "BNK003003"
+}
+\end{lstlisting}
+
+\begingroup\small
+\begin{longtable}{@{}P{1.9cm}P{1.1cm}P{4.3cm}P{8.0cm}@{}}
+\toprule
+\textbf{Código} & \textbf{HTTP} & \textbf{Title} & \textbf{Quando} \\
+\midrule
+\endhead
+BNK000001 & 400 & Invalid Payload & Corpo fora do schema (campo faltando, tipo errado, enum inválido). \\
+BNK000002 & 403 & Forbidden & Sem \tb{INTERNAL-TOKEN} (repositório-base). \\
+BNK000003 & 400 & Missing Idempotency Key & Rota de dinheiro sem \tb{Idempotency-Key}. \\
+BNK000004 & 409 & Idempotency Key Reused & Mesma chave com corpo diferente. \\
+BNK000005 & 400 & Invalid Query Parameter & Paginação ou filtro inválido. \\
+\midrule
+BNK001001 & 404 & Customer Not Found & \tb{customer_key} não existe. \\
+BNK001002 & 409 & Document Already Registered & CPF já cadastrado. \\
+BNK001003 & 422 & Invalid Document Number & CPF com dígitos verificadores errados. \\
+BNK001004 & 422 & Underage Customer & Menor de 18 anos ou nascimento no futuro. \\
+\midrule
+BNK002001 & 404 & Account Not Found & Conta inexistente ou de outro cliente. \\
+BNK002002 & 409 & Account Already Exists & Cliente já tem conta não encerrada. \\
+BNK002003 & 409 & Invalid Status Transition & Transição proibida (ex.: sair de CLOSED). \\
+BNK002004 & 409 & Account Not Empty & Encerrar com saldo ou posição. \\
+BNK002005 & 409 & Account Not Active & Movimentar conta bloqueada ou encerrada. \\
+BNK002006 & 422 & Status Reason Required & Bloquear/encerrar sem motivo. \\
+\midrule
+BNK003001 & 404 & Transaction Not Found & Inexistente ou não envolve a conta. \\
+BNK003002 & 404 & Destination Account Not Found & Conta de destino não existe. \\
+BNK003003 & 409 & Insufficient Balance & Saldo menor que valor + tarifa (ou que a aplicação). \\
+BNK003004 & 422 & Invalid Amount & Valor zero ou negativo. \\
+BNK003005 & 422 & Amount Above Limit & Acima do limite por operação. \\
+BNK003006 & 422 & Same Account Transfer & Origem igual ao destino. \\
+BNK003007 & 409 & Destination Account Not Active & Destino bloqueado ou encerrado. \\
+\midrule
+BNK004001 & 404 & Suitability Not Found & Cliente nunca respondeu o questionário. \\
+BNK004002 & 422 & Incomplete Answers & Falta pergunta ou pergunta repetida. \\
+BNK004003 & 422 & Invalid Option & Opção não pertence à pergunta. \\
+BNK004004 & 409 & Suitability Expired & Perfil com mais de 24 meses. \\
+BNK004005 & 409 & Suitability Required & Aplicar ou pedir sugestão sem perfil. \\
+\midrule
+BNK005001 & 404 & Product Not Found & \tb{product_key} não existe. \\
+BNK005002 & 409 & Product Not Available & Produto inativo ou vencido. \\
+BNK005003 & 409 & Price Unavailable & Nenhum preço até hoje. \\
+BNK005004 & 409 & Price Already Published & Já existe preço nessa data. \\
+BNK005005 & 422 & Invalid Price & Preço $\le 0$ ou data futura. \\
+\midrule
+BNK006001 & 404 & Order Not Found & Ordem inexistente ou de outro cliente. \\
+BNK006002 & 422 & Below Minimum Application & Valor menor que o mínimo do produto. \\
+BNK006003 & 422 & Product Not Suitable & Risco do produto acima do perfil. \\
+BNK006004 & 409 & Insufficient Position & Resgate maior que a posição. \\
+BNK006005 & 422 & Redemption Not Allowed & Resgate antes do vencimento (liquidez no vencimento). \\
+BNK006006 & 422 & Suggestion Amount Too Low & Sugestão abaixo de \rs 1.000,00. \\
+BNK006007 & 409 & No Active Account & Cliente sem conta ativa para liquidar a ordem. \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+% =====================================================================
+\section{Fluxos principais}
+% =====================================================================
+
+Cada fluxo tem o caminho feliz e os caminhos de falha mais prováveis. É este material que vira a
+seção ``Fluxos'' da RFC.
+
+\subsection{Criar cliente}
+\textbf{Feliz:} (1) schema valida o corpo; (2) normaliza o CPF (só dígitos); (3) valida dígitos;
+(4) confere idade $\ge$ 18; (5) busca CPF no banco --- não existe; (6) cria com \tb{customer_key}
+nova; (7) \tb{commit}; (8) 201.\\
+\textbf{Falhas:} passo 3 $\to$ 422 \tb{BNK001003}; passo 4 $\to$ 422 \tb{BNK001004}; passo 5 $\to$
+409 \tb{BNK001002}. Corrida (dois cadastros iguais ao mesmo tempo): o \tb{UNIQUE} do banco recusa
+o segundo; o controller transforma o erro de integridade em 409.
+
+\subsection{Abrir conta}
+\textbf{Feliz:} (1) busca cliente pela \tb{key}; (2) trava a linha do cliente (\tb{FOR UPDATE});
+(3) conta contas não encerradas = 0; (4) cria conta \tb{ACTIVE}, saldo 0; (5) grava evento
+\tb{null} $\to$ \tb{ACTIVE}; (6) \tb{commit}; (7) 201.\\
+\textbf{Falhas:} passo 1 $\to$ 404; passo 3 $\to$ 409 \tb{BNK002002}. Dois pedidos simultâneos: o
+segundo espera a trava do passo 2, conta uma conta e recebe 409.
+
+\subsection{Transferência (o coração do sistema)}
+\textbf{Feliz:}
+\begin{enumerate}
+  \item Schema valida corpo e cabeçalho \tb{Idempotency-Key}.
+  \item Busca a conta de origem pela \tb{key} \emph{e} confere que é do cliente do caminho.
+  \item Busca a conta de destino; confere que não é a mesma da origem.
+  \item \textbf{Trava as duas contas} (\tb{FOR UPDATE}) em ordem crescente de \tb{id}.
+  \item Procura transação com (conta de origem, chave). Se existir e o hash do corpo for igual,
+        devolve a resposta original (200) e \textbf{para aqui}. Se o hash for diferente, 409.
+  \item Confere status \tb{ACTIVE} nas duas e saldo da origem $\ge$ valor + tarifa (lidos
+        \emph{depois} da trava).
+  \item Grava a \tb{transaction}; grava 3 lançamentos (débito principal, débito tarifa, crédito);
+        atualiza os 2 saldos.
+  \item \tb{commit} (libera as travas); responde 201 com \tb{transaction_key} e saldo novo.
+\end{enumerate}
+\textbf{Falhas:}
+\begin{itemize}
+  \item Saldo insuficiente no passo 6 $\to$ nada foi escrito, \tb{rollback}, 409 \tb{BNK003003}.
+  \item Duas transferências simultâneas de uma conta com \rs 100 (cada uma de \rs 80): a segunda
+        espera a trava da primeira no passo 4; quando lê o saldo já vê \rs 18 e recebe 409. Sem a
+        trava, as duas leriam \rs 100 e o saldo ficaria negativo (o \tb{CHECK} do banco
+        barraria, mas com um 500).
+  \item O cliente reenvia o pedido porque a resposta demorou: a chave já existe $\to$ passo 5
+        devolve a mesma resposta, sem debitar de novo. Se o reenvio chega enquanto o original
+        ainda roda, ele espera a trava no passo 4 e depois cai no mesmo caso. Por isso a checagem
+        vem depois da trava: antes dela, o reenvio veria o saldo já debitado e receberia um falso
+        ``saldo insuficiente''. O \tb{UNIQUE(requester_account_id, idempotency_key)} fica como
+        rede de segurança.
+\end{itemize}
+
+\subsection{Responder o suitability}
+\textbf{Feliz:} (1) busca cliente; (2) confere 7 respostas, uma por pergunta, opções válidas; (3)
+soma pontos; (4) aplica a trava da Q3/Q5; (5) escolhe o perfil pela faixa; (6) grava avaliação +
+7 respostas, \tb{valid_until} = agora + 24 meses; (7) \tb{commit}; (8) 201.\\
+\textbf{Falhas:} passo 1 $\to$ 404; passo 2 $\to$ 422 \tb{BNK004002}/\tb{BNK004003}.
+
+\subsection{Aplicação}
+\textbf{Feliz:} (1) schema e \tb{Idempotency-Key}; (2) busca cliente, conta ativa, perfil
+válido, produto disponível; (3) confere risco $\le$ perfil e valor $\ge$ mínimo; (4) busca preço
+do dia; (5) trava a conta e depois a posição (cria a posição com quantidade 0 se não existir); (6)
+checa a idempotência, já com as travas; confere saldo $\ge$ valor; (7) calcula quantidade; (8) grava transação \tb{INVESTMENT_APPLY} +
+lançamento de débito, atualiza saldo; (9) grava ordem; (10) soma quantidade e custo na posição;
+(11) \tb{commit}; (12) 201.\\
+\textbf{Falhas:} perfil vencido $\to$ 409; produto de risco 3 para Conservador $\to$ 422
+\tb{BNK006003}; sem preço $\to$ 409 \tb{BNK005003}; saldo insuficiente $\to$ 409 (nada gravado).
+
+\subsection{Resgate}
+Igual à aplicação, sem a checagem de perfil, com: posição suficiente (409 \tb{BNK006004}),
+liquidez (422 \tb{BNK006005} antes do vencimento), crédito na conta e redução proporcional do
+custo.
+
+\subsection*{Principal desafio (candidato para a RFC)}
+
+\textbf{Qual é:} mover dinheiro entre contas e entre conta e investimento sem nunca criar,
+duplicar ou sumir com um centavo.\\
+\textbf{Por que é difícil:} cada operação são várias escritas em tabelas diferentes; pedidos
+simultâneos disputam o mesmo saldo; e o cliente pode reenviar o mesmo pedido.\\
+\textbf{Como o desenho resolve:} uma transação de banco por operação (tudo ou nada), trava das
+linhas lidas para decidir (\tb{FOR UPDATE}, sempre na mesma ordem), chave de idempotência com
+\tb{UNIQUE} no banco, e o invariante ``saldo = soma do extrato'' conferido por testes.
+
+% =====================================================================
+\section{Organização do código (onde cada coisa mora)}
+% =====================================================================
+
+Seguindo as camadas do repositório-base. Para cada módulo, criar:
+
+\begingroup\small
+\begin{longtable}{@{}P{3.6cm}P{12.5cm}@{}}
+\toprule
+\textbf{Pasta} & \textbf{Arquivos a criar} \\
+\midrule
+\endhead
+\tb{database/} & \tb{database.sql}: todas as tabelas, índices, \tb{CHECK}s e o seed. \\
+\tb{src/models/} & \tb{customer.py}, \tb{account.py} (+ status e evento), \tb{transaction.py} (+ tipo e \tb{ledger_entry}), \tb{suitability.py}, \tb{product.py} (+ tipo e preço), \tb{model_portfolio.py}, \tb{investment_order.py}, \tb{position.py}. Atenção à ordem no \tb{models/__init__.py}: enumerador antes da entidade que o usa. \\
+\tb{src/schemas/} & Um \tb{.json} por corpo de entrada: \tb{customer_create}, \tb{account_status_update}, \tb{transaction_create}, \tb{suitability_submit}, \tb{price_create}, \tb{investment_order_create}. \\
+\tb{src/repositories/} & Um por entidade. Gera a \tb{key} no \tb{create}; métodos \tb{get_by_key}, \tb{get_by_key_for_update}, listagens paginadas. Não decide nada. \\
+\tb{src/controllers/} & \tb{customer}, \tb{account}, \tb{transaction}, \tb{suitability}, \tb{product}, \tb{portfolio}, \tb{investment_order}. Aqui moram todos os \tb{if} de negócio e o \tb{commit}. \\
+\tb{src/resources/} & Um por controller: lê HTTP, chama o controller, devolve o status de sucesso. \\
+\tb{src/dtos/} & Um por resposta: troca \tb{id} por \tb{key}, número de status por texto, mascara o CPF. \\
+\tb{src/errors/} & Uma classe por código do catálogo, com status e textos. \\
+\tb{src/connectors/} & Vazio no MVP (\ext: preço externo, antifraude). \\
+\tb{src/app.py} & Registro das rotas da seção de rotas. \\
+\tb{tests/} & Testes black box por módulo (próxima seção). \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+% =====================================================================
+\section{Testes (cada regra que barra vira pelo menos um teste)}
+% =====================================================================
+
+Todos black box (R1): preparam o mundo pela porta da frente (criando cliente e conta via HTTP),
+fazem a requisição e conferem \textbf{status e corpo}. Nomes sugeridos, lidos como frases:
+
+\begingroup\small
+\begin{longtable}{@{}P{2.4cm}P{13.7cm}@{}}
+\toprule
+\textbf{Módulo} & \textbf{Testes} \\
+\midrule
+\endhead
+Clientes & cria cliente e devolve key (não id); recusa CPF inválido com 422; recusa CPF repetido com 409; recusa CPF repetido com pontuação diferente; recusa menor de idade; devolve CPF mascarado; cliente inexistente dá 404. \\
+Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409; recusa conta para cliente inexistente com 404; conta de outro cliente dá 404; bloqueia e desbloqueia; não sai de CLOSED; não encerra com saldo; exige motivo; histórico registra todas as transições. \\
+Movimentações & depósito aumenta saldo; saque diminui saldo; \textbf{transferência debita valor + tarifa na origem e credita só o valor no destino}; recusa saldo insuficiente sem alterar nenhum saldo; recusa transferência para si mesmo; recusa destino inexistente; recusa conta bloqueada (origem e destino); recusa valor zero e acima do limite; mesmo Idempotency-Key não debita duas vezes; mesma chave com corpo diferente dá 409; sem chave dá 400; extrato reconstrói o saldo; extrato pagina; comprovante de outra conta dá 404; tipo INVESTMENT_APPLY recusado na rota de transação. \\
+Suitability & calcula cada um dos três perfis; trava da Q3 força Conservador; recusa respostas incompletas; recusa opção de outra pergunta; refazer mantém histórico e muda o perfil atual; cliente sem perfil dá 404. \\
+Produtos & lista catálogo; filtra por risco; publica preço; recusa preço repetido na mesma data; recusa preço negativo e data futura. \\
+Carteira & soma dos pesos de cada carteira-modelo é 10.000; sugestão soma exatamente o valor pedido (inclusive com centavos quebrados); recusa sem perfil; recusa valor abaixo do mínimo. \\
+Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate funciona mesmo sem perfil válido; mesmo Idempotency-Key não aplica duas vezes; ordem de outro cliente dá 404. \\
+Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. \\
+Concorrência \ext & dispara N transferências em paralelo (threads) de uma conta e confere que o saldo final nunca fica negativo e bate com o extrato. \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+% =====================================================================
+\section{Decisões e alternativas descartadas (R7)}\label{sec:decisoes}
+% =====================================================================
+
+No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (preço). Ganharia se
+(cenário).}
+
+\begin{enumerate}
+  \item \textbf{Saldo só como soma do extrato} (sem coluna \tb{balance}) --- descartada porque toda
+  leitura de saldo vira uma soma sobre todas as linhas e a concorrência continua existindo. Ganharia
+  se o volume fosse pequeno e quiséssemos zero redundância. \emph{Escolhido:} coluna \tb{balance}
+  + \tb{ledger_entry} com \tb{balance_after}, e um teste que confere que os dois batem.
+  \item \textbf{Uma tabela por tipo de operação} (\tb{deposit}, \tb{transfer}\ldots) --- descartada
+  porque o extrato vira união de várias consultas e toda regra nova se escreve várias vezes. Ganharia
+  se cada tipo tivesse muitos campos exclusivos. \emph{Escolhido:} \tb{transaction} com \tb{type} +
+  \tb{ledger_entry}.
+  \item \textbf{Atualização condicional sem trava}
+  (\tb{UPDATE account SET balance = balance - x WHERE id = .. AND balance >= x}) --- descartada
+  porque na transferência precisamos ler duas contas e o status delas antes de decidir, e a trava
+  explícita é mais fácil de explicar e testar. Ganharia se só uma conta fosse afetada e o
+  desempenho importasse mais.
+  \item \textbf{Posição calculada a partir das ordens} (sem tabela \tb{position}) --- descartada pelo
+  mesmo motivo do item 1 e porque o resgate precisa travar ``a posição''. Ganharia se não houvesse
+  resgate parcial.
+  \item \textbf{Preço calculado em tempo real por fórmula ou buscado num serviço externo} ---
+  descartada no MVP porque aumenta muito o código e cria dependência externa (timeout, falha).
+  Ganharia se tivéssemos ativos de mercado (ações). Fica como \ext{} com connector + Mockserver.
+  \item \textbf{Perguntas do suitability no código} --- descartada porque mudar uma pergunta exigiria
+  mudar código, e não daria para guardar a resposta escolhida com integridade. Ganharia pela
+  simplicidade se o questionário nunca mudasse.
+  \item \textbf{Permitir produto fora do perfil com termo de ciência} (prática comum no mercado) ---
+  descartada no MVP porque exige guardar o aceite e mais um ramo de fluxo. Ganharia num produto
+  real, em que bloquear o cliente é ruim para o negócio.
+  \item \textbf{Rotas planas} (\tb{/account/\{ak\}}) com o dono identificado por cabeçalho ---
+  descartada porque o dono ficaria implícito e fácil de esquecer (IDOR). Ganharia se existisse
+  autenticação de verdade (token do cliente).
+  \item \textbf{Quantidade como inteiro com escala fixa} (ex.: cotas $\times 10^8$ em \tb{BIGINT})
+  --- descartada porque \tb{NUMERIC} já é exato e mais legível. Ganharia se o banco não tivesse
+  tipo decimal exato.
+  \item \textbf{Conta de receitas do banco com saldo} (a tarifa seria creditada numa conta
+  interna) --- descartada porque toda transferência teria de travar e atualizar a \emph{mesma}
+  linha, e o banco inteiro passaria a fazer uma transferência por vez. Ganharia se o volume fosse
+  pequeno. \emph{Escolhido:} a receita é a soma dos lançamentos \tb{FEE}, e a conservação do
+  dinheiro é conferida pela reconciliação.
+  \item \textbf{Cobrar a taxa de administração como transação diária} --- descartada porque exigiria
+  uma rotina agendada e não é assim que o mercado faz: a taxa já vem descontada da cota. Ganharia se
+  quiséssemos mostrar a cobrança no extrato do cliente.
+  \item \textbf{Não fazer o módulo de investimentos} (``não fazer nada'') --- é a opção mais
+  barata e deixaria todo o tempo para o núcleo. Descartada porque perderíamos o diferencial e a
+  conexão com a vertical de fundos da QI Tech. \textbf{Vira o plano de corte:} se o núcleo atrasar,
+  os investimentos são reduzidos (ver Seção~\ref{sec:plano}).
+\end{enumerate}
+
+% =====================================================================
+\section{Incrementos para se destacar}\label{sec:incrementos}
+% =====================================================================
+
+Em ordem aproximada de custo-benefício (os primeiros são baratos e impressionam):
+
+\begin{enumerate}
+  \item \textbf{Rota de reconciliação} (\tb{GET /internal/reconciliation}): prova, ao vivo, que
+  saldo = soma do extrato para todas as contas. Barata e mostra maturidade.
+  \item \textbf{Teste de concorrência}: N transferências em paralelo, saldo final correto.
+  \item \textbf{Aplicar a carteira sugerida inteira numa só requisição}, atômica: ou todas as
+  ordens executam, ou nenhuma.
+  \item \textbf{Termo de ciência de desenquadramento}: aceitar produto fora do perfil se o corpo
+  trouxer \tb{acknowledge_unsuitable: true}, guardando o aceite na ordem.
+  \item \textbf{Imposto de renda regressivo e IOF} no resgate, com a tabela regressiva de renda fixa
+  (22,5\% até 180 dias; 20\% até 360; 17,5\% até 720; 15\% acima), LCI isenta.
+  \item \textbf{Connector de preços + Mockserver}: o preço do dia vem de um serviço ``de fora''
+  simulado, com timeout e erro próprio quando ele não responde (exatamente o que a Aula 3 ensinou).
+  \item \textbf{Connector de antifraude/bureau na abertura de conta}, também com Mockserver.
+  \item \textbf{Cotização e liquidação com prazo} (fundo D+1, D+30): ordem nasce \tb{PENDING} e vira
+  \tb{SETTLED} na data de liquidação --- mais um ciclo de estados.
+  \item \textbf{Isenção de tarifa para quem investe}: cliente com, por exemplo, \rs 10.000 ou mais
+  no \fundo{} não paga transferência. É uma alavanca de negócio fácil de explicar na banca.
+  \item \textbf{Taxa de performance} no fundo (ex.: 20\% do que render acima do CDI), mostrada no
+  relatório de receita.
+  \item \textbf{Rebalanceamento}: comparar a posição atual com a carteira-modelo e sugerir as
+  ordens para voltar aos pesos.
+  \item \textbf{Rentabilidade comparada ao CDI} no período (benchmark), usando o CDI da tabela
+  \tb{reference_rate} como referência.
+  \item \textbf{Limite diário} de transferência (soma do dia), além do limite por operação.
+  \item \textbf{Estorno} como transação contrária ligada à original.
+  \item \textbf{Documentação automática}: reativar o \tb{/docs} do FastAPI (o repositório-base
+  desliga com \tb{docs_url=None}) e deixar exemplos de cada rota.
+  \item \textbf{Índice único parcial} no banco para uma conta não encerrada por cliente.
+\end{enumerate}
+
+% =====================================================================
+\section{Plano de trabalho até 12/10}\label{sec:plano}
+% =====================================================================
+
+\begin{tabularx}{\linewidth}{@{}P{3.1cm}X@{}}
+\toprule
+\textbf{Período} & \textbf{Entregas} \\
+\midrule
+29/09 a 01/10 & Fechar este documento; conferir o enunciado da Aula 1; subir o repositório-base na máquina de todos; escrever o \tb{database.sql} completo com seeds. \\
+02/10 a 05/10 & Nível 1 com TDD: clientes, contas, movimentações, extrato, erros. Meta: transferência com teste verde e idempotência funcionando. \\
+06/10 a 09/10 & Nível 2: suitability, produtos e preços, carteira sugerida, ordens e posição. \\
+10/10 a 11/10 & RFC final (2 a 4 páginas, no modelo); \tb{docker compose up} + \tb{pytest -v} numa máquina limpa; incrementos baratos (reconciliação). \\
+12/10 até 12h & Entrega: repositório \textbf{público} no GitHub + PDF. Não programar nada novo nesse dia. \\
+\bottomrule
+\end{tabularx}
+
+\textbf{Divisão sugerida (time de 3):} Pessoa A --- clientes, contas e o \tb{database.sql}
+(para evitar conflitos); Pessoa B --- movimentações, extrato e a RFC; Pessoa C --- suitability,
+produtos e preços, carteira sugerida. Ordens e posição (o módulo mais delicado) ficam para quem
+terminar primeiro, com revisão de outro. Cada um escreve os testes do próprio módulo.
+
+\textbf{Plano de corte} (se o tempo apertar, cortar nesta ordem): incrementos $\to$ histórico de
+preços e de perfis $\to$ carteira sugerida $\to$ resgate parcial (manter só resgate total). O que
+\textbf{não} se corta: núcleo bancário completo, suitability, aplicação e posição.
+
+% =====================================================================
+\section{Checklist final e pontos a confirmar}\label{sec:confirmar}
+% =====================================================================
+
+\subsection{O que não pode faltar na entrega}
+
+\begin{itemize}
+  \item[$\square$] \tb{docker compose up} sobe tudo numa máquina Linux limpa, sem passo manual (R2).
+  \item[$\square$] Repositório \textbf{público} no GitHub no dia da entrega.
+  \item[$\square$] As 5 entregas do enunciado: cliente, conta, transação com saldo, tarifa, extrato paginado.
+  \item[$\square$] Nenhum teste importa \tb{src/} (R1); \tb{pytest -v} todo verde.
+  \item[$\square$] Todo erro com \tb{title}, \tb{description}, \tb{translation}, \tb{code} (R3).
+  \item[$\square$] Nenhuma rota \tb{DELETE}; nenhum \tb{DELETE}/\tb{UPDATE} de histórico (R4).
+  \item[$\square$] Nenhum \tb{id} numérico em URL ou resposta (R5).
+  \item[$\square$] Nenhum \tb{FLOAT}; dinheiro em centavos \tb{BIGINT} (R6).
+  \item[$\square$] RFC com decisões e alternativas descartadas (R7).
+  \item[$\square$] Recurso de outro cliente sempre 404 (R8).
+  \item[$\square$] Transferência com tarifa atômica, com trava e idempotente.
+  \item[$\square$] Extrato reconstrói o saldo.
+  \item[$\square$] Jornada de investimento completa de ponta a ponta.
+\end{itemize}
+
+\subsection{Perguntas que ainda ficam em aberto}
+
+O enunciado da Aula 1 respondeu à maioria das dúvidas (o que é obrigatório, o que é livre, que
+podemos ter quantas entidades quisermos). Ficam três:
+
+\begin{enumerate}
+  \item Qual status o repositório-base usa para CPF inválido: 422 ou 400? O arquivo para
+        conferir é o \tb{src/errors/custom_errors.py}.
+  \item A apresentação deve ``mostrar o ecossistema'', mas o modelo de RFC fala em 2 a 4 páginas.
+        Perguntar no Slack se o limite é rígido ou se podemos ter um anexo para o módulo de
+        investimentos.
+  \item Usar outro container no compose (ex.: Mockserver) é permitido na entrega?
+\end{enumerate}
+
+\subsection{Como este documento vira a RFC}
+
+\begin{tabularx}{\linewidth}{@{}P{5.2cm}X@{}}
+\toprule
+\textbf{Seção do modelo de RFC} & \textbf{De onde tirar} \\
+\midrule
+Entendendo o problema & Seções 2 e 4 (garantias sobre o dinheiro, fora de escopo). \\
+Solução macro + alternativas & Seção 5 (peças) + Seção~\ref{sec:decisoes} (escolher 2 a 4 alternativas). \\
+Rotas & Tabela de rotas (uma linha por rota, com status e idempotência). \\
+Banco de dados & Diagrama do Apêndice~\ref{ap:mermaid} exportado como imagem. \\
+Fluxos + principal desafio & Seção de fluxos (transferência e aplicação). \\
+\bottomrule
+\end{tabularx}
+
+% =====================================================================
+\appendix
+\section{Diagrama ER em mermaid}\label{ap:mermaid}
+% =====================================================================
+
+Colar em \url{https://mermaid.live} para gerar a imagem da RFC. Só as colunas que importam.
+
+\begin{lstlisting}
+erDiagram
+  customer ||--o{ account : "tem"
+  account_status ||--o{ account : "estado"
+  account ||--o{ account_status_event : "historico"
+  account ||--o{ ledger_entry : "lancamentos"
+  transaction ||--|{ ledger_entry : "gera"
+  transaction_type ||--o{ transaction : "tipo"
+  customer ||--o{ suitability_assessment : "responde"
+  investor_profile ||--o{ suitability_assessment : "resulta"
+  suitability_assessment ||--|{ suitability_answer : "contem"
+  suitability_question ||--|{ suitability_option : "opcoes"
+  suitability_option ||--o{ suitability_answer : "escolhida"
+  investor_profile ||--|| model_portfolio : "modelo"
+  model_portfolio ||--|{ model_portfolio_item : "itens"
+  product ||--o{ model_portfolio_item : "compoe"
+  product_type ||--o{ product : "tipo"
+  product ||--o{ product_price : "precos"
+  customer ||--o{ investment_order : "envia"
+  product ||--o{ investment_order : "negociado"
+  transaction ||--o| investment_order : "liquida"
+  customer ||--o{ position : "possui"
+  product ||--o{ position : "em"
+
+  customer {
+    int id PK
+    char customer_key UK
+    char document_number UK
+  }
+  account {
+    int id PK
+    char account_key UK
+    int customer_id FK
+    int status_id FK
+    bigint balance "centavos, >= 0"
+  }
+  transaction {
+    int id PK
+    char transaction_key UK
+    int requester_account_id FK
+    int origin_account_id FK "nulo em deposito"
+    int destination_account_id FK "nulo em saque"
+    bigint amount "centavos"
+    bigint fee_amount
+    char idempotency_key "UK com requester"
+  }
+  ledger_entry {
+    int id PK
+    int transaction_id FK
+    int account_id FK
+    string direction "DEBIT ou CREDIT"
+    bigint amount
+    bigint balance_after
+  }
+  suitability_assessment {
+    int id PK
+    char assessment_key UK
+    int customer_id FK
+    int profile_id FK
+    smallint score
+    timestamptz valid_until
+  }
+  product {
+    int id PK
+    char product_key UK
+    smallint risk_level
+    string liquidity
+    bigint min_application
+    boolean own_issue
+    smallint admin_fee_bps
+  }
+  product_price {
+    int id PK
+    int product_id FK
+    date reference_date "UK com product"
+    numeric unit_price
+  }
+  investment_order {
+    int id PK
+    char order_key UK
+    int customer_id FK
+    int product_id FK
+    int transaction_id FK
+    string side "APPLY ou REDEEM"
+    bigint amount
+    numeric quantity
+  }
+  position {
+    int id PK
+    int customer_id FK
+    int product_id FK "UK com customer"
+    numeric quantity ">= 0"
+    bigint invested_amount
+  }
+\end{lstlisting}
+
+% =====================================================================
+\section{Exemplos de requisição e resposta}
+% =====================================================================
+
+\subsection*{Transferência}
+\begin{lstlisting}
+POST /customer/9c2f.../account/7b1e.../transaction
+INTERNAL-TOKEN: ...
+Idempotency-Key: 5d0c2a6e-8a51-4f7e-9d1b-2f3c4b5a6d7e
+{
+  "type": "TRANSFER",
+  "amount": 20000,
+  "destination_account_key": "3b7e41d0-...",
+  "description": "Aluguel"
+}
+
+HTTP/1.1 201 Created
+{
+  "transaction_key": "e4a1...",
+  "type": "TRANSFER",
+  "amount": 20000,
+  "fee_amount": 200,
+  "balance": 79600,
+  "created_at": "2026-10-02T14:10:00Z"
+}
+\end{lstlisting}
+
+\subsection*{Suitability}
+\begin{lstlisting}
+POST /customer/9c2f.../suitability
+{
+  "answers": [
+    {"question_code": "Q1", "option_code": 3},
+    {"question_code": "Q2", "option_code": 3},
+    {"question_code": "Q3", "option_code": 3},
+    {"question_code": "Q4", "option_code": 2},
+    {"question_code": "Q5", "option_code": 3},
+    {"question_code": "Q6", "option_code": 2},
+    {"question_code": "Q7", "option_code": 3}
+  ]
+}
+
+HTTP/1.1 201 Created
+{
+  "assessment_key": "a81f...",
+  "profile": "MODERATE",
+  "score": 19,
+  "forced_by_rule": false,
+  "max_risk_level": 3,
+  "valid_until": "2028-10-02T14:12:00Z"
+}
+\end{lstlisting}
+
+\subsection*{Sugestão de carteira}
+\begin{lstlisting}
+GET /customer/9c2f.../portfolio_suggestion?amount=1000000
+
+HTTP/1.1 200 OK
+{
+  "profile": "MODERATE",
+  "amount": 1000000,
+  "items": [
+    {"product_key": "11aa...", "name": "Tesouro Selic 2031",     "weight_bps": 2500, "amount": 250000},
+    {"product_key": "22bb...", "name": "CDB Liquidez",           "weight_bps": 2000, "amount": 200000},
+    {"product_key": "33cc...", "name": "Tesouro Prefixado 2029", "weight_bps": 2000, "amount": 200000},
+    {"product_key": "44dd...", "name": "Tesouro IPCA+ 2035",     "weight_bps": 2000, "amount": 200000},
+    {"product_key": "55ee...", "name": "FGV Quant Capital FIM",  "weight_bps": 1500, "amount": 150000}
+  ]
+}
+\end{lstlisting}
+
+\subsection*{Aplicação}
+\begin{lstlisting}
+POST /customer/9c2f.../investment_order
+Idempotency-Key: 0f9e8d7c-...
+{
+  "product_key": "55ee...",
+  "side": "APPLY",
+  "amount": 150000
+}
+
+HTTP/1.1 201 Created
+{
+  "order_key": "b3c4...",
+  "side": "APPLY",
+  "amount": 150000,
+  "unit_price": "1.23456789",
+  "quantity": "1215.00001105",
+  "status": "EXECUTED",
+  "transaction_key": "f5d6..."
+}
+\end{lstlisting}
+
+\textit{Obs.: \tb{quantity} e \tb{unit_price} saem como texto no JSON para não perder precisão
+(um número decimal no JSON costuma ser lido como \tb{float} por quem recebe).}
+
+\subsection*{Relatório de receita}
+\begin{lstlisting}
+GET /internal/revenue?from=2026-10-01&to=2026-10-30
+
+HTTP/1.1 200 OK
+{
+  "from": "2026-10-01",
+  "to": "2026-10-30",
+  "realized": {
+    "transfer_fees": 400000
+  },
+  "estimated": {
+    "fund_admin_fee": 410959,
+    "own_issue_spread": 172603,
+    "float": 2301370
+  },
+  "total": 3284932
+}
+\end{lstlisting}
+
+\end{document}

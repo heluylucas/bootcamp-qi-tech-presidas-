@@ -31,17 +31,29 @@ services:
       # endereco do banco e sempre este.
       DATABASE_URL: postgresql+psycopg2://bootcamp:bootcamp@db:5432/bootcamp
       APP_ENV: ${APP_ENV:-local}
-      SERVICE_NAME: ${SERVICE_NAME:-bootcamp-api}
+      SERVICE_NAME: ${SERVICE_NAME:-bootcamp-library-api}
+      # Com "true", todo SQL emitido aparece no log da API. Desligado
+      # por padrao: ligado, e uma linha de log por comando.
+      DATABASE_ECHO: ${DATABASE_ECHO:-false}
       # A senha que protege os endpoints internos. O padrao vale pra
       # estudar; num sistema de verdade, isso nunca teria valor padrao.
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-default_token}
-      # A API de boletos (assunto do sabado 4). Variavel que nao esta
-      # nesta lista NAO CHEGA no container: o compose repassa o que
-      # esta escrito aqui, e mais nada. Sem estas tres linhas, mexer
-      # nos BANKSLIP_* do .env nao teria efeito nenhum aqui dentro.
-      BANKSLIP_API_URL: ${BANKSLIP_API_URL:-http://localhost:8080}
-      BANKSLIP_API_INTERNAL_TOKEN: ${BANKSLIP_API_INTERNAL_TOKEN:-default_token}
-      BANKSLIP_API_TIMEOUT: ${BANKSLIP_API_TIMEOUT:-5}
+      # O catalogo de ISBN, o servico de fora que a biblioteca consulta.
+      # Variavel que nao esta nesta lista NAO CHEGA no container: o
+      # compose repassa o que esta escrito aqui, e mais nada. Sem estas
+      # linhas, mexer nos CATALOG_API_* do .env nao teria efeito nenhum
+      # aqui dentro.
+      #
+      # O endereco segue a mesma regra do DATABASE_URL la em cima: aqui
+      # dentro, quem faz o papel do catalogo e o mock server, que atende
+      # pelo nome "mock". Por isso a linha nao tem padrao pra
+      # sobrescrever.
+      #
+      # O "/catalog" no fim e o prefixo deste servico dentro do mock. Um
+      # mock so atende todos os servicos de fora; cada um ganha o seu
+      # prefixo, e as expectativas usam o mesmo.
+      CATALOG_API_URL: http://mock:1080/catalog
+      CATALOG_API_INTERNAL_TOKEN: ${CATALOG_API_INTERNAL_TOKEN:-default_token}
     volumes:
       # Monta o codigo pra dentro do container: salvou o arquivo,
       # a API recarrega sozinha (o --reload ali embaixo).
@@ -61,6 +73,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  mock:
+    # O catalogo de mentira. Ele sobe VAZIO: quem ensina o que
+    # ele responde e o proprio teste, antes de chamar a API — veja
+    # tests/utils/mock_generator.py.
+    #
+    # A versao fica fixa de proposito: com "latest", o mock de amanha
+    # pode responder diferente do de hoje sem ninguem ter mexido aqui.
+    image: mockserver/mockserver:mockserver-5.11.1
+    command: -logLevel ERROR -serverPort 1080 -proxyRemotePort 1080
+    ports:
+      # Os testes rodam na sua maquina e falam com o mock por esta
+      # porta: e por ela que eles limpam e ensinam as respostas.
+      # MOCK_PORT=1081 (ou outra livre) no seu .env se a 1080 estiver
+      # ocupada.
+      - "${MOCK_PORT:-1080}:1080"
 
   db:
     build: ./database/.

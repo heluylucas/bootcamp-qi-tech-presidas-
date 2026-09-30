@@ -1,0 +1,25 @@
+{
+  "title": "PostBook",
+  "type": "object",
+  "properties": {
+    "isbn": {
+      "type": "string",
+      "pattern": "^\\d{13}$"
+    },
+    "author_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "shelf_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    }
+  },
+  "required": [
+    "isbn",
+    "author_key"
+  ],
+  "additionalProperties": false
+}

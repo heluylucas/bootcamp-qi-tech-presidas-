@@ -1,0 +1,26 @@
+{
+  "title": "PostAuthor",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "nationality": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "document_number": {
+      "type": "string",
+      "pattern": "^\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}$"
+    }
+  },
+  "required": [
+    "name",
+    "nationality",
+    "document_number"
+  ],
+  "additionalProperties": false
+}
