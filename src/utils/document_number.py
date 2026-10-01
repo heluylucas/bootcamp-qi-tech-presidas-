@@ -7,7 +7,8 @@ def is_valid_cpf(document_number: str) -> bool:
     """Diz se um CPF existe de verdade — não se ele tem a cara certa.
 
     O schema (src/schemas/post_customer.json) já cobrou o formato:
-    onze dígitos arrumados em 000.000.000-00 — dois pontos e um hífen.
+    onze dígitos, arrumados em 000.000.000-00 ou seguidos (RN-CLI-04).
+    Por isso a conta abaixo olha só os dígitos e ignora a pontuação.
     Isto aqui é outra pergunta, e a diferença entre as duas é a lição
     deste arquivo.
 
