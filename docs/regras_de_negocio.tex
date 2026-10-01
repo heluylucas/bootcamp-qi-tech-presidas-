@@ -499,10 +499,11 @@ tem estado é a conta.
   existe em \tb{src/utils/document_number.py}. Inválido $\to$ 422 (\tb{BNK001003}).
   \item[RN-CLI-03 \obr] Não pode existir dois clientes com o mesmo CPF. Repetido $\to$ 409
   (\tb{BNK001002}). Garantido também no banco com \tb{UNIQUE(document_number)}.
-  \item[RN-CLI-04 \dec] Seguindo o repositório-base, o CPF entra \textbf{só no formato}
-  \tb{000.000.000-00}: o schema recusa qualquer outro com 400 (padrão \tb{pattern}), e ele é
-  gravado assim mesmo, em \tb{CHAR(14)}. Como só um formato entra, não há risco de o mesmo CPF
-  aparecer escrito de dois jeitos.
+  \item[RN-CLI-04 \dec] O CPF entra em \textbf{dois formatos}: \tb{000.000.000-00} ou 11 dígitos
+  seguidos (\tb{00000000000}). Qualquer outro é recusado pelo schema com 400 (padrão
+  \tb{pattern}). O controller normaliza para \tb{000.000.000-00} antes de qualquer regra, e é
+  assim que ele é gravado, em \tb{CHAR(14)}. Por isso o mesmo CPF com pontuação diferente é
+  repetido (409, \tb{BNK001002}). Ver Seção~\ref{sec:decisoes}.
   \item[RN-CLI-04b \dec] Os schemas usam \tb{"additionalProperties": false}: campo que não está no
   contrato é recusado com 400.
   \item[RN-CLI-05 \dec] Idade mínima de 18 anos na data do cadastro. Menor $\to$ 422
@@ -1216,7 +1217,7 @@ Cada fluxo tem o caminho feliz e os caminhos de falha mais prováveis. É este m
 seção ``Fluxos'' da RFC.
 
 \subsection{Criar cliente}
-\textbf{Feliz:} (1) schema valida o corpo; (2) normaliza o CPF (só dígitos); (3) valida dígitos;
+\textbf{Feliz:} (1) schema valida o corpo; (2) normaliza o CPF para \tb{000.000.000-00}; (3) valida dígitos;
 (4) confere idade $\ge$ 18; (5) busca CPF no banco --- não existe; (6) cria com \tb{customer_key}
 nova; (7) \tb{commit}; (8) 201.\\
 \textbf{Falhas:} passo 3 $\to$ 422 \tb{BNK001003}; passo 4 $\to$ 422 \tb{BNK001004}; passo 5 $\to$
@@ -1395,6 +1396,11 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   barata e deixaria todo o tempo para o núcleo. Descartada porque perderíamos o diferencial e a
   conexão com a vertical de fundos da QI Tech. \textbf{Vira o plano de corte:} se o núcleo atrasar,
   os investimentos são reduzidos (ver Seção~\ref{sec:plano}).
+  \item \textbf{CPF só no formato \tb{000.000.000-00}} (o padrão do repositório-base, com 400
+  para qualquer outro) --- descartada porque quem integra com a API manda o CPF do jeito que o
+  usuário digitou, e recusar ``12345678909'' seria atrito sem ganho: o número é o mesmo.
+  Ganharia se quiséssemos zero código de normalização. \emph{Escolhido:} aceitar os dois
+  formatos e gravar sempre \tb{000.000.000-00} (RN-CLI-04).
 \end{enumerate}
 
 % =====================================================================
