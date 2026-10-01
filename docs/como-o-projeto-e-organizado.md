@@ -5,8 +5,8 @@
 > requisição e mostra as rotas. Este texto aqui é o passo seguinte —
 > ele assume que a API já respondeu pelo menos uma vez na sua máquina.
 
-Dentro de `src/` tem dez pastas. Para um programa que atende catorze
-rotas, parece muita pasta — e no começo assusta mesmo.
+Dentro de `src/` tem dez pastas. Para quem está começando, parece muita
+pasta — e no começo assusta mesmo.
 
 Este texto explica por que elas existem, o que cada uma pode e não pode
 fazer, e principalmente: **onde você mexe quando quer fazer alguma
@@ -20,7 +20,7 @@ estiver perdido.
 ## 1. O caminho de uma requisição
 
 Toda requisição atravessa as mesmas camadas, sempre na mesma ordem.
-Este é o `POST /book`, que cadastra um livro:
+Este é o `POST /customer/{customer_key}/account`, que abre uma conta:
 
 ```
   requisição chega
@@ -38,8 +38,8 @@ Este é o `POST /book`, que cadastra um livro:
         ↓               confere o JSON. Torto, para aqui: 400)
         ↓
   src/controllers/     pode fazer isso? é aqui que mora a regra
-        ↓              (no POST /book, é daqui que sai a pergunta ao
-        ↓               catálogo de ISBN, por src/connectors/)
+        ↓              (se a regra precisasse de um serviço de fora,
+        ↓               é daqui que sairia a chamada, por src/connectors/)
         ↓
   src/repositories/    a conversa com o banco — só aqui existe consulta
         ↓
@@ -78,13 +78,12 @@ este texto.
 | `utils/` | ferramenta de uso geral — aqui, o logger, o identificador da requisição, o validador de schema e a conta do CPF | virar o depósito do que não se sabe onde pôr |
 
 Um exemplo do que isso significa na prática: em
-`src/controllers/book_controller.py` você lê
-`if occupancy >= locked_shelf.capacity: raise ShelfFull(...)`.
-Essa frase é a regra do negócio, e ela mora no controller. Em
-`src/repositories/book_repository.py` não existe nenhuma frase dessas:
-o `count_by_shelf` de lá conta, e não sabe o que o número significa.
-O único `if` do repository decide se a busca leva o filtro de estante,
-e isso não é regra: é jeito de buscar.
+`src/controllers/account_controller.py` você lê algo como
+`if open_accounts > 0: raise AccountAlreadyExists()`.
+Essa frase é a regra do negócio (RN-CON-02), e ela mora no controller. Em
+`src/repositories/account_repository.py` não existe nenhuma frase dessas:
+o método de lá conta as contas não encerradas, e não sabe o que o número
+significa.
 
 ### "E a conexão com o banco, em qual pasta ela mora?"
 
@@ -151,16 +150,16 @@ middleware era escrito; a história está na docstring dele.
 
 **E o `commit`?** Nunca é do middleware. Quem sabe se o trabalho terminou
 é o controller, e é por isso que `self.session.commit()` é a última linha
-antes do `return` em `src/controllers/book_controller.py`. O
+antes do `return` em todo arquivo de `src/controllers/`. O
 middleware cuida do ciclo de vida; o controller decide o conteúdo.
 
-Na biblioteca isso deixa de ser só organização e vira correção. A
-regra de lotação trava a estante (`SELECT ... FOR UPDATE`), conta os
-livros e grava o novo — e a trava só vale enquanto a transação estiver
+No banco isso deixa de ser só organização e vira correção. Abrir conta
+trava a linha do cliente (`SELECT ... FOR UPDATE`), conta as contas não
+encerradas e grava a nova — e a trava só vale enquanto a transação estiver
 aberta. Um `commit` no meio do caminho soltaria a trava antes da
-gravação, e duas requisições ao mesmo tempo poderiam pôr onze livros
-numa estante de dez. O passo a passo está na docstring do `_check_capacity`,
-em `src/controllers/book_controller.py`.
+gravação, e duas requisições ao mesmo tempo poderiam abrir duas contas
+para o mesmo cliente. O mesmo vale, com mais peso, para tudo que mexe em
+saldo (veja `docs/rfc_fluxos.tex`).
 
 Abra os dois arquivos na ordem — o middleware primeiro, o `database.py`
 depois. São poucas linhas de código cada um, e juntas elas dizem o
@@ -172,15 +171,15 @@ combinado inteiro.
 
 | Quero... | Mexo em | Na ordem |
 |---|---|---|
-| **aceitar um campo novo** no JSON de entrada | `src/schemas/post_book.json` (ou o do autor, da estante) | se o campo vai para o banco, também `database/database.sql` e `src/models/` |
-| **mudar o que a resposta devolve** | `src/dtos/book_dto.py` (ou o do autor, da estante) | vale para os campos do objeto; o envelope da listagem (`data`, `limit`, `page`, `is_last_page`) é montado no resource. Se o campo ainda não existe no banco, antes disso `database/database.sql` e `src/models/` |
-| **criar uma rota nova** numa entidade que já existe | `src/resources/book.py` | registrar o endereço em `src/app.py`, e o método no controller se a regra for nova |
-| **mudar uma regra** ("não pode X") | `src/controllers/book_controller.py` | e um erro novo em `src/errors/custom_errors.py`, se precisar |
-| **consultar o banco de outro jeito** (filtrar, ordenar, contar) | `src/repositories/book_repository.py` | o controller chama o método novo |
+| **aceitar um campo novo** no JSON de entrada | o `.json` da rota em `src/schemas/` (ex.: `post_customer.json`) | se o campo vai para o banco, também `database/database.sql` e `src/models/` |
+| **mudar o que a resposta devolve** | o DTO da entidade em `src/dtos/` (ex.: `account_dto.py`) | vale para os campos do objeto; o envelope da listagem (`items`, `page`, `limit`, `total`) é montado no resource. Se o campo ainda não existe no banco, antes disso `database/database.sql` e `src/models/` |
+| **criar uma rota nova** numa entidade que já existe | o arquivo da entidade em `src/resources/` (ex.: `account.py`) | registrar o endereço em `src/app.py`, e o método no controller se a regra for nova |
+| **mudar uma regra** ("não pode X") | o controller da entidade (ex.: `src/controllers/account_controller.py`) | e um erro novo em `src/errors/custom_errors.py`, se precisar |
+| **consultar o banco de outro jeito** (filtrar, ordenar, contar) | o repository da entidade (ex.: `src/repositories/account_repository.py`) | o controller chama o método novo |
 | **criar uma tabela** | `database/database.sql` | depois `src/models/` e o `__init__.py` da pasta |
 | **criar uma entidade inteira** (rota + regra + tabela) | um arquivo em cada pasta | `database.sql` → `models/` → `repositories/` → `controllers/` → `schemas/` → `resources/` → registrar em `src/app.py` |
 | **fazer algo em toda requisição** | `src/middlewares/` | registrar em `src/app.py` |
-| **chamar outro serviço** | `src/connectors/` | quem chama o connector é o controller, nunca o resource. O exemplo pronto é o `_fetch_from_catalog` de `src/controllers/book_controller.py`, atrás do `POST /book`; o teste ensina o mock em `tests/utils/mock_generator.py` |
+| **chamar outro serviço** | `src/connectors/` | quem chama o connector é o controller, nunca o resource. A base pronta é o `src/connectors/rest_connector.py` (vazio no MVP) |
 
 Quatro armadilhas que pegam quase todo mundo. A segunda e a terceira
 custam caro pelo mesmo motivo: a mensagem de erro aponta para o
@@ -192,16 +191,16 @@ mensagem nenhuma.
 `src/repositories/__init__.py`) e acrescente a sua linha.
 
 **E a ORDEM das linhas do `src/models/__init__.py` importa.** Abra
-`src/models/book.py` e repare no `from models import Author, Member, Shelf`:
+`src/models/account.py` e repare no `from models import AccountStatus, Customer`:
 o arquivo importa de dentro do próprio pacote em que ele mora. Isso só
-funciona porque o `__init__.py` lista o `Author`, a `Shelf` e o
-`Member` **antes** do `Book` — quando a linha do `Book` roda, os três
+funciona porque o `__init__.py` lista o `Customer` e o `AccountStatus`
+**antes** da `Account` — quando a linha da `Account` roda, os dois
 já foram carregados.
 
-Ponha a linha do `Book` em primeiro lugar e o Python responde:
+Ponha a linha da `Account` em primeiro lugar e o Python responde:
 
 ```
-ImportError: cannot import name 'Author' from partially initialized
+ImportError: cannot import name 'AccountStatus' from partially initialized
 module 'models' (most likely due to a circular import)
 ```
 
@@ -250,7 +249,7 @@ máquina. Acrescentar uma linha no `requirements.txt` não avisa nenhum dos
 dois: o container continua com a imagem que ele já tinha, e o seu `.venv`
 continua com o que você instalou da última vez.
 
-O sintoma é enganoso. Se a biblioteca nova é usada pelo **código da API**,
+O sintoma é enganoso. Se o pacote novo é usado pelo **código da API**,
 os testes quebram com um erro que parece de teste, mas vem do container.
 Se é usada só pelos **testes**, tudo passa na sua máquina e quebra na de
 quem clonar o projeto.
@@ -323,11 +322,11 @@ Duas pastas falam de formato, e é fácil confundi-las. A divisão é a
 direção: **o `schemas/` cuida do que ENTRA, o `dtos/` cuida do que
 SAI.**
 
-- `src/schemas/post_book.json` descreve o JSON que o cliente manda.
+- `src/schemas/post_customer.json` descreve o JSON que o cliente manda.
   Quem lê isso é o `jsonschema`, antes da primeira linha da rota rodar:
-  campo faltando, tipo errado, campo a mais ou um ISBN que não tem
-  treze dígitos viram 400 ali mesmo. Quem aciona a conferência é o
-  decorator `@SchemaHandler.validate("post_book.json")` na rota, e o
+  campo faltando, tipo errado, campo a mais ou um CPF fora do formato
+  `000.000.000-00` viram 400 ali mesmo. Quem aciona a conferência é o
+  decorator `@SchemaHandler.validate("post_customer.json")` na rota, e o
   código dele está em `src/utils/schema_handler.py`.
 
   **Por que um `.json` e não uma classe Python?** Porque o contrato
@@ -337,22 +336,22 @@ SAI.**
   existe fora do Python — quem integra com a API lê o mesmo arquivo
   que o servidor cobra, sem abrir o repositório. É assim nos serviços
   da QI Tech. O preço é que o corpo chega como dicionário:
-  `payload["isbn"]` em vez de `payload.isbn`.
-- `src/dtos/book_dto.py` faz o caminho de volta. O repository entrega
+  `payload["name"]` em vez de `payload.name`.
+- `src/dtos/account_dto.py` faz o caminho de volta. O repository entrega
   o objeto do banco; o DTO devolve um dicionário simples, e é esse
   dicionário que vira o JSON da resposta.
 
-Abra os dois ao lado de `src/models/book.py` e a diferença fica
-óbvia. Na **tabela**, o livro aponta para o autor e para a estante por
-um `id` numérico. Na **resposta**, ele aponta pelo `author_key` e pelo
-`shelf_key`, que são os únicos identificadores que o cliente conhece.
-Quem faz essa travessia é o DTO, e é por isso que ele existe.
+Abra os dois ao lado de `src/models/account.py` e a diferença fica
+óbvia. Na **tabela**, a conta aponta para o cliente e para o status por
+um `id` numérico. Na **resposta**, ela aponta pelo `customer_key` e traz o
+status como texto (`ACTIVE`), que é o que o cliente conhece (R5). É
+também no DTO que o CPF sai mascarado (`***.456.789-**`). Quem faz essa
+travessia é o DTO, e é por isso que ele existe.
 
-Campo novo no **livro**? Acrescente no `dtos/`, e nenhum outro arquivo
-precisa saber. O envelope da página é a exceção: `data`, `limit`,
-`page` e `is_last_page` não descrevem um livro, descrevem a consulta —
-por isso nascem no resource, que é quem sabe qual página foi pedida. O
-comentário lá em `src/resources/author.py` diz isso com todas as letras.
+Campo novo na **conta**? Acrescente no `dtos/`, e nenhum outro arquivo
+precisa saber. O envelope da página é a exceção: `items`, `page`,
+`limit` e `total` não descrevem uma conta, descrevem a consulta — por
+isso nascem no resource, que é quem sabe qual página foi pedida.
 
 Uma consequência que vale conhecer: **o que o DTO monta é exatamente o
 que sai.** Não existe ninguém depois dele conferindo a forma — se um

@@ -29,7 +29,7 @@ class TestHealthCheck:
     def test_no_token(self):
         response = ClientRequisition.send("PUT", "/sample")
         assert response.response_status == 403
-        assert response.response_json["code"] == "QIT000002"
+        assert response.response_json["code"] == "BNK000002"
 
     def test_sink(self):
         response = ClientRequisition.send(
@@ -38,12 +38,12 @@ class TestHealthCheck:
             headers={"INTERNAL-TOKEN": INTERNAL_TOKEN},
         )
         assert response.response_status == 404
-        assert response.response_json["code"] == "QIT000404"
+        assert response.response_json["code"] == "BNK000404"
 
     def test_method_not_allowed(self):
         response = ClientRequisition.send("PUT", "/health_check")
         assert response.response_status == 405
-        assert response.response_json["code"] == "QIT000405"
+        assert response.response_json["code"] == "BNK000405"
 
     def test_error_translation_keeps_accents(self):
         """O acento da fonte chega no cliente — nas duas portas de erro da API.
@@ -59,7 +59,7 @@ class TestHealthCheck:
         """
         response = ClientRequisition.send("PUT", "/sample")
         assert response.response_status == 403
-        assert response.response_json["code"] == "QIT000002"
+        assert response.response_json["code"] == "BNK000002"
         assert response.response_json["translation"] == FORBIDDEN_TRANSLATION
 
         response = ClientRequisition.send(
@@ -68,5 +68,5 @@ class TestHealthCheck:
             headers={"INTERNAL-TOKEN": INTERNAL_TOKEN},
         )
         assert response.response_status == 404
-        assert response.response_json["code"] == "QIT000404"
+        assert response.response_json["code"] == "BNK000404"
         assert response.response_json["translation"] == NOT_FOUND_TRANSLATION

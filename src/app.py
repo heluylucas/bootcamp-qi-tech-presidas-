@@ -9,7 +9,7 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import AuthorResource, BookResource, HealthCheckResource, MemberResource, ShelfResource
+from resources import HealthCheckResource
 from utils.logger import setup_logging
 
 
@@ -124,14 +124,10 @@ def create_app() -> FastAPI:
     # se a coisa foi criada ou concluída. Esta lista diz QUEM atende cada
     # endereço, e mais nada.
     #
-    # Repare na convenção dos nomes: um item é SINGULAR (/book/{key}),
-    # a coleção é PLURAL (/books). A ação sobre um item é um pedaço a
-    # mais no endereço dele (/book/{key}/borrow).
+    # Repare na convenção dos nomes: um item é SINGULAR (/customer/{key}),
+    # a coleção é PLURAL (/transactions). O que pertence a um item é um
+    # pedaço a mais no endereço dele (/customer/{key}/account).
     health_check_resource = HealthCheckResource()
-    author_resource = AuthorResource()
-    shelf_resource = ShelfResource()
-    member_resource = MemberResource()
-    book_resource = BookResource()
 
     application.add_api_route("/", health_check_resource.on_get_home, methods=["GET"])
     application.add_api_route(
@@ -139,25 +135,6 @@ def create_app() -> FastAPI:
         health_check_resource.on_get_health_check,
         methods=["GET"]
     )
-
-    application.add_api_route("/author", author_resource.on_post, methods=["POST"])
-    application.add_api_route("/author/{author_key}", author_resource.on_get_by_key, methods=["POST"])
-    application.add_api_route("/authors", author_resource.on_get_list, methods=["GET"])
-
-    application.add_api_route("/shelf", shelf_resource.on_post, methods=["POST"])
-    application.add_api_route("/shelf/{shelf_key}", shelf_resource.on_get_by_key, methods=["GET"])
-    application.add_api_route("/shelves", shelf_resource.on_get_list, methods=["GET"])
-
-    application.add_api_route("/member", member_resource.on_post, methods=["POST"])
-    application.add_api_route("/member/{member_key}", member_resource.on_get_by_key, methods=["GET"])
-    application.add_api_route("/members", member_resource.on_get_list, methods=["GET"])
-
-    application.add_api_route("/book", book_resource.on_post, methods=["POST"])
-    application.add_api_route("/book/{book_key}", book_resource.on_get_by_key, methods=["GET"])
-    application.add_api_route("/books", book_resource.on_get_list, methods=["GET"])
-    application.add_api_route("/book/{book_key}/shelf", book_resource.on_put_shelf, methods=["PUT"])
-    application.add_api_route("/book/{book_key}/borrow", book_resource.on_put_borrow, methods=["PUT"])
-    application.add_api_route("/book/{book_key}/return", book_resource.on_put_return, methods=["PUT"])
 
     register_error_handlers(application)
 

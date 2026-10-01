@@ -1,1 +1,0 @@
-from connectors.catalog_connector import CatalogConnector

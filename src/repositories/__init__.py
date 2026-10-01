@@ -1,4 +1,0 @@
-from repositories.author_repository import AuthorRepository
-from repositories.shelf_repository import ShelfRepository
-from repositories.member_repository import MemberRepository
-from repositories.book_repository import BookRepository
