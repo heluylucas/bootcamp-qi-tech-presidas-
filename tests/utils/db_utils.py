@@ -34,14 +34,14 @@ class DbUtils:
 
     O nome engana um pouco: isto não desfaz uma transação. Ele derruba
     o schema `public` com tudo que estiver dentro e roda o
-    `database/database.sql` de novo — as tabelas de volta, vazias, e a
-    `book_status` com as duas linhas que o próprio arquivo insere.
+    `database/database.sql` de novo — as tabelas de volta, vazias, e
+    os enumeradores (`account_status`, `transaction_type`...) com as
+    linhas que o próprio arquivo insere.
 
     Quando o seu teste precisa chamar: sempre que alguma asserção
     depender de QUANTAS linhas existem no banco — contar, listar,
     paginar, filtrar. Nesses casos `DbUtils.rollback()` é a primeira
-    linha do teste, antes de criar qualquer coisa (o exemplo está em
-    `tests/integration/author/test_author.py`). Um teste que só olha o que
+    linha do teste, antes de criar qualquer coisa. Um teste que só olha o que
     ele mesmo criou, pela chave que recebeu de volta,
     não precisa de limpeza nenhuma — e fica mais rápido sem ela.
 

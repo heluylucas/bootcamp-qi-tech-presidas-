@@ -83,8 +83,8 @@ class SchemaHandler:
 
         Usa-se assim, no método do resource que recebe corpo:
 
-            class BookResource:
-                @SchemaHandler.validate("post_book.json")
+            class CustomerResource:
+                @SchemaHandler.validate("post_customer.json")
                 def on_post(self, payload: dict) -> dict:
 
         O nome do arquivo é o único argumento, e ele aponta pra dentro
@@ -97,7 +97,7 @@ class SchemaHandler:
         aos parâmetros do endereço.
 
         Repare que o endereço HTTP não aparece aqui. Quem liga
-        "/book" a este método é o src/app.py, e é de propósito:
+        "/customer" a este método é o src/app.py, e é de propósito:
         o resource cuida do CONTEÚDO da requisição, o app.py cuida do
         ENDEREÇO dela.
         """
@@ -146,8 +146,8 @@ class SchemaHandler:
 
         Usa-se assim, num metodo que recebe a requisicao inteira:
 
-            class BookResource:
-                @SchemaHandler.validate_query_params("get_books.json")
+            class TransactionResource:
+                @SchemaHandler.validate_query_params("get_transactions.json")
                 def on_get_list(self, request: Request) -> JSONResponse:
 
         Por que ler do `request` em vez dos argumentos da funcao: o

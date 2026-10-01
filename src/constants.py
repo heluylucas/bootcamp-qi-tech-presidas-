@@ -9,7 +9,7 @@ SERVICE_ROOT = os.path.abspath(os.path.dirname(__file__))
 SCHEMA_PATH = os.path.join(SERVICE_ROOT, "schemas")
 
 APP_ENV = os.environ.get("APP_ENV", "local")
-SERVICE_NAME = os.environ.get("SERVICE_NAME", "bootcamp-library-api")
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "quant-bank-api")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 INTERNAL_TOKEN = os.environ.get("INTERNAL_TOKEN")
@@ -22,14 +22,6 @@ INTERNAL_TOKEN = os.environ.get("INTERNAL_TOKEN")
 # Padrao desligado: em producao isso escreveria uma linha de log por
 # comando, incluindo os valores enviados.
 DATABASE_ECHO = os.environ.get("DATABASE_ECHO", "false").lower() == "true"
-
-# O catálogo de ISBN, o serviço de fora que esta biblioteca consulta
-# (veja src/connectors/catalog_connector.py). O endereço vem do
-# ambiente, como tudo aqui — na sua máquina ele aponta pro mock server;
-# em produção, apontaria pro catálogo de verdade. O código não sabe a
-# diferença, e esse é o ponto.
-CATALOG_API_URL = os.environ.get("CATALOG_API_URL", "http://localhost:1080/catalog")
-CATALOG_API_INTERNAL_TOKEN = os.environ.get("CATALOG_API_INTERNAL_TOKEN", "default_token")
 
 # Rotas públicas: não exigem o header INTERNAL-TOKEN. São as duas que
 # precisam responder pra quem ainda não tem token nenhum: a raiz, que

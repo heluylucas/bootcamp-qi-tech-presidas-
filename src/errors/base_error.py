@@ -9,7 +9,7 @@ resposta de erro que sai desta API. Qualquer erro — 400, 403, 404, 409,
     title        o nome do erro, em inglês, pra quem programa
     description  o que aconteceu, com detalhe
     translation  a frase em português, pronta pra mostrar ao usuário
-    code         o identificador estável (QIT000001, QIT001016, ...)
+    code         o identificador estável (BNK000001, BNK001002, ...)
     http_status  o número do HTTP
 
 Cinco campos e não um texto solto porque quem integra com a API precisa
@@ -17,8 +17,8 @@ programar em cima de ALGO. Se o combinado fosse a mensagem, mudar uma
 palavra quebraria o cliente de alguém. O `code` existe pra ser o
 contrato: ele nunca muda, e o texto pode melhorar à vontade.
 
-Os erros genéricos (QIT000...) moram aqui — os que toda API tem. Os das
-regras deste projeto (QIT001...) moram em custom_errors.py, ao lado.
+Os erros genéricos (BNK000...) moram aqui — os que toda API tem. Os das
+regras deste projeto (BNK001...) moram em custom_errors.py, ao lado.
 """
 import sys
 import inspect
@@ -83,7 +83,7 @@ class QIException(Exception):
 
 
 class MethodNotAllowed(QIException):
-    code = "QIT000405"
+    code = "BNK000405"
 
     def __init__(self) -> None:
         title = "Method not allowed"
@@ -94,7 +94,7 @@ class MethodNotAllowed(QIException):
 
 
 class InternalError(QIException):
-    code = "QIT000500"
+    code = "BNK000500"
 
     def __init__(self) -> None:
         title = "Internal Error"
@@ -105,7 +105,7 @@ class InternalError(QIException):
 
 
 class NotFoundResource(QIException):
-    code = "QIT000404"
+    code = "BNK000404"
 
     def __init__(self) -> None:
         title = "Resource not Found"
@@ -116,7 +116,7 @@ class NotFoundResource(QIException):
 
 
 class InvalidSchema(QIException):
-    code = "QIT000001"
+    code = "BNK000001"
 
     def __init__(self, __description) -> None:
         title = "Bad Request"
@@ -127,7 +127,7 @@ class InvalidSchema(QIException):
 
 
 class ForbiddenNotInternal(QIException):
-    code = "QIT000002"
+    code = "BNK000002"
 
     def __init__(self) -> None:
         title = "Forbidden"
@@ -138,7 +138,7 @@ class ForbiddenNotInternal(QIException):
 
 
 class InvalidParameter(QIException):
-    code = "QIT000010"
+    code = "BNK000005"
 
     def __init__(self, description) -> None:
         title = "Invalid Parameter"
