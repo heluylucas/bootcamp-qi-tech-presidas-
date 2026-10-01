@@ -20,3 +20,26 @@ class RequestGenerator:
     def get_customer(customer_key: str):
         response = ClientRequisition.send("GET", f"/customer/{customer_key}", headers=HEADERS)
         return response.response_status, response.response_json
+
+    @staticmethod
+    def post_account(customer_key: str):
+        response = ClientRequisition.send("POST", f"/customer/{customer_key}/account", headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def get_account(customer_key: str, account_key: str):
+        endpoint = f"/customer/{customer_key}/account/{account_key}"
+        response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def patch_account(customer_key: str, account_key: str, payload: dict):
+        endpoint = f"/customer/{customer_key}/account/{account_key}"
+        response = ClientRequisition.send("PATCH", endpoint, payload=payload, headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def get_account_status_events(customer_key: str, account_key: str):
+        endpoint = f"/customer/{customer_key}/account/{account_key}/status_events"
+        response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
+        return response.response_status, response.response_json

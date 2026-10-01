@@ -43,3 +43,58 @@ class UnderageCustomer(QIException):
         description = "The customer must be at least 18 years old and born in the past."
         translation = "O cliente precisa ter pelo menos 18 anos."
         super().__init__(title, self.code, http_status, description, translation)
+
+
+class AccountNotFound(QIException):
+    code = "BNK002001"
+
+    def __init__(self) -> None:
+        title = "Account Not Found"
+        http_status = 404
+        description = "The account_key does not exist for this customer."
+        translation = "Conta não encontrada."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class AccountAlreadyExists(QIException):
+    code = "BNK002002"
+
+    def __init__(self) -> None:
+        title = "Account Already Exists"
+        http_status = 409
+        description = "The customer already has an account that is not closed."
+        translation = "O cliente já tem uma conta não encerrada."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidStatusTransition(QIException):
+    code = "BNK002003"
+
+    def __init__(self) -> None:
+        title = "Invalid Status Transition"
+        http_status = 409
+        description = "The account cannot move from its current status to the requested one."
+        translation = "A conta não pode passar do status atual para o status pedido."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class AccountNotEmpty(QIException):
+    code = "BNK002004"
+
+    def __init__(self) -> None:
+        title = "Account Not Empty"
+        http_status = 409
+        description = "The account must have zero balance and no investment position to be closed."
+        translation = "Só é possível encerrar uma conta sem saldo e sem investimentos."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class StatusReasonRequired(QIException):
+    code = "BNK002006"
+
+    def __init__(self) -> None:
+        title = "Status Reason Required"
+        http_status = 422
+        description = "Blocking or closing an account requires a reason."
+        translation = "Bloquear ou encerrar a conta exige um motivo."
+        super().__init__(title, self.code, http_status, description, translation)

@@ -58,4 +58,5 @@ desenvolvimento: explique em português simples o que mudou e por quê.
 - Um módulo por vez, nesta ordem: `database.sql` → clientes → contas → movimentações e extrato →
   suitability → produtos e preços → carteira sugerida → ordens e posição → receita.
 - Mudanças pequenas; ao terminar cada passo, rode `pytest -v` e mostre o resultado.
+- Atalhos e pendências no código: `# TODO(módulo N): o que falta`, nunca `ponytail:`.
 - Responda em português.

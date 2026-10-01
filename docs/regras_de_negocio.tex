@@ -1401,6 +1401,18 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   usuário digitou, e recusar ``12345678909'' seria atrito sem ganho: o número é o mesmo.
   Ganharia se quiséssemos zero código de normalização. \emph{Escolhido:} aceitar os dois
   formatos e gravar sempre \tb{000.000.000-00} (RN-CLI-04).
+  \item \textbf{No PATCH de status, conferir o motivo antes da transição} (validar o conteúdo do
+  pedido antes de olhar a conta) --- descartada porque, para uma conta \tb{CLOSED}, dizer ``falta
+  o motivo'' induz o cliente a reenviar com motivo e receber outro erro; o estado da conta é a
+  recusa mais definitiva. Ganharia se quiséssemos recusar sem consultar o banco. \emph{Escolhido:}
+  com a conta travada, transição proibida (409 \tb{BNK002003}) $\to$ falta de motivo (422
+  \tb{BNK002006}; motivo vazio ou só com espaços conta como ausente) $\to$ conta não vazia (409
+  \tb{BNK002004}).
+  \item \textbf{Paginar o histórico de status} (\tb{GET .../status_events} com \tb{page} e
+  \tb{limit}, como o extrato) --- descartada porque uma conta tem poucos eventos (abertura,
+  bloqueios, encerramento) e a paginação traria schema de query e mais um 400 sem ganho. Ganharia
+  se bloqueio/desbloqueio virasse rotina automática (ex.: antifraude) e o histórico crescesse.
+  \emph{Escolhido:} devolve \tb{\{items\}} completo, em ordem cronológica.
 \end{enumerate}
 
 % =====================================================================
