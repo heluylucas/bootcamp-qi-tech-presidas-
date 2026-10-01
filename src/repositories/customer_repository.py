@@ -25,5 +25,10 @@ class CustomerRepository:
         return context.db_session.query(Customer).filter(Customer.customer_key == customer_key).first()
 
     @staticmethod
+    def get_by_key_for_update(context: Context, customer_key: str) -> Optional[Customer]:
+        query = context.db_session.query(Customer).filter(Customer.customer_key == customer_key)
+        return query.with_for_update().first()
+
+    @staticmethod
     def get_by_document_number(context: Context, document_number: str) -> Optional[Customer]:
         return context.db_session.query(Customer).filter(Customer.document_number == document_number).first()

@@ -1,4 +1,5 @@
 from sqlalchemy import BigInteger, CHAR, Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.orm import relationship
 
 from models.base import Base
 
@@ -22,6 +23,10 @@ class Account(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
+    # Carregado só quando alguém lê `account.status` (padrão do SQLAlchemy).
+    # Não troque por lazy="joined": o JOIN quebraria o SELECT ... FOR UPDATE.
+    status = relationship(AccountStatus)
+
 
 class AccountStatusEvent(Base):
     __tablename__ = "account_status_event"
@@ -32,3 +37,6 @@ class AccountStatusEvent(Base):
     to_status_id = Column(Integer, ForeignKey("account_status.id"), nullable=False)
     reason = Column(String(255))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    from_status = relationship(AccountStatus, foreign_keys=[from_status_id])
+    to_status = relationship(AccountStatus, foreign_keys=[to_status_id])
