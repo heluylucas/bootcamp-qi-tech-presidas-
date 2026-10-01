@@ -15,8 +15,7 @@ class CustomerRepository:
             document_number=document_number,
             birth_date=birth_date,
         )
-        context.db_session.add(customer)
-        
+        context.db_session.add(customer)       
         context.db_session.flush()
 
         return customer
