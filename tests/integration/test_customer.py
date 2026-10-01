@@ -1,4 +1,6 @@
+import threading
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 import pytest
@@ -83,6 +85,30 @@ class TestCreateCustomer:
 
         assert status == 409
         assert body["code"] == "BNK001002"
+
+    def test_concurrent_duplicate_document_number(self):
+        """Dez cadastros do mesmo CPF ao mesmo tempo: um 201, nove 409, nenhum 500.
+
+        Os dez passam juntos pela busca "esse CPF já existe?" e só o UNIQUE
+        do banco segura os nove atrasados. A barreira solta as threads de uma
+        vez, para que as requisições caiam nessa janela.
+        """
+        payload = customer_payload()
+        parallel_requests = 10
+        barrier = threading.Barrier(parallel_requests)
+
+        def send(_):
+            barrier.wait()
+            return RequestGenerator.post_customer(payload)
+
+        with ThreadPoolExecutor(max_workers=parallel_requests) as executor:
+            results = list(executor.map(send, range(parallel_requests)))
+
+        statuses = sorted(status for status, _ in results)
+        assert statuses == [201] + [409] * (parallel_requests - 1)
+        for status, body in results:
+            if status == 409:
+                assert body["code"] == "BNK001002"
 
     def test_underage(self):
         # Dia 1 do mês, 17 anos atrás: menor de idade em qualquer dia do ano,
