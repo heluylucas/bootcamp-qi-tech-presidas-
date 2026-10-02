@@ -768,6 +768,38 @@ D+0. Liquidez com prazo real fica como \ext.}
   (\tb{GET /products?max_risk=2}) --- útil para mostrar ``o que cabe no meu perfil''.
 \end{regras}
 
+\subsection{Parâmetros do seed \dec}
+
+Números fictícios usados pelo \tb{database.sql}. Mudou algum? Mude aqui e no seed juntos.
+
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Produto} & \textbf{Emissor} & \textbf{Vencimento} & \textbf{Taxa anual usada no seed} \\
+\midrule
+Tesouro Selic 2031 & Tesouro Nacional & 01/03/2031 & Selic = 15\% \\
+CDB \banco{} Liquidez & \banco & sem vencimento & 95\% do CDI (CDI = 14,9\%) \\
+LCI \banco{} 2027 & \banco & 01/03/2027 & 93\% do CDI \\
+Tesouro Prefixado 2029 & Tesouro Nacional & 01/01/2029 & 13\% \\
+Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & IPCA 4,5\% + 6\% $= 1{,}045 \times 1{,}06 - 1$ \\
+\fundo{} FIM & \fundo & --- & cota oscila; taxa de administração 1\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+  \item \tb{reference_rate}: CDI \tb{1490} bps, Selic \tb{1500} bps.
+  \item Todos os produtos começam em \rs 100,00 no primeiro dia da série.
+  \item A série tem uma linha por dia \textbf{corrido}, de hoje $-29$ até hoje (30 preços por
+        produto, sempre existe preço de hoje). O $d$ da RN-PRO-06 conta só dias úteis (segunda a
+        sexta), então no fim de semana o preço repete o de sexta.
+  \item Fundo: a cada dia útil $n$, retorno bruto $r_n = 0{,}06\% + 0{,}8\% \times \sin(n)$ e
+        $P_n = P_{n-1} \times (1 + r_n) \times (1 - 1\%)^{1/252}$ (RN-REC-04). Sobe e desce, mas é
+        sempre a mesma série.
+  \item CDB e LCI: \tb{own_issue = true}, \tb{cdi_percentage_bps} \tb{9500} e \tb{9300}. Fundo:
+        \tb{admin_fee_bps = 100}. Todos com \tb{is_active = true}.
+\end{itemize}
+
 % =====================================================================
 \section{Módulo 6 --- Carteira sugerida}
 % =====================================================================
@@ -973,7 +1005,8 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
 \subsection{Exemplo: um mês de operação}
 
 Premissas fictícias: 2.000 transferências no mês; \rs 5 milhões no fundo; \rs 3 milhões em CDB
-a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI e Selic de 14\% ao ano; 30 dias.
+a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI de 14,9\% e Selic de 15\% ao ano
+(os mesmos do seed); 30 dias.
 
 \begin{center}
 \begin{tabular}{@{}llr@{}}
@@ -982,10 +1015,10 @@ a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI e Selic de 14\% ao 
 \midrule
 Tarifas (realizada) & $2.000 \times \rs 2{,}00$ & \rs 4.000,00 \\
 Taxa de administração & $5.000.000 \times 1\% \times 30/365$ & \rs 4.109,59 \\
-Spread do CDB & $3.000.000 \times 14\% \times 5\% \times 30/365$ & \rs 1.726,03 \\
-Float & $2.000.000 \times 14\% \times 30/365$ & \rs 23.013,70 \\
+Spread do CDB & $3.000.000 \times 14{,}9\% \times 5\% \times 30/365$ & \rs 1.836,99 \\
+Float & $2.000.000 \times 15\% \times 30/365$ & \rs 24.657,53 \\
 \midrule
-\textbf{Total} & & \textbf{\rs 32.849,32} \\
+\textbf{Total} & & \textbf{\rs 34.604,11} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1011,7 +1044,7 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \endhead
 \tb{customer} & \tb{customer_key}; \tb{name TEXT NOT NULL}; \tb{document_number CHAR(14) NOT NULL UNIQUE}; \tb{birth_date DATE NOT NULL}; \tb{created_at}. \\
 \tb{account_status} & Enumerador: \tb{ACTIVE}, \tb{BLOCKED}, \tb{CLOSED}. \\
-\tb{account} & \tb{account_key}; \tb{customer_id} FK $\to$ customer (NOT NULL); \tb{status_id} FK $\to$ account_status; \tb{balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0)}; \tb{created_at}, \tb{updated_at}. \ext: índice único parcial \tb{UNIQUE(customer_id) WHERE status <> CLOSED} para o banco também barrar a segunda conta. \\
+\tb{account} & \tb{account_key}; \tb{customer_id} FK $\to$ customer (NOT NULL); \tb{status_id} FK $\to$ account_status; \tb{balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0)}; \tb{created_at}, \tb{updated_at}. Índice único parcial \tb{UNIQUE(customer_id) WHERE status <> CLOSED} para o banco também barrar a segunda conta (rede de segurança). \\
 \tb{account_status_event} & \tb{account_id} FK; \tb{from_status_id} FK (nulo no nascimento); \tb{to_status_id} FK NOT NULL; \tb{reason VARCHAR(255)}; \tb{created_at}. \\
 \tb{transaction_type} & Enumerador: \tb{DEPOSIT}, \tb{WITHDRAWAL}, \tb{TRANSFER}, \tb{INVESTMENT_APPLY}, \tb{INVESTMENT_REDEEM}. \\
 \tb{transaction} & \tb{transaction_key}; \tb{type_id} FK; \tb{requester_account_id} FK NOT NULL (quem pediu); \tb{origin_account_id} FK (nulo no depósito e no resgate); \tb{destination_account_id} FK (nulo no saque e na aplicação); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{fee_amount BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0)}; \tb{description VARCHAR(140)}; \tb{idempotency_key CHAR(36) NOT NULL}; \tb{request_hash CHAR(64) NOT NULL}; \tb{created_at}. \tb{UNIQUE(requester_account_id, idempotency_key)}. \\
@@ -1413,6 +1446,17 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   bloqueios, encerramento) e a paginação traria schema de query e mais um 400 sem ganho. Ganharia
   se bloqueio/desbloqueio virasse rotina automática (ex.: antifraude) e o histórico crescesse.
   \emph{Escolhido:} devolve \tb{\{items\}} completo, em ordem cronológica.
+  \item \textbf{Cota do fundo com oscilação aleatória no seed} (\tb{random()}) --- descartada
+  porque cada \tb{docker compose up} geraria preços diferentes, e um teste ou uma conta conferida
+  na apresentação deixaria de bater. Ganharia se quiséssemos simular cenários de mercado.
+  \emph{Escolhido:} oscilação determinística com seno (Seção~\ref{sec:produtos}).
+  \item \textbf{Preços só em dias úteis} --- descartada porque num sábado ou domingo não haveria
+  preço de hoje, e cada produto teria um número diferente de linhas. Ganharia se o relatório
+  precisasse distinguir dia útil de dia corrido. \emph{Escolhido:} uma linha por dia corrido, com
+  o preço repetido no fim de semana.
+  \item \textbf{Preço inicial parecido com o mercado} (Tesouro Selic $\approx$ \rs 17.000, cota
+  $\approx$ \rs 1,00) --- descartada porque dificulta conferir as contas na mão. Ganharia se o
+  objetivo fosse realismo visual. \emph{Escolhido:} todos começam em \rs 100,00.
 \end{enumerate}
 
 % =====================================================================
@@ -1738,10 +1782,10 @@ HTTP/1.1 200 OK
   },
   "estimated": {
     "fund_admin_fee": 410959,
-    "own_issue_spread": 172603,
-    "float": 2301370
+    "own_issue_spread": 183699,
+    "float": 2465753
   },
-  "total": 3284932
+  "total": 3460411
 }
 \end{lstlisting}
 

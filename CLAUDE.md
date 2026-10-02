@@ -17,7 +17,8 @@ desenvolvimento: explique em português simples o que mudou e por quê.
 - Python 3.11, FastAPI, PostgreSQL 16, SQLAlchemy 2.0, jsonschema, Docker Compose, pytest.
 - Subir: `docker compose up -d` (esperar a API ficar healthy).
 - Testes: `pytest -v`.
-- Mudou `database/database.sql`? Ele só roda quando o banco nasce: `docker compose down -v` e subir de novo.
+- Mudou `database/database.sql`? Ele só roda quando o banco nasce e é copiado para a imagem no build:
+  `docker compose down -v` e depois `docker compose up -d --build` (sem `--build` roda o SQL antigo).
 - A banca roda em Linux: arquivos com fim de linha LF.
 
 ## Restrições obrigatórias (nunca violar)
