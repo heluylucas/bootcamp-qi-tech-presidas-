@@ -109,3 +109,80 @@ class StatusReasonRequired(QIException):
         description = "Blocking or closing an account requires a reason."
         translation = "Bloquear ou encerrar a conta exige um motivo."
         super().__init__(title, self.code, http_status, description, translation)
+
+
+class TransactionNotFound(QIException):
+    code = "BNK003001"
+
+    def __init__(self) -> None:
+        title = "Transaction Not Found"
+        http_status = 404
+        description = "The transaction_key does not exist or does not involve this account."
+        translation = "Transação não encontrada."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class DestinationAccountNotFound(QIException):
+    code = "BNK003002"
+
+    def __init__(self) -> None:
+        title = "Destination Account Not Found"
+        http_status = 404
+        description = "The destination_account_key does not exist."
+        translation = "Conta de destino não encontrada."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InsufficientBalance(QIException):
+    code = "BNK003003"
+
+    def __init__(self) -> None:
+        title = "Insufficient Balance"
+        http_status = 409
+        description = "The account does not have enough balance for amount plus fee."
+        translation = "Saldo insuficiente para o valor mais a tarifa."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidAmount(QIException):
+    code = "BNK003004"
+
+    def __init__(self) -> None:
+        title = "Invalid Amount"
+        http_status = 422
+        description = "The amount must be an integer greater than zero, in cents."
+        translation = "O valor precisa ser maior que zero, em centavos."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class AmountAboveLimit(QIException):
+    code = "BNK003005"
+
+    def __init__(self) -> None:
+        title = "Amount Above Limit"
+        http_status = 422
+        description = "The amount is above the limit for this type of operation."
+        translation = "O valor está acima do limite para este tipo de operação."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class SameAccountTransfer(QIException):
+    code = "BNK003006"
+
+    def __init__(self) -> None:
+        title = "Same Account Transfer"
+        http_status = 422
+        description = "The destination account must be different from the origin account."
+        translation = "A conta de destino precisa ser diferente da conta de origem."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class DestinationAccountNotActive(QIException):
+    code = "BNK003007"
+
+    def __init__(self) -> None:
+        title = "Destination Account Not Active"
+        http_status = 409
+        description = "The destination account is blocked or closed and cannot receive money."
+        translation = "A conta de destino está bloqueada ou encerrada e não pode receber dinheiro."
+        super().__init__(title, self.code, http_status, description, translation)
