@@ -89,6 +89,17 @@ class AccountNotEmpty(QIException):
         super().__init__(title, self.code, http_status, description, translation)
 
 
+class AccountNotActive(QIException):
+    code = "BNK002005"
+
+    def __init__(self) -> None:
+        title = "Account Not Active"
+        http_status = 409
+        description = "The account is blocked or closed and cannot move money."
+        translation = "A conta está bloqueada ou encerrada e não pode movimentar dinheiro."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
 class StatusReasonRequired(QIException):
     code = "BNK002006"
 

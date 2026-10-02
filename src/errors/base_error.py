@@ -145,3 +145,25 @@ class InvalidParameter(QIException):
         http_status = 400
         translation = "Parâmetros inválidos foram fornecidos na requisição."
         super().__init__(title, self.code, http_status, description, translation)
+
+
+class MissingIdempotencyKey(QIException):
+    code = "BNK000003"
+
+    def __init__(self) -> None:
+        title = "Missing Idempotency Key"
+        http_status = 400
+        description = "This route moves money and requires the Idempotency-Key header."
+        translation = "Esta operação exige o cabeçalho Idempotency-Key."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class IdempotencyKeyReused(QIException):
+    code = "BNK000004"
+
+    def __init__(self) -> None:
+        title = "Idempotency Key Reused"
+        http_status = 409
+        description = "This Idempotency-Key was already used with a different request body."
+        translation = "Esta Idempotency-Key já foi usada com um pedido diferente."
+        super().__init__(title, self.code, http_status, description, translation)
