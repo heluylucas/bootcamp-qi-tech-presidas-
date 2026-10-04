@@ -83,3 +83,30 @@ class AccountRepository:
             .order_by(AccountStatusEvent.id)
             .all()
         )
+
+    @staticmethod
+    def get_by_key_any_owner(context: Context, account_key: str) -> Optional[Account]:
+        # Sem filtro de dono: só para o DESTINO de uma transferência, que pode
+        # ser de outro cliente (RN-MOV-05). Nunca use para a conta do caminho.
+        return context.db_session.query(Account).filter(Account.account_key == account_key).first()
+
+    @staticmethod
+    def get_by_id_for_update(context: Context, account_id: int) -> Optional[Account]:
+        # populate_existing: se a conta já foi lida antes nesta sessão, o
+        # SQLAlchemy devolveria o objeto com o saldo ANTIGO, lido antes da
+        # trava. Com ele, os valores são relidos depois que a trava é concedida.
+        return (
+            context.db_session.query(Account)
+            .filter(Account.id == account_id)
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
+
+    @staticmethod
+    def update_balance(context: Context, account: Account, balance: int) -> Account:
+        account.balance = balance
+        account.updated_at = func.now()
+        context.db_session.flush()
+
+        return account
