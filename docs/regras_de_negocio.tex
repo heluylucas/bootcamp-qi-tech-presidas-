@@ -237,8 +237,9 @@ proposta deste documento é:
         unitário diário tabelado (Seção~\ref{sec:produtos}).
   \item \dec{} \textbf{Não} oferecer ações, cripto ou ativos com preço de mercado em tempo
         real: exigiriam um serviço externo de cotação e regras de pregão.
-  \item \ext{} Se sobrar tempo, trocar o preço tabelado por um \emph{connector} que busca o preço
-        em um serviço externo simulado (Mockserver), como ensinado na Aula 3.
+  \item \dec{} O preço novo de cada dia chega pelo \textbf{fechamento do dia}: \emph{connectors}
+        buscam a cota, o preço dos títulos e o CDI em serviços externos simulados (MockServer),
+        como ensinado na Aula 3 (Seção~\ref{sec:fechamento}).
 \end{itemize}
 
 \subsection{O que está dentro e fora do escopo}
@@ -429,7 +430,8 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   \tb{..._key} UUID (gerado no repository, com \tb{uuid4}). Só a \tb{key} sai.
   \item[RN-GER-03 \dec] \textbf{Datas.} Tudo em \tb{TIMESTAMPTZ}, gravado em UTC e devolvido no
   formato ISO 8601. Exemplo: \tb{2026-10-01T13:02:11Z}. Datas sem hora (nascimento, data do
-  preço) em \tb{DATE}.
+  preço) em \tb{DATE}. Os \tb{created_at} guardam a hora \emph{real} (auditoria); toda regra que
+  pergunta ``que dia é hoje?'' usa a data de movimento (RN-GER-13).
   \item[RN-GER-04 \obr] \textbf{Nada é apagado.} Não existe rota \tb{DELETE}. Encerrar, bloquear e
   refazer perfil são mudanças de estado ou linhas novas.
   \item[RN-GER-05 \obr] \textbf{Formato de erro único.} Todo erro devolve
@@ -460,6 +462,14 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   e depois escreve com base nele trava a linha (\tb{SELECT ... FOR UPDATE}) dentro da mesma
   transação. Quando há duas contas, trava sempre na ordem crescente de \tb{id} (evita
   \emph{deadlock}).
+  \item[RN-GER-13 \dec] \textbf{Data de movimento.} O banco tem um calendário próprio, guardado
+  em \tb{business_day} (uma linha por dia aberto, nunca alterada; a data atual é a maior
+  \tb{reference_date}). Ela nasce com a data real em que o banco é criado e \textbf{só avança} pelo
+  fechamento do dia (\tb{POST /internal/day_close}, Seção~\ref{sec:fechamento}), que pula sábado e
+  domingo. É ela o ``hoje'' de todas as regras: idade mínima, validade do perfil, vencimento de
+  título, preço do dia e taxas de referência. É assim que um banco real trabalha (data contábil e
+  virada de data), e é o que permite mostrar ``aplica no dia $t$, resgata no dia $t+n$'' em
+  segundos, na frente da banca.
 \end{regras}
 
 \subsection*{Quando usar cada status HTTP}
@@ -506,8 +516,8 @@ tem estado é a conta.
   repetido (409, \tb{BNK001002}). Ver Seção~\ref{sec:decisoes}.
   \item[RN-CLI-04b \dec] Os schemas usam \tb{"additionalProperties": false}: campo que não está no
   contrato é recusado com 400.
-  \item[RN-CLI-05 \dec] Idade mínima de 18 anos na data do cadastro. Menor $\to$ 422
-  (\tb{BNK001004}). Data de nascimento no futuro também $\to$ 422.
+  \item[RN-CLI-05 \dec] Idade mínima de 18 anos na data de movimento (RN-GER-13). Menor $\to$ 422
+  (\tb{BNK001004}). Data de nascimento depois da data de movimento também $\to$ 422.
   \item[RN-CLI-06 \dec] Nome com 3 a 120 caracteres, sem espaços sobrando nas pontas.
   \item[RN-CLI-07 \obr] A resposta de criação é 201 com \tb{customer_key}; nunca o \tb{id}.
   \item[RN-CLI-08 \dec] O CPF volta mascarado (RN-GER-10).
@@ -704,8 +714,9 @@ Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1
   \item[RN-SUI-04 \dec] \textbf{Trava de segurança:} quem responde (1) na Q3 (``resgataria tudo'')
   ou (1) na Q5 (``preciso a qualquer momento'') é \textbf{Conservador}, qualquer que seja a soma. A
   resposta guarda o motivo (\tb{forced_by_rule = true}).
-  \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until}). Vencido, o cliente
-  não faz novas aplicações nem pede sugestão até refazer (409, \tb{BNK004004}).
+  \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until} \tb{DATE} = data de
+  movimento da resposta + 24 meses). Vencido (data de movimento depois de \tb{valid_until}), o
+  cliente não faz novas aplicações nem pede sugestão até refazer (409, \tb{BNK004004}).
   \item[RN-SUI-06 \obr] Refazer o questionário cria uma avaliação \textbf{nova}; as antigas continuam
   guardadas (R4). O perfil atual é sempre a avaliação mais recente.
   \item[RN-SUI-07 \dec] Cada avaliação guarda as respostas escolhidas (\tb{suitability_answer}),
@@ -750,19 +761,23 @@ D+0. Liquidez com prazo real fica como \ext.}
   \item[RN-PRO-01 \dec] Os produtos são criados pelo seed do \tb{database.sql}. Não há rota para
   criar produto no MVP (\ext: rota interna de cadastro).
   \item[RN-PRO-02 \obr] Todo produto tem \tb{product_key} (UUID) e só ela sai na API.
-  \item[RN-PRO-03 \dec] Produto inativo (\tb{is_active = false}) ou com vencimento já passado não
-  aceita aplicação $\to$ 409 (\tb{BNK005002}).
+  \item[RN-PRO-03 \dec] Produto inativo (\tb{is_active = false}) ou com vencimento anterior à data
+  de movimento não aceita aplicação $\to$ 409 (\tb{BNK005002}).
   \item[RN-PRO-04 \dec] O preço do dia é o registro de \tb{product_price} com a maior
-  \tb{reference_date} menor ou igual a hoje. Se não existir nenhum $\to$ 409
-  (\tb{BNK005003}) e a operação não acontece.
+  \tb{reference_date} menor ou igual à \textbf{data de movimento} (RN-GER-13). Se não existir
+  nenhum $\to$ 409 (\tb{BNK005003}) e a operação não acontece. Num dia sem preço novo (fim de
+  semana, fechamento que falhou), vale o último publicado.
   \item[RN-PRO-05 \dec] \textbf{Publicação de preço/cota:} \tb{POST /product/\{key\}/price} grava o
-  preço de uma data. Preço menor ou igual a zero, ou data no futuro $\to$ 422 (\tb{BNK005005}).
-  Já existe preço para aquela data $\to$ 409 (\tb{BNK005004}) --- preço publicado não se
-  reescreve (R4), garantido por \tb{UNIQUE(product_id, reference_date)}.
-  \item[RN-PRO-06 \dec] O seed gera preços para os últimos 30 dias de cada produto usando juros
-  compostos com a taxa fictícia do produto:
-  $P_t = P_0 \times (1+i)^{\,d/252}$, em que $d$ é o número de dias úteis desde a data inicial.
-  Para o \fundo, a cota do seed pode oscilar (sobe e desce), para mostrar ganho e perda.
+  preço de uma data. Preço menor ou igual a zero, ou data depois da data de movimento $\to$ 422
+  (\tb{BNK005005}). Já existe preço para aquela data $\to$ 409 (\tb{BNK005004}) --- preço
+  publicado não se reescreve (R4), garantido por \tb{UNIQUE(product_id, reference_date)}. O
+  caminho normal de preço novo é o fechamento do dia (Seção~\ref{sec:fechamento}); esta rota fica
+  para correções manuais.
+  \item[RN-PRO-06 \dec] \textbf{Preço simulado depende só da data.} O seed e o cenário do mock usam
+  as mesmas fórmulas (tabela abaixo), em que $d$ é o número de dias úteis (segunda a sexta) depois
+  da \textbf{data âncora fixa 01/01/2026}. Como a fórmula só usa a data, qualquer dia pode ser
+  calculado direto, em qualquer ordem, e sempre dá o mesmo número --- o mock não precisa lembrar o
+  preço de ontem. O \fundo{} tem uma onda de seno, para mostrar ganho \emph{e} perda.
   \item[RN-PRO-07 \obr] Preço unitário em \tb{NUMERIC(20,8)}, nunca \tb{FLOAT} (R6).
   \item[RN-PRO-08 \dec] O catálogo pode ser filtrado por tipo e por risco máximo
   (\tb{GET /products?max_risk=2}) --- útil para mostrar ``o que cabe no meu perfil''.
@@ -772,33 +787,99 @@ D+0. Liquidez com prazo real fica como \ext.}
 
 Números fictícios usados pelo \tb{database.sql}. Mudou algum? Mude aqui e no seed juntos.
 
-\begin{center}
-\begin{tabular}{@{}llll@{}}
+\begingroup\small
+\begin{longtable}{@{}P{3.3cm}P{2.6cm}P{2.1cm}P{3.4cm}P{4.6cm}@{}}
 \toprule
-\textbf{Produto} & \textbf{Emissor} & \textbf{Vencimento} & \textbf{Taxa anual usada no seed} \\
+\textbf{Produto} & \textbf{Emissor} & \textbf{Vencimento} & \textbf{\tb{external_code}} & \textbf{Preço no dia $d$} \\
 \midrule
-Tesouro Selic 2031 & Tesouro Nacional & 01/03/2031 & Selic = 15\% \\
-CDB \banco{} Liquidez & \banco & sem vencimento & 95\% do CDI (CDI = 14,9\%) \\
-LCI \banco{} 2027 & \banco & 01/03/2027 & 93\% do CDI \\
-Tesouro Prefixado 2029 & Tesouro Nacional & 01/01/2029 & 13\% \\
-Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & IPCA 4,5\% + 6\% $= 1{,}045 \times 1{,}06 - 1$ \\
-\fundo{} FIM & \fundo & --- & cota oscila; taxa de administração 1\% \\
+\endhead
+Tesouro Selic 2031 & Tesouro Nacional & 01/03/2031 & \tb{TESOURO SELIC 2031} & $100 \times 1{,}15^{\,d/252}$ \\
+CDB \banco{} Liquidez & \banco & sem vencimento & (nulo: emissão própria) & $100 \times (1 + c \times 0{,}95)^{d}$ \\
+LCI \banco{} 2027 & \banco & 01/03/2027 & (nulo: emissão própria) & $100 \times (1 + c \times 0{,}93)^{d}$ \\
+Tesouro Prefixado 2029 & Tesouro Nacional & 01/01/2029 & \tb{TESOURO PREFIXADO 2029} & $100 \times 1{,}13^{\,d/252}$ \\
+Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $100 \times (1{,}045 \times 1{,}06)^{\,d/252}$ \\
+\fundo{} FIM & \fundo & --- & CNPJ fictício \tb{12.345.678/0001-95} & $100 \times (1{,}10 \times 0{,}99)^{\,d/252} \times (1 + 3\% \times \sin(d/7))$ \\
 \bottomrule
-\end{tabular}
-\end{center}
+\end{longtable}
+\endgroup
 
 \begin{itemize}
-  \item \tb{reference_rate}: CDI \tb{1490} bps, Selic \tb{1500} bps.
-  \item Todos os produtos começam em \rs 100,00 no primeiro dia da série.
-  \item A série tem uma linha por dia \textbf{corrido}, de hoje $-29$ até hoje (30 preços por
-        produto, sempre existe preço de hoje). O $d$ da RN-PRO-06 conta só dias úteis (segunda a
-        sexta), então no fim de semana o preço repete o de sexta.
-  \item Fundo: a cada dia útil $n$, retorno bruto $r_n = 0{,}06\% + 0{,}8\% \times \sin(n)$ e
-        $P_n = P_{n-1} \times (1 + r_n) \times (1 - 1\%)^{1/252}$ (RN-REC-04). Sobe e desce, mas é
-        sempre a mesma série.
+  \item $c = (1 + \text{CDI})^{1/252} - 1$ é o CDI de um dia útil. CDB e LCI rendem
+        $c \times$ \tb{cdi_percentage_bps} por dia útil: é a conta que o mercado faz para
+        ``95\% do CDI'', e é a mesma que o fechamento do dia repete (RN-FEC-05).
+  \item \tb{reference_rate} (histórico, RN-REC-08): o seed grava CDI \tb{1490} bps e Selic
+        \tb{1500} bps com data de hoje $-29$. O cenário padrão do mock repete esses valores todo dia.
+  \item Todos os produtos valem \rs 100,00 na data âncora ($d = 0$).
+  \item A série do seed tem uma linha por dia \textbf{corrido}, de hoje $-29$ até hoje (30 preços
+        por produto, sempre existe preço de hoje). No fim de semana $d$ não muda, então o preço
+        repete o de sexta.
+  \item Fundo: $(1{,}10 \times 0{,}99)^{d/252}$ é uma tendência de 10\% ao ano já descontada a
+        taxa de administração de 1\% (RN-REC-04). A onda $3\% \times \sin(d/7)$ faz a cota subir
+        e descer: no pior dia ela cai cerca de 0,4\%, o que basta para mostrar um resgate com
+        prejuízo.
+  \item Preços arredondados em 8 casas (\tb{NUMERIC(20,8)}, RN-PRO-07).
   \item CDB e LCI: \tb{own_issue = true}, \tb{cdi_percentage_bps} \tb{9500} e \tb{9300}. Fundo:
         \tb{admin_fee_bps = 100}. Todos com \tb{is_active = true}.
 \end{itemize}
+
+\subsection{Fechamento do dia e fontes externas de preço}\label{sec:fechamento}
+
+O banco não inventa o preço do Tesouro nem a cota do fundo: no fim de cada dia ele
+\textbf{pergunta} a quem publica (Tesouro, administradora do fundo, Banco Central) e guarda a
+resposta. Só calcula o preço dos papéis que ele mesmo emitiu (CDB e LCI), a partir do CDI. No
+simulador, esses serviços de fora são um \textbf{MockServer} que sobe junto com o
+\tb{docker compose}; os connectors em \tb{src/connectors/} são o mesmo código que iria para
+produção, mudando só o endereço.
+
+\begin{regras}
+  \item[RN-FEC-01 \dec] \textbf{Rotas.} \tb{GET /internal/business_date} devolve a data de
+  movimento. \tb{POST /internal/day_close} com \tb{\{"close_date": "AAAA-MM-DD"\}} fecha esse dia e
+  abre o próximo dia útil. As duas são internas (só \tb{INTERNAL-TOKEN}).
+  \item[RN-FEC-02 \dec] \textbf{Contra clique duplo.} O \tb{close_date} precisa ser a data de
+  movimento atual, conferida com a linha de \tb{business_day} travada (\tb{FOR UPDATE}).
+  Diferente $\to$ 409 (\tb{BNK000006}) e nada muda. Assim, dois pedidos iguais fecham um dia só.
+  \item[RN-FEC-03 \dec] \textbf{Próximo dia útil.} Sexta fecha para segunda; sábado e domingo nunca
+  são abertos pelo fechamento. Feriados ficam como \ext.
+  \item[RN-FEC-04 \dec] \textbf{O que se pergunta lá fora}, sempre para o novo dia: a cota do
+  \fundo{} (administradora), o preço dos três títulos (Tesouro) e o CDI e a Selic anualizados
+  (Banco Central). Contratos na tabela abaixo.
+  \item[RN-FEC-05 \dec] \textbf{O que o banco calcula:} CDB e LCI $=$ preço anterior $\times$
+  $(1 + c \times$ \tb{cdi_percentage_bps}$/10000)$, com $c = (1 + \text{CDI do novo dia})^{1/252}
+  - 1$, em \tb{Decimal} e arredondado em 8 casas.
+  \item[RN-FEC-06 \obr] \textbf{Tudo ou nada.} Serviço fora do ar, demorando mais que o timeout (5 s)
+  ou respondendo erro $\to$ 502 (\tb{BNK005006}). Resposta sem sentido (preço $\le 0$, data
+  diferente da pedida, título ou fundo faltando, taxa ausente) $\to$ 502 (\tb{BNK005007}). Nos dois
+  casos nada é gravado e a data de movimento não muda.
+  \item[RN-FEC-07 \dec] \textbf{O que é gravado}, num \tb{commit} só: um preço por produto em
+  \tb{product_price}, o CDI e a Selic em \tb{reference_rate} e a nova linha de \tb{business_day}.
+  Resposta 201 com a nova data, os preços e as taxas.
+  \item[RN-FEC-08 \dec] \textbf{Simplificações do MVP.} As chamadas externas acontecem com a trava
+  da data segurada (no máximo 5 s por serviço), então fechamentos simultâneos ficam em fila. Ordens
+  não travam a data de movimento: uma ordem que começou antes do fechamento usa o preço do dia em
+  que começou.
+\end{regras}
+
+\begingroup\small
+\begin{longtable}{@{}P{2.7cm}P{6.3cm}P{7.0cm}@{}}
+\toprule
+\textbf{Serviço (connector)} & \textbf{Pedido ao mock} & \textbf{Resposta (inspirada no contrato real)} \\
+\midrule
+\endhead
+Administradora (\tb{FundAdminConnector}) & \tb{GET /fund-admin/funds/\{cnpj\}/quotes?date=AAAA-MM-DD} & \tb{\{"CNPJ_FUNDO", "DT_COMPTC", "VL_QUOTA", "VL_PATRIM_LIQ", "NR_COTST"\}} --- campos do Informe Diário da CVM. \\
+Tesouro (\tb{TreasuryConnector}) & \tb{GET /treasury/prices?date=AAAA-MM-DD} & \tb{\{"date", "bonds": [\{"name", "maturity_date", "unit_price"\}]\}}. \\
+Banco Central (\tb{CentralBankConnector}) & \tb{GET /bcb/dados/serie/bcdata.sgs.\{série\}/dados?formato=json\&dataInicial=DD/MM/AAAA\&dataFinal=DD/MM/AAAA}, série 4389 (CDI) e 1178 (Selic), anualizadas base 252 & \tb{[\{"data": "DD/MM/AAAA", "valor": "14.90"\}]} --- mesmo formato da API pública do Banco Central. \tb{valor} em \% ao ano, vira bps ($\times 100$). \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+\textbf{Quem ensina o mock.} O MockServer sobe vazio. Um container que roda uma vez
+(\tb{mock-init}) ensina a ele os próximos 60 dias úteis pelas fórmulas da RN-PRO-06, para a
+demonstração manual. Os testes ensinam as próprias respostas (números redondos, erros, queda de
+conexão) com \textbf{prioridade maior}, sem apagar o cenário da demonstração.
+
+\textbf{Por que diário, e não intradiário.} Fundo de investimento tem uma cota por dia útil (a
+cota de fechamento), e renda fixa rende por dia útil. Preço minuto a minuto só existe para ações e
+cripto, que estão fora do escopo.
 
 % =====================================================================
 \section{Módulo 6 --- Carteira sugerida}
@@ -899,8 +980,8 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   sempre pode tirar o dinheiro (princípio de proteção ao cliente).
   \item[RN-ORD-10 \obr] Precisa existir posição com quantidade suficiente; senão $\to$ 409
   (\tb{BNK006004}).
-  \item[RN-ORD-11 \dec] Produto com liquidez \tb{AT_MATURITY} só pode ser resgatado na data de
-  vencimento ou depois. Antes $\to$ 422 (\tb{BNK006005}).
+  \item[RN-ORD-11 \dec] Produto com liquidez \tb{AT_MATURITY} só pode ser resgatado quando a data
+  de movimento chega ao vencimento. Antes $\to$ 422 (\tb{BNK006005}).
   \item[RN-ORD-12 \dec] O resgate pode ser por valor (\tb{amount}) ou total
   (\tb{redeem_all: true}). Por valor: \tb{quantidade = valor / preço}, truncada em 8 casas. Total:
   quantidade = toda a posição e valor = \tb{floor(quantidade} $\times$ \tb{preço)} em centavos.
@@ -988,25 +1069,30 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   aplicações $+\ \Sigma$ resgates. É o que a rota de reconciliação confere, e é o que prova que a
   tarifa saiu de algum lugar e foi para o banco, sem sumir.
   \item[RN-REC-04 \dec] \textbf{Taxa de administração.} Só o fundo tem \tb{admin_fee_bps}
-  (\tb{100} = 1\% ao ano). A cota publicada é \emph{líquida}, como no mercado: o seed gera a série
-  com $P_t = P_{t-1} \times (1 + r_t) \times (1 - \text{taxa})^{1/252}$, em que $r_t$ é o retorno
-  bruto do dia.
+  (\tb{100} = 1\% ao ano). A cota publicada é \emph{líquida}, como no mercado: a administradora
+  (no simulador, o mock e o seed) já desconta a taxa, com o fator $(1 - \text{taxa})$ ao ano da
+  fórmula da RN-PRO-06.
   \item[RN-REC-05 \dec] \textbf{Estimativa da taxa de administração} no período $=$ patrimônio do
-  fundo hoje $\times$ taxa $\times$ dias corridos $/ 365$, com patrimônio $= \Sigma$
-  \tb{position.quantity} $\times$ cota do dia. É uma aproximação linear, suficiente para o
+  fundo na data de movimento $\times$ taxa $\times$ dias corridos $/ 365$, com patrimônio $=
+  \Sigma$ \tb{position.quantity} $\times$ cota do dia. É uma aproximação linear, suficiente para o
   relatório.
   \item[RN-REC-06 \dec] \textbf{Títulos próprios.} CDB e LCI têm \tb{own_issue = true} e guardam o
   percentual do CDI que pagam em \tb{cdi_percentage_bps} (\tb{9500} = 95\%). Spread estimado $=
   \Sigma$ \tb{position.invested_amount} nesses produtos $\times$ CDI $\times$ (1 $-$ percentual
   pago) $\times$ dias $/ 365$.
   \item[RN-REC-07 \dec] \textbf{Float} estimado $= \Sigma$ \tb{account.balance} das contas
-  \tb{ACTIVE} e \tb{BLOCKED} hoje $\times$ Selic $\times$ dias $/ 365$. Saldo em conta corrente não
+  \tb{ACTIVE} e \tb{BLOCKED} agora $\times$ Selic $\times$ dias $/ 365$. Saldo em conta corrente não
   é remunerado para o cliente.
-  \item[RN-REC-08 \dec] \textbf{Taxas de referência.} CDI e Selic anuais (fictícios) ficam na
-  tabela \tb{reference_rate}, preenchida pelo seed. O seed de preços e o relatório de receita usam
-  os mesmos números, para que tudo seja coerente.
+  \item[RN-REC-08 \dec] \textbf{Taxas de referência (histórico).} CDI e Selic anuais ficam em
+  \tb{reference_rate}, \textbf{uma linha por taxa e por data}, nunca alterada (R4): o seed grava a
+  primeira e cada fechamento do dia grava as do novo dia, vindas do Banco Central (RN-FEC-04).
+  Quem precisa de uma taxa (o cálculo do CDB e da LCI, este relatório) usa a última com data menor
+  ou igual à data de movimento --- a mesma regra do preço (RN-PRO-04). Assim existe \emph{um} CDI
+  só: o CDB rende pelo mesmo número que o relatório usa, e cada preço de CDB pode ser refeito com
+  o CDI gravado do dia.
   \item[RN-REC-09 \dec] \textbf{Relatório.} \tb{GET /internal/revenue?from=\&to=} devolve as
-  duas partes, em centavos. Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
+  duas partes, em centavos. O período filtra pelo \tb{created_at} (hora real) dos lançamentos.
+  Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
   intervalo maior que 366 dias $\to$ 400 (\tb{BNK000005}). A rota é interna (não pertence a
   nenhum cliente) e fica protegida pelo \tb{INTERNAL-TOKEN}; num banco real ela exigiria perfil de
   administrador, o que está fora do escopo.
@@ -1073,11 +1159,12 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \tb{suitability_question} & \tb{code} (Q1..Q7) UNIQUE; \tb{text}; \tb{dimension} (objetivo, situação financeira, conhecimento); \tb{position} (ordem de exibição). \\
 \tb{suitability_option} & \tb{question_id} FK; \tb{code} (1..4); \tb{text}; \tb{points SMALLINT}. \tb{UNIQUE(question_id, code)}. \\
 \tb{investor_profile} & Enumerador com dados: \tb{CONSERVATIVE}, \tb{MODERATE}, \tb{AGGRESSIVE}; \tb{min_score}, \tb{max_score}, \tb{max_risk_level}. \\
-\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{profile_id} FK; \tb{score SMALLINT}; \tb{forced_by_rule BOOLEAN}; \tb{valid_until TIMESTAMPTZ}; \tb{created_at}. (Uma linha por vez que o cliente responde; nunca é editada.) \\
+\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{profile_id} FK; \tb{score SMALLINT}; \tb{forced_by_rule BOOLEAN}; \tb{valid_until DATE} (data de movimento + 24 meses); \tb{created_at}. (Uma linha por vez que o cliente responde; nunca é editada.) \\
 \tb{suitability_answer} & \tb{assessment_id} FK; \tb{question_id} FK; \tb{option_id} FK. \tb{UNIQUE(assessment_id, question_id)}. \\
 \tb{product_type} & Enumerador: \tb{PUBLIC_BOND}, \tb{PRIVATE_BOND}, \tb{FUND}. \\
-\tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (nulo no fundo); \tb{min_application BIGINT}; \tb{is_active BOOLEAN}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo). \\
-\tb{reference_rate} & \tb{code} (\tb{CDI}, \tb{SELIC}) UNIQUE; \tb{annual_rate_bps INTEGER CHECK (> 0)}. Taxas fictícias usadas no seed de preços e no relatório de receita. \\
+\tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (nulo no fundo); \tb{min_application BIGINT}; \tb{is_active BOOLEAN}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo); \tb{external_code VARCHAR(40)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo na emissão própria). \\
+\tb{business_day} & \tb{reference_date DATE NOT NULL UNIQUE}; \tb{created_at}. Uma linha por dia aberto, nunca alterada; a data de movimento é a maior \tb{reference_date} (RN-GER-13). \\
+\tb{reference_rate} & \tb{code} (\tb{CDI}, \tb{SELIC}); \tb{reference_date DATE NOT NULL}; \tb{annual_rate_bps INTEGER CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(code, reference_date)}. Histórico das taxas (RN-REC-08). \\
 \tb{product_price} & \tb{product_id} FK; \tb{reference_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, reference_date)}. \\
 \tb{model_portfolio} & \tb{profile_id} FK UNIQUE; \tb{name}. \\
 \tb{model_portfolio_item} & \tb{model_portfolio_id} FK; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(model_portfolio_id, product_id)}. A soma de 10.000 é conferida por um teste. \\
@@ -1106,8 +1193,10 @@ O diagrama no formato \emph{mermaid} (que o modelo de RFC usa) está no Apêndic
 \begin{enumerate}
   \item Enumeradores: \tb{account_status}, \tb{transaction_type}, \tb{product_type}, \tb{investor_profile}.
   \item As 7 perguntas e 28 opções do questionário.
-  \item As taxas de referência (CDI e Selic) e os 6 produtos com seus preços dos últimos 30 dias
-        (a cota do fundo já líquida da taxa de administração).
+  \item A primeira data de movimento (\tb{business_day} = data real em que o banco nasce).
+  \item As taxas de referência (CDI e Selic, com data de hoje $-29$) e os 6 produtos com seus
+        preços dos últimos 30 dias pelas fórmulas da RN-PRO-06 (a cota do fundo já líquida da taxa
+        de administração).
   \item As 3 carteiras-modelo e seus itens.
 \end{enumerate}
 
@@ -1155,7 +1244,11 @@ GET & \rota|/customer/{ck}/suitabilities| & Histórico de avaliações. & 200; 4
 GET & \rota|/products| & Catálogo. Query: \tb{type}, \tb{max_risk}. & 200. \\
 GET & \rota|/product/{product_key}| & Detalhe + preço do dia. & 200; 404. \\
 GET & \rota|/product/{product_key}/prices| & Histórico de preços. Query: \tb{from}, \tb{to}. & 200; 404. \\
-POST & \rota|/product/{product_key}/price| & Publica preço/cota de uma data (uso interno). \tb{reference_date}, \tb{unit_price}. & 201; 404; 409 já existe preço na data; 422 preço $\le 0$ ou data futura. \\
+POST & \rota|/product/{product_key}/price| & Publica preço/cota de uma data (correção manual). \tb{reference_date}, \tb{unit_price}. & 201; 404; 409 já existe preço na data; 422 preço $\le 0$ ou data depois da data de movimento. \\
+\midrule
+\multicolumn{4}{@{}l}{\textbf{Data de movimento e fechamento do dia}} \\
+GET & \rota|/internal/business_date| & Data de movimento atual. & 200 \tb{\{business_date\}}. \\
+POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, buscando preços e taxas lá fora. \tb{close_date}. & 201 nova data, preços e taxas; 400 schema; 409 \tb{close_date} não é a data atual; 502 fonte externa fora do ar ou com resposta inválida (nada gravado). \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Carteira sugerida}} \\
 GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
@@ -1209,6 +1302,7 @@ BNK000002 & 403 & Forbidden & Sem \tb{INTERNAL-TOKEN} (repositório-base). \\
 BNK000003 & 400 & Missing Idempotency Key & Rota de dinheiro sem \tb{Idempotency-Key}. \\
 BNK000004 & 409 & Idempotency Key Reused & Mesma chave com corpo diferente. \\
 BNK000005 & 400 & Invalid Query Parameter & Paginação ou filtro inválido. \\
+BNK000006 & 409 & Business Date Mismatch & \tb{close_date} do fechamento não é a data de movimento atual. \\
 \midrule
 BNK001001 & 404 & Customer Not Found & \tb{customer_key} não existe. \\
 BNK001002 & 409 & Document Already Registered & CPF já cadastrado. \\
@@ -1238,9 +1332,11 @@ BNK004005 & 409 & Suitability Required & Aplicar ou pedir sugestão sem perfil. 
 \midrule
 BNK005001 & 404 & Product Not Found & \tb{product_key} não existe. \\
 BNK005002 & 409 & Product Not Available & Produto inativo ou vencido. \\
-BNK005003 & 409 & Price Unavailable & Nenhum preço até hoje. \\
+BNK005003 & 409 & Price Unavailable & Nenhum preço até a data de movimento. \\
 BNK005004 & 409 & Price Already Published & Já existe preço nessa data. \\
-BNK005005 & 422 & Invalid Price & Preço $\le 0$ ou data futura. \\
+BNK005005 & 422 & Invalid Price & Preço $\le 0$ ou data depois da data de movimento. \\
+BNK005006 & 502 & Price Source Unavailable & Fonte externa de preço ou taxa fora do ar, com timeout ou respondendo erro. \\
+BNK005007 & 502 & Invalid Price Source Response & Fonte externa respondeu algo sem sentido (preço $\le 0$, data errada, produto ou taxa faltando). \\
 \midrule
 BNK006001 & 404 & Order Not Found & Ordem inexistente ou de outro cliente. \\
 BNK006002 & 422 & Below Minimum Application & Valor menor que o mínimo do produto. \\
@@ -1308,7 +1404,7 @@ segundo espera a trava do passo 2, conta uma conta e recebe 409.
 \subsection{Responder o suitability}
 \textbf{Feliz:} (1) busca cliente; (2) confere 7 respostas, uma por pergunta, opções válidas; (3)
 soma pontos; (4) aplica a trava da Q3/Q5; (5) escolhe o perfil pela faixa; (6) grava avaliação +
-7 respostas, \tb{valid_until} = agora + 24 meses; (7) \tb{commit}; (8) 201.\\
+7 respostas, \tb{valid_until} = data de movimento + 24 meses; (7) \tb{commit}; (8) 201.\\
 \textbf{Falhas:} passo 1 $\to$ 404; passo 2 $\to$ 422 \tb{BNK004002}/\tb{BNK004003}.
 
 \subsection{Aplicação}
@@ -1356,7 +1452,7 @@ Seguindo as camadas do repositório-base. Para cada módulo, criar:
 \tb{src/resources/} & Um por controller: lê HTTP, chama o controller, devolve o status de sucesso. \\
 \tb{src/dtos/} & Um por resposta: troca \tb{id} por \tb{key}, número de status por texto, mascara o CPF. \\
 \tb{src/errors/} & Uma classe por código do catálogo, com status e textos. \\
-\tb{src/connectors/} & Vazio no MVP (\ext: preço externo, antifraude). \\
+\tb{src/connectors/} & \tb{fund_admin_connector}, \tb{treasury_connector}, \tb{central_bank_connector}, todos sobre o \tb{RestConnector} do repositório-base (Seção~\ref{sec:fechamento}). \\
 \tb{src/app.py} & Registro das rotas da seção de rotas. \\
 \tb{tests/} & Testes black box por módulo (próxima seção). \\
 \bottomrule
@@ -1376,11 +1472,12 @@ fazem a requisição e conferem \textbf{status e corpo}. Nomes sugeridos, lidos 
 \textbf{Módulo} & \textbf{Testes} \\
 \midrule
 \endhead
-Clientes & cria cliente e devolve key (não id); recusa CPF inválido com 422; recusa CPF repetido com 409; recusa CPF repetido com pontuação diferente; recusa menor de idade; devolve CPF mascarado; cliente inexistente dá 404. \\
+Clientes & cria cliente e devolve key (não id); recusa CPF inválido com 422; recusa CPF repetido com 409; recusa CPF repetido com pontuação diferente; recusa menor de idade (idade calculada sobre a data de movimento, lida pela API); devolve CPF mascarado; cliente inexistente dá 404. \\
 Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409; recusa conta para cliente inexistente com 404; conta de outro cliente dá 404; bloqueia e desbloqueia; não sai de CLOSED; não encerra com saldo; exige motivo; histórico registra todas as transições. \\
 Movimentações & depósito aumenta saldo; saque diminui saldo; \textbf{transferência debita valor + tarifa na origem e credita só o valor no destino}; recusa saldo insuficiente sem alterar nenhum saldo; recusa transferência para si mesmo; recusa destino inexistente; recusa conta bloqueada (origem e destino); recusa valor zero e acima do limite; mesmo Idempotency-Key não debita duas vezes; mesma chave com corpo diferente dá 409; sem chave dá 400; extrato reconstrói o saldo; extrato pagina; comprovante de outra conta dá 404; tipo INVESTMENT_APPLY recusado na rota de transação. \\
 Suitability & calcula cada um dos três perfis; trava da Q3 força Conservador; recusa respostas incompletas; recusa opção de outra pergunta; refazer mantém histórico e muda o perfil atual; cliente sem perfil dá 404. \\
-Produtos & lista catálogo; filtra por risco; publica preço; recusa preço repetido na mesma data; recusa preço negativo e data futura. \\
+Produtos & lista catálogo; filtra por risco; publica preço; recusa preço repetido na mesma data; recusa preço negativo e data depois da data de movimento. \\
+Fechamento do dia & devolve a data de movimento; fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova. \\
 Carteira & soma dos pesos de cada carteira-modelo é 10.000; sugestão soma exatamente o valor pedido (inclusive com centavos quebrados); recusa sem perfil; recusa valor abaixo do mínimo. \\
 Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate devolve custo, resultado e rentabilidade (inclusive na repetição idempotente); resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate funciona mesmo sem perfil válido; mesmo Idempotency-Key não aplica duas vezes; ordem de outro cliente dá 404. \\
 Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. \\
@@ -1413,15 +1510,48 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \item \textbf{Posição calculada a partir das ordens} (sem tabela \tb{position}) --- descartada pelo
   mesmo motivo do item 1 e porque o resgate precisa travar ``a posição''. Ganharia se não houvesse
   resgate parcial.
-  \item \textbf{Preço calculado em tempo real por fórmula ou buscado num serviço externo} ---
-  descartada no MVP porque aumenta muito o código e cria dependência externa (timeout, falha).
-  Ganharia se tivéssemos ativos de mercado (ações). Fica como \ext{} com connector + Mockserver.
-  \item \textbf{Rotina agendada (cron) que publica o preço todo dia} --- descartada porque a banca
-  sobe o banco do zero e o seed já cria o preço de hoje; um agendador seria mais um processo no
-  compose sem ganho na avaliação. Se o sistema ficar no ar por dias, a RN-PRO-04 usa o último preço
-  publicado. Ganharia num banco que fica no ar por semanas: em produção seria o job de fim de dia
-  que recebe a cota da administradora do fundo e o CDI da B3 e chama a mesma
-  \tb{POST /product/\{key\}/price}.
+  \item \textbf{Buscar o preço lá fora na hora em que o cliente pede} (a cada aplicação ou
+  consulta de posição) --- descartada porque cada pedido do cliente passaria a depender de outro
+  serviço estar no ar, e dois clientes no mesmo dia poderiam ver preços diferentes. Ganharia se
+  tivéssemos ativos com preço minuto a minuto (ações). \emph{Escolhido:} o preço é buscado
+  \textbf{uma vez por dia}, no fechamento, e gravado; a API só lê a tabela (RN-PRO-04).
+  \item \textbf{Usar o relógio real como ``hoje''} --- descartada porque o dia seguinte só chega
+  depois de 24 horas: não daria para mostrar nem testar ``aplica no dia $t$, resgata no dia
+  $t+n$''. Ganharia se não houvesse rentabilidade para mostrar. \emph{Escolhido:} data de
+  movimento própria que avança pelo fechamento do dia (RN-GER-13), como a data contábil de um
+  banco real.
+  \item \textbf{Rotina agendada (cron) que vira o dia sozinha} --- descartada porque a banca precisa
+  controlar quando o dia vira, e um agendador seria mais um processo no compose. Ganharia num banco
+  de verdade, que fica no ar por semanas: lá o mesmo \tb{POST /internal/day_close} seria chamado
+  por um agendador depois do fechamento do mercado.
+  \item \textbf{O próprio banco calcular todos os preços por fórmula} (uma função SQL chamada todo
+  dia) --- descartada porque em produção o banco não inventa a cota do fundo nem o preço do
+  Tesouro: recebe de quem publica. Seria mais barato (sem mock, sem connector), mas não mostraria a
+  integração com serviço externo que a Aula 3 ensinou. Ganharia se o objetivo fosse só ter preço
+  novo todo dia. \emph{Escolhido:} connectors + MockServer; o banco só calcula o que ele mesmo
+  emitiu (CDB e LCI).
+  \item \textbf{Preço intradiário} --- descartada porque fundo tem uma cota por dia útil e renda
+  fixa rende por dia útil; variar o preço dentro do dia seria \emph{menos} realista. Ganharia se
+  oferecêssemos ações ou cripto.
+  \item \textbf{Taxa de referência fixa} (uma linha de CDI e uma de Selic) --- descartada porque,
+  com o CDI chegando do Banco Central todo dia, o banco teria dois CDIs: um rendendo o CDB e outro
+  no relatório de receita. \emph{Também descartado:} apagar \tb{reference_rate}, porque o relatório
+  de receita precisa das taxas. \emph{Escolhido:} histórico com uma linha por taxa e por data
+  (RN-REC-08).
+  \item \textbf{Fórmula da cota que depende do preço de ontem} (o seno acumulado dia a dia, usado
+  na primeira versão do seed) --- descartada porque o mock não tem memória: para responder a cota de
+  amanhã, precisaria lembrar a de hoje. Ganharia se o preço fosse calculado sempre pelo próprio
+  banco. \emph{Escolhido:} fórmulas que só dependem da data, com uma data âncora fixa
+  (RN-PRO-06).
+  \item \textbf{Chamar os serviços externos antes de travar a data} (e travar só para gravar) ---
+  descartada no MVP porque exigiria conferir de novo, depois da trava, se o dia não foi fechado
+  por outro pedido no meio. Ganharia com muitos fechamentos simultâneos, o que não existe: é um
+  fechamento por dia. \emph{Escolhido:} trava primeiro, com timeout de 5 s por serviço
+  (RN-FEC-08).
+  \item \textbf{Testes apagando o mock antes de cada caso} (\tb{Mock().clear()}, o ritual do
+  repositório-base) --- descartada porque apagaria também o cenário da demonstração manual.
+  \emph{Escolhido:} cada teste ensina as próprias respostas com prioridade maior, que ganham das do
+  cenário.
   \item \textbf{Perguntas do suitability no código} --- descartada porque mudar uma pergunta exigiria
   mudar código, e não daria para guardar a resposta escolhida com integridade. Ganharia pela
   simplicidade se o questionário nunca mudasse.
@@ -1466,14 +1596,14 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \item \textbf{Cota do fundo com oscilação aleatória no seed} (\tb{random()}) --- descartada
   porque cada \tb{docker compose up} geraria preços diferentes, e um teste ou uma conta conferida
   na apresentação deixaria de bater. Ganharia se quiséssemos simular cenários de mercado.
-  \emph{Escolhido:} oscilação determinística com seno (Seção~\ref{sec:produtos}).
-  \item \textbf{Preços só em dias úteis} --- descartada porque num sábado ou domingo não haveria
-  preço de hoje, e cada produto teria um número diferente de linhas. Ganharia se o relatório
-  precisasse distinguir dia útil de dia corrido. \emph{Escolhido:} uma linha por dia corrido, com
-  o preço repetido no fim de semana.
+  \emph{Escolhido:} oscilação determinística com seno da data (RN-PRO-06).
+  \item \textbf{Seed só com dias úteis} --- descartada porque, se o banco nascer num sábado ou
+  domingo, não haveria preço de hoje. Ganharia se o relatório precisasse distinguir dia útil de dia
+  corrido. \emph{Escolhido:} o seed tem uma linha por dia corrido, com o preço repetido no fim de
+  semana; depois disso, o fechamento só abre dias úteis e a RN-PRO-04 cobre os dias sem linha.
   \item \textbf{Preço inicial parecido com o mercado} (Tesouro Selic $\approx$ \rs 17.000, cota
   $\approx$ \rs 1,00) --- descartada porque dificulta conferir as contas na mão. Ganharia se o
-  objetivo fosse realismo visual. \emph{Escolhido:} todos começam em \rs 100,00.
+  objetivo fosse realismo visual. \emph{Escolhido:} todos valem \rs 100,00 na data âncora.
 \end{enumerate}
 
 % =====================================================================
@@ -1492,8 +1622,10 @@ Em ordem aproximada de custo-benefício (os primeiros são baratos e impressiona
   trouxer \tb{acknowledge_unsuitable: true}, guardando o aceite na ordem.
   \item \textbf{Imposto de renda regressivo e IOF} no resgate, com a tabela regressiva de renda fixa
   (22,5\% até 180 dias; 20\% até 360; 17,5\% até 720; 15\% acima), LCI isenta.
-  \item \textbf{Connector de preços + Mockserver}: o preço do dia vem de um serviço ``de fora''
-  simulado, com timeout e erro próprio quando ele não responde (exatamente o que a Aula 3 ensinou).
+  \item \textbf{Feriados no fechamento do dia}: calendário de feriados (ANBIMA) para o fechamento
+  pular também os feriados nacionais.
+  \item \textbf{Marcação a mercado do Prefixado e do IPCA+}: no mercado real o preço deles cai
+  quando os juros sobem; no simulador eles só sobem.
   \item \textbf{Connector de antifraude/bureau na abertura de conta}, também com Mockserver.
   \item \textbf{Cotização e liquidação com prazo} (fundo D+1, D+30): ordem nasce \tb{PENDING} e vira
   \tb{SETTLED} na data de liquidação --- mais um ciclo de estados.
@@ -1503,8 +1635,8 @@ Em ordem aproximada de custo-benefício (os primeiros são baratos e impressiona
   relatório de receita.
   \item \textbf{Rebalanceamento}: comparar a posição atual com a carteira-modelo e sugerir as
   ordens para voltar aos pesos.
-  \item \textbf{Rentabilidade comparada ao CDI} no período (benchmark), usando o CDI da tabela
-  \tb{reference_rate} como referência.
+  \item \textbf{Rentabilidade comparada ao CDI} no período (benchmark), usando o histórico de CDI
+  da tabela \tb{reference_rate}.
   \item \textbf{Limite diário} de transferência (soma do dia), além do limite por operação.
   \item \textbf{Estorno} como transação contrária ligada à original.
   \item \textbf{Documentação automática}: reativar o \tb{/docs} do FastAPI (o repositório-base
@@ -1654,7 +1786,7 @@ erDiagram
     int customer_id FK
     int profile_id FK
     smallint score
-    timestamptz valid_until
+    date valid_until
   }
   product {
     int id PK
@@ -1664,6 +1796,17 @@ erDiagram
     bigint min_application
     boolean own_issue
     smallint admin_fee_bps
+    string external_code "nulo na emissao propria"
+  }
+  business_day {
+    int id PK
+    date reference_date UK "maior = data de movimento"
+  }
+  reference_rate {
+    int id PK
+    string code "CDI ou SELIC"
+    date reference_date "UK com code"
+    int annual_rate_bps
   }
   product_price {
     int id PK
