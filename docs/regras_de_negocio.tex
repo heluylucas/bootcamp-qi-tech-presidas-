@@ -430,8 +430,8 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   \tb{..._key} UUID (gerado no repository, com \tb{uuid4}). Só a \tb{key} sai.
   \item[RN-GER-03 \dec] \textbf{Datas.} Tudo em \tb{TIMESTAMPTZ}, gravado em UTC e devolvido no
   formato ISO 8601. Exemplo: \tb{2026-10-01T13:02:11Z}. Datas sem hora (nascimento, data do
-  preço) em \tb{DATE}. Os \tb{created_at} guardam a hora \emph{real} (auditoria); toda regra que
-  pergunta ``que dia é hoje?'' usa a data de movimento (RN-GER-13).
+  preço) em \tb{DATE}. Os \tb{created_at} guardam a hora \emph{real} (auditoria); as regras da
+  simulação que perguntam ``que dia é hoje?'' usam a data de movimento (RN-GER-13).
   \item[RN-GER-04 \obr] \textbf{Nada é apagado.} Não existe rota \tb{DELETE}. Encerrar, bloquear e
   refazer perfil são mudanças de estado ou linhas novas.
   \item[RN-GER-05 \obr] \textbf{Formato de erro único.} Todo erro devolve
@@ -466,8 +466,9 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   em \tb{business_day} (uma linha por dia aberto, nunca alterada; a data atual é a maior
   \tb{reference_date}). Ela nasce com a data real em que o banco é criado e \textbf{só avança} pelo
   fechamento do dia (\tb{POST /internal/day_close}, Seção~\ref{sec:fechamento}), que pula sábado e
-  domingo. É ela o ``hoje'' de todas as regras: idade mínima, validade do perfil, vencimento de
-  título, preço do dia e taxas de referência. É assim que um banco real trabalha (data contábil e
+  domingo. É ela o ``hoje'' das regras da simulação: vencimento de título, preço do dia e taxas de
+  referência. Idade mínima (RN-CLI-05) e validade do perfil (RN-SUI-05) usam o relógio real,
+  porque são fatos regulatórios e a data de movimento pode estar à frente do calendário. É assim que um banco real trabalha (data contábil e
   virada de data), e é o que permite mostrar ``aplica no dia $t$, resgata no dia $t+n$'' em
   segundos, na frente da banca.
 \end{regras}
@@ -516,8 +517,8 @@ tem estado é a conta.
   repetido (409, \tb{BNK001002}). Ver Seção~\ref{sec:decisoes}.
   \item[RN-CLI-04b \dec] Os schemas usam \tb{"additionalProperties": false}: campo que não está no
   contrato é recusado com 400.
-  \item[RN-CLI-05 \dec] Idade mínima de 18 anos na data de movimento (RN-GER-13). Menor $\to$ 422
-  (\tb{BNK001004}). Data de nascimento depois da data de movimento também $\to$ 422.
+  \item[RN-CLI-05 \dec] Idade mínima de 18 anos na data real (não na data de movimento, ver
+  RN-GER-13). Menor $\to$ 422 (\tb{BNK001004}). Data de nascimento no futuro também $\to$ 422.
   \item[RN-CLI-06 \dec] Nome com 3 a 120 caracteres, sem espaços sobrando nas pontas.
   \item[RN-CLI-07 \obr] A resposta de criação é 201 com \tb{customer_key}; nunca o \tb{id}.
   \item[RN-CLI-08 \dec] O CPF volta mascarado (RN-GER-10).
@@ -714,8 +715,9 @@ Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1
   \item[RN-SUI-04 \dec] \textbf{Trava de segurança:} quem responde (1) na Q3 (``resgataria tudo'')
   ou (1) na Q5 (``preciso a qualquer momento'') é \textbf{Conservador}, qualquer que seja a soma. A
   resposta guarda o motivo (\tb{forced_by_rule = true}).
-  \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until} \tb{DATE} = data de
-  movimento da resposta + 24 meses). Vencido (data de movimento depois de \tb{valid_until}), o
+  \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until} \tb{TIMESTAMPTZ} = hora real
+  da resposta + 24 meses, não a data de movimento, ver RN-GER-13). Vencido (hora real depois de
+  \tb{valid_until}), o
   cliente não faz novas aplicações nem pede sugestão até refazer (409, \tb{BNK004004}).
   \item[RN-SUI-06 \obr] Refazer o questionário cria uma avaliação \textbf{nova}; as antigas continuam
   guardadas (R4). O perfil atual é sempre a avaliação mais recente.
@@ -1159,7 +1161,7 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \tb{suitability_question} & \tb{code} (Q1..Q7) UNIQUE; \tb{text}; \tb{dimension} (objetivo, situação financeira, conhecimento); \tb{position} (ordem de exibição). \\
 \tb{suitability_option} & \tb{question_id} FK; \tb{code} (1..4); \tb{text}; \tb{points SMALLINT}. \tb{UNIQUE(question_id, code)}. \\
 \tb{investor_profile} & Enumerador com dados: \tb{CONSERVATIVE}, \tb{MODERATE}, \tb{AGGRESSIVE}; \tb{min_score}, \tb{max_score}, \tb{max_risk_level}. \\
-\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{profile_id} FK; \tb{score SMALLINT}; \tb{forced_by_rule BOOLEAN}; \tb{valid_until DATE} (data de movimento + 24 meses); \tb{created_at}. (Uma linha por vez que o cliente responde; nunca é editada.) \\
+\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{profile_id} FK; \tb{score SMALLINT}; \tb{forced_by_rule BOOLEAN}; \tb{valid_until TIMESTAMPTZ} (hora real + 24 meses); \tb{created_at}. (Uma linha por vez que o cliente responde; nunca é editada.) \\
 \tb{suitability_answer} & \tb{assessment_id} FK; \tb{question_id} FK; \tb{option_id} FK. \tb{UNIQUE(assessment_id, question_id)}. \\
 \tb{product_type} & Enumerador: \tb{PUBLIC_BOND}, \tb{PRIVATE_BOND}, \tb{FUND}. \\
 \tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (nulo no fundo); \tb{min_application BIGINT}; \tb{is_active BOOLEAN}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo); \tb{external_code VARCHAR(40)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo na emissão própria). \\
@@ -1404,7 +1406,7 @@ segundo espera a trava do passo 2, conta uma conta e recebe 409.
 \subsection{Responder o suitability}
 \textbf{Feliz:} (1) busca cliente; (2) confere 7 respostas, uma por pergunta, opções válidas; (3)
 soma pontos; (4) aplica a trava da Q3/Q5; (5) escolhe o perfil pela faixa; (6) grava avaliação +
-7 respostas, \tb{valid_until} = data de movimento + 24 meses; (7) \tb{commit}; (8) 201.\\
+7 respostas, \tb{valid_until} = hora real + 24 meses; (7) \tb{commit}; (8) 201.\\
 \textbf{Falhas:} passo 1 $\to$ 404; passo 2 $\to$ 422 \tb{BNK004002}/\tb{BNK004003}.
 
 \subsection{Aplicação}
@@ -1472,7 +1474,7 @@ fazem a requisição e conferem \textbf{status e corpo}. Nomes sugeridos, lidos 
 \textbf{Módulo} & \textbf{Testes} \\
 \midrule
 \endhead
-Clientes & cria cliente e devolve key (não id); recusa CPF inválido com 422; recusa CPF repetido com 409; recusa CPF repetido com pontuação diferente; recusa menor de idade (idade calculada sobre a data de movimento, lida pela API); devolve CPF mascarado; cliente inexistente dá 404. \\
+Clientes & cria cliente e devolve key (não id); recusa CPF inválido com 422; recusa CPF repetido com 409; recusa CPF repetido com pontuação diferente; recusa menor de idade (idade calculada sobre a data real); devolve CPF mascarado; cliente inexistente dá 404. \\
 Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409; recusa conta para cliente inexistente com 404; conta de outro cliente dá 404; bloqueia e desbloqueia; não sai de CLOSED; não encerra com saldo; exige motivo; histórico registra todas as transições. \\
 Movimentações & depósito aumenta saldo; saque diminui saldo; \textbf{transferência debita valor + tarifa na origem e credita só o valor no destino}; recusa saldo insuficiente sem alterar nenhum saldo; recusa transferência para si mesmo; recusa destino inexistente; recusa conta bloqueada (origem e destino); recusa valor zero e acima do limite; mesmo Idempotency-Key não debita duas vezes; mesma chave com corpo diferente dá 409; sem chave dá 400; extrato reconstrói o saldo; extrato pagina; comprovante de outra conta dá 404; tipo INVESTMENT_APPLY recusado na rota de transação. \\
 Suitability & calcula cada um dos três perfis; trava da Q3 força Conservador; recusa respostas incompletas; recusa opção de outra pergunta; refazer mantém histórico e muda o perfil atual; cliente sem perfil dá 404. \\
@@ -1520,6 +1522,14 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   $t+n$''. Ganharia se não houvesse rentabilidade para mostrar. \emph{Escolhido:} data de
   movimento própria que avança pelo fechamento do dia (RN-GER-13), como a data contábil de um
   banco real.
+  \item \textbf{Idade mínima e validade do perfil pela data de movimento} (uma regra só de
+  ``hoje'' para tudo) --- descartada porque idade e validade do suitability são fatos
+  regulatórios do mundo real, e no simulador a data de movimento fica à frente do calendário
+  (cada rodada da suíte a adianta): um cliente com 17 anos de verdade poderia ser aceito. Num banco
+  real as duas datas quase coincidem, porque o dia só fecha depois de acabar. Nenhum teste de
+  investimento depende dessas duas regras. Ganharia se a simulação precisasse mostrar alguém
+  ficando maior de idade ou o perfil vencendo. \emph{Escolhido:} hora real para RN-CLI-05 e
+  RN-SUI-05; data de movimento para vencimento, preço e taxas.
   \item \textbf{Rotina agendada (cron) que vira o dia sozinha} --- descartada porque a banca precisa
   controlar quando o dia vira, e um agendador seria mais um processo no compose. Ganharia num banco
   de verdade, que fica no ar por semanas: lá o mesmo \tb{POST /internal/day_close} seria chamado
@@ -1786,7 +1796,7 @@ erDiagram
     int customer_id FK
     int profile_id FK
     smallint score
-    date valid_until
+    timestamptz valid_until
   }
   product {
     int id PK

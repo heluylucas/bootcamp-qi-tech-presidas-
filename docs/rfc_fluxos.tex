@@ -144,8 +144,8 @@ disputam a mesma primeira trava: um passa e o outro espera.
   \item O schema exige \tb{product_key}, \tb{side = APPLY}, \tb{amount} e \tb{Idempotency-Key}.
   \item Busca o cliente e a sua conta não encerrada. Se não tiver, 409 (\tb{BNK006007}).
   \item Busca \tb{product}. Confere \tb{is_active} e que o vencimento não passou.
-  \item Busca a \tb{suitability_assessment} mais recente. Confere \tb{valid_until} $\geq$ data de
-        movimento,
+  \item Busca a \tb{suitability_assessment} mais recente. Confere \tb{valid_until} $\geq$ hora
+        real,
         \tb{risk_level} $\leq$ \tb{max_risk_level} do perfil e \tb{amount} $\geq$
         \tb{min_application}.
   \item Busca o preço do dia: o \tb{product_price} de maior \tb{reference_date} $\leq$ data de
@@ -207,7 +207,7 @@ nada foi escrito. O cliente recebe 409 (\tb{BNK006004}).
   \item Soma os \tb{points}. Se Q3 ou Q5 tiver a opção 1, o perfil é \tb{CONSERVATIVE} com
         \tb{forced_by_rule = true}. Se não, o perfil sai da faixa de pontos em
         \tb{investor_profile}.
-  \item Grava a \tb{suitability_assessment} (\tb{valid_until} = data de movimento + 24 meses) e
+  \item Grava a \tb{suitability_assessment} (\tb{valid_until} = hora real + 24 meses) e
         as sete
         \tb{suitability_answer}.
   \item \tb{commit}; 201 com perfil, pontuação e validade.
