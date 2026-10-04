@@ -55,9 +55,10 @@ class BaseExpectation:
 class Mock:
     """Fala com o MockServer pela porta que o compose abriu na sua máquina.
 
-    De propósito, não existe `clear()`: apagar o mock apagaria também o
+    De propósito, não existe `clear()` do mock inteiro: apagaria também o
     cenário da demonstração que o mock-init ensinou. Os testes ensinam as
-    próprias respostas com prioridade maior, e elas ganham.
+    próprias respostas com prioridade maior, e elas ganham; o
+    `clear_request` apaga só as de uma requisição.
     """
 
     def __init__(self) -> None:
@@ -70,6 +71,13 @@ class Mock:
         response = requests.put(f"{self.url}/expectation", json=expectations)
         if response.status_code not in (200, 201):
             raise Exception(f"O mock em {self.url} recusou a expectativa: {response.text}")
+
+    def clear_request(self, path: str, query_params: dict) -> None:
+        """Apaga só as respostas ensinadas para ESTA requisição (caminho + query)."""
+        matcher = {"path": path, "queryStringParameters": query_params}
+        response = requests.put(f"{self.url}/clear", params={"type": "expectations"}, json=matcher)
+        if response.status_code != 200:
+            raise Exception(f"O mock em {self.url} não apagou {path}: {response.text}")
 
     def get(self, endpoint: str, query_params: dict = None) -> requests.Response:
         """Chama o mock como a API vai chamar: serve para conferir o que ele responde."""

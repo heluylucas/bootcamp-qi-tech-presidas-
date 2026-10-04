@@ -17,6 +17,11 @@ class RequestGenerator:
         return response.response_status, response.response_json
 
     @staticmethod
+    def post_day_close(payload: dict):
+        response = ClientRequisition.send("POST", "/internal/day_close", payload=payload, headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
     def post_customer(payload: dict):
         response = ClientRequisition.send("POST", "/customer", payload=payload, headers=HEADERS)
         return response.response_status, response.response_json
