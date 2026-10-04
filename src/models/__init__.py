@@ -3,3 +3,4 @@ from models.customer import Customer
 from models.account import AccountStatus, Account, AccountStatusEvent
 from models.transaction import TransactionType, Transaction, LedgerEntry
 from models.product import ProductType, Product, ProductPrice
+from models.reference_rate import ReferenceRate
