@@ -1,3 +1,14 @@
+-- Data de movimento (RN-GER-13): o "hoje" do banco. Uma linha por dia aberto,
+-- nunca alterada; a data atual é a maior reference_date. Nasce com a data real
+-- e só avança pelo fechamento do dia.
+CREATE TABLE business_day(
+    id                              SERIAL PRIMARY KEY,
+    reference_date                  DATE NOT NULL UNIQUE,
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO business_day (reference_date) VALUES (CURRENT_DATE);
+
 CREATE TABLE customer(
     id                              SERIAL PRIMARY KEY,
     customer_key                    CHAR(36) NOT NULL UNIQUE,
@@ -217,15 +228,20 @@ CREATE TABLE product(
     own_issue                       BOOLEAN NOT NULL DEFAULT false,
     cdi_percentage_bps              SMALLINT CHECK (cdi_percentage_bps > 0),
     admin_fee_bps                   SMALLINT CHECK (admin_fee_bps >= 0),
+    -- Como a fonte externa chama o produto (RN-FEC-04). Nulo na emissão própria.
+    external_code                   VARCHAR(50),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Histórico das taxas (RN-REC-08): uma linha por taxa e por data, nunca alterada.
 CREATE TABLE reference_rate(
     id                              SERIAL PRIMARY KEY,
-    code                            VARCHAR(5) NOT NULL UNIQUE,
+    code                            VARCHAR(5) NOT NULL CHECK (code IN ('CDI', 'SELIC')),
+    reference_date                  DATE NOT NULL,
     annual_rate_bps                 INTEGER NOT NULL CHECK (annual_rate_bps > 0),
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(code, reference_date)
 );
 
 CREATE TABLE product_price(
@@ -237,58 +253,52 @@ CREATE TABLE product_price(
     UNIQUE(product_id, reference_date)
 );
 
-INSERT INTO reference_rate (code, annual_rate_bps) VALUES
-('CDI', 1490),
-('SELIC', 1500);
+INSERT INTO reference_rate (code, reference_date, annual_rate_bps) VALUES
+('CDI', CURRENT_DATE - 29, 1490),
+('SELIC', CURRENT_DATE - 29, 1500);
 
 INSERT INTO product (product_key, name, type_id, issuer, indexer, rate_description, risk_level, liquidity,
-                     maturity_date, min_application, own_issue, cdi_percentage_bps, admin_fee_bps)
+                     maturity_date, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
 SELECT gen_random_uuid()::text, v.name, t.id, v.issuer, v.indexer, v.rate_description, v.risk_level, v.liquidity,
-       v.maturity_date::date, v.min_application, v.own_issue, v.cdi_percentage_bps, v.admin_fee_bps
+       v.maturity_date::date, v.min_application, v.own_issue, v.cdi_percentage_bps, v.admin_fee_bps, v.external_code
 FROM (VALUES
-    ('Tesouro Selic 2031',     'PUBLIC_BOND',  'Tesouro Nacional',  'SELIC',    '100% da Selic',           1, 'DAILY',       '2031-03-01', 5000,  false, NULL, NULL),
-    ('CDB Quant Bank Liquidez','PRIVATE_BOND', 'Quant Bank',        'CDI',      '95% do CDI',              2, 'DAILY',       NULL,         5000,  true,  9500, NULL),
-    ('LCI Quant Bank 2027',    'PRIVATE_BOND', 'Quant Bank',        'CDI',      '93% do CDI, isento de IR',2, 'AT_MATURITY', '2027-03-01', 10000, true,  9300, NULL),
-    ('Tesouro Prefixado 2029', 'PUBLIC_BOND',  'Tesouro Nacional',  'PREFIXED', '13% a.a.',                2, 'DAILY',       '2029-01-01', 5000,  false, NULL, NULL),
-    ('Tesouro IPCA+ 2035',     'PUBLIC_BOND',  'Tesouro Nacional',  'IPCA',     'IPCA + 6% a.a.',          3, 'DAILY',       '2035-05-15', 5000,  false, NULL, NULL),
-    ('FGV Quant Capital FIM',  'FUND',         'FGV Quant Capital', 'QUOTA',    'Varia com a cota',        3, 'DAILY',       NULL,         10000, false, NULL, 100)
+    ('Tesouro Selic 2031',     'PUBLIC_BOND',  'Tesouro Nacional',  'SELIC',    '100% da Selic',           1, 'DAILY',       '2031-03-01', 5000,  false, NULL, NULL, 'TESOURO SELIC 2031'),
+    ('CDB Quant Bank Liquidez','PRIVATE_BOND', 'Quant Bank',        'CDI',      '95% do CDI',              2, 'DAILY',       NULL,         5000,  true,  9500, NULL, NULL),
+    ('LCI Quant Bank 2027',    'PRIVATE_BOND', 'Quant Bank',        'CDI',      '93% do CDI, isento de IR',2, 'AT_MATURITY', '2027-03-01', 10000, true,  9300, NULL, NULL),
+    ('Tesouro Prefixado 2029', 'PUBLIC_BOND',  'Tesouro Nacional',  'PREFIXED', '13% a.a.',                2, 'DAILY',       '2029-01-01', 5000,  false, NULL, NULL, 'TESOURO PREFIXADO 2029'),
+    ('Tesouro IPCA+ 2035',     'PUBLIC_BOND',  'Tesouro Nacional',  'IPCA',     'IPCA + 6% a.a.',          3, 'DAILY',       '2035-05-15', 5000,  false, NULL, NULL, 'TESOURO IPCA+ 2035'),
+    ('FGV Quant Capital FIM',  'FUND',         'FGV Quant Capital', 'QUOTA',    'Varia com a cota',        3, 'DAILY',       NULL,         10000, false, NULL, 100,  '12.345.678/0001-95')
 ) AS v(name, type, issuer, indexer, rate_description, risk_level, liquidity,
-       maturity_date, min_application, own_issue, cdi_percentage_bps, admin_fee_bps)
+       maturity_date, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
 JOIN product_type t ON t.enumerator = v.type;
 
--- Preços dos últimos 30 dias corridos (RN-PRO-06), todos partindo de 100,00.
--- d = dias úteis desde o primeiro dia; no fim de semana o preço repete.
--- Títulos: P = 100 * (1 + taxa anual)^(d/252). Prefixado 13% a.a.; IPCA+ = IPCA 4,5% + 6%.
--- Fundo (RN-REC-04): a cada dia útil, P = P_anterior * (1 + r) * (1 - 1%)^(1/252),
--- com retorno bruto r = 0,06% + 0,8% * sen(n), que sobe e desce sem ser aleatório.
-WITH days AS (
+-- Preços dos últimos 30 dias corridos, pelas fórmulas da RN-PRO-06 (as mesmas do mock).
+-- d = dias úteis (segunda a sexta) depois da data âncora 01/01/2026. No fim de semana
+-- d não muda, então o preço repete o de sexta. Todo produto vale 100,00 em d = 0.
+--   Títulos públicos: 100 * (1 + taxa anual)^(d/252). Selic 15%, Prefixado 13%, IPCA+ = 4,5% e 6%.
+--   CDB e LCI: 100 * (1 + c * percentual do CDI)^d, com c = (1 + CDI)^(1/252) - 1 (CDI de um dia útil).
+--   Fundo: 100 * (1,10 * 0,99)^(d/252) * (1 + 3% * sen((d + 15)/7)). A cota já vem líquida da
+--   taxa de administração (0,99, RN-REC-04); a onda faz a cota subir e descer. O "+ 15" põe
+--   outubro de 2026 numa subida (pico perto de 30/10); novembro cai.
+WITH series AS (
     SELECT day::date AS day,
-           day::date - (CURRENT_DATE - 29) AS n,
-           CASE WHEN day::date > CURRENT_DATE - 29 AND EXTRACT(ISODOW FROM day) < 6 THEN 1 ELSE 0 END AS is_business_day
+           (SELECT COUNT(*) FROM generate_series(DATE '2026-01-02', day::date, INTERVAL '1 day') AS g
+            WHERE EXTRACT(ISODOW FROM g) < 6) AS d
     FROM generate_series(CURRENT_DATE - 29, CURRENT_DATE, INTERVAL '1 day') AS day
-), series AS (
-    SELECT day,
-           SUM(is_business_day) OVER (ORDER BY day) AS d,
-           SUM(CASE WHEN is_business_day = 1
-                    THEN ln((1.0006 + 0.008 * sin(n)::numeric) * power(0.99::numeric, 1 / 252.0))
-                    ELSE 0 END) OVER (ORDER BY day) AS fund_log
-    FROM days
-), rates AS (
-    SELECT (SELECT annual_rate_bps FROM reference_rate WHERE code = 'CDI') / 10000.0 AS cdi,
-           (SELECT annual_rate_bps FROM reference_rate WHERE code = 'SELIC') / 10000.0 AS selic
+), cdi AS (
+    SELECT power(1 + annual_rate_bps / 10000.0, 1 / 252.0) - 1 AS c
+    FROM reference_rate WHERE code = 'CDI'
 )
 INSERT INTO product_price (product_id, reference_date, unit_price)
 SELECT p.id, s.day, ROUND(
     CASE p.indexer
-        WHEN 'QUOTA' THEN 100 * exp(s.fund_log)
-        ELSE 100 * power(1 + CASE p.indexer
-            WHEN 'SELIC'    THEN r.selic
-            WHEN 'CDI'      THEN r.cdi * p.cdi_percentage_bps / 10000
-            WHEN 'PREFIXED' THEN 0.13
-            WHEN 'IPCA'     THEN 1.045 * 1.06 - 1
-        END, s.d / 252.0)
+        WHEN 'SELIC'    THEN 100 * power(1.15, s.d / 252.0)
+        WHEN 'PREFIXED' THEN 100 * power(1.13, s.d / 252.0)
+        WHEN 'IPCA'     THEN 100 * power(1.045 * 1.06, s.d / 252.0)
+        WHEN 'CDI'      THEN 100 * power(1 + cdi.c * p.cdi_percentage_bps / 10000, s.d)
+        WHEN 'QUOTA'    THEN 100 * power(1.10 * 0.99, s.d / 252.0) * (1 + 0.03 * sin((s.d + 15) / 7.0)::numeric)
     END, 8)
-FROM product p CROSS JOIN series s CROSS JOIN rates r;
+FROM product p CROSS JOIN series s CROSS JOIN cdi;
 
 -- =====================================================================
 -- Carteira sugerida
@@ -353,6 +363,7 @@ CREATE TABLE investment_order(
     amount                          BIGINT NOT NULL CHECK (amount > 0),
     quantity                        NUMERIC(24,8) NOT NULL CHECK (quantity > 0),
     unit_price                      NUMERIC(20,8) NOT NULL CHECK (unit_price > 0),
+    cost_amount                     BIGINT NOT NULL CHECK (cost_amount >= 0),
     transaction_id                  INTEGER NOT NULL UNIQUE REFERENCES transaction(id),
     status                          VARCHAR(8) NOT NULL DEFAULT 'EXECUTED' CHECK (status IN ('EXECUTED')),
     idempotency_key                 CHAR(36) NOT NULL,

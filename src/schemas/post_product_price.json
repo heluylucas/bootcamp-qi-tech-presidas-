@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reference_date", "unit_price"],
+  "properties": {
+    "reference_date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "unit_price": {
+      "description": "Texto, para não virar float. Até 12 dígitos inteiros e 8 casas (NUMERIC(20,8)). O sinal passa aqui para o controller recusar com 422.",
+      "type": "string",
+      "pattern": "^-?\\d{1,12}(\\.\\d{1,8})?$"
+    }
+  }
+}

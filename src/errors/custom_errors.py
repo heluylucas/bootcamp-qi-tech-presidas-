@@ -1,6 +1,17 @@
 from errors import QIException
 
 
+class BusinessDateMismatch(QIException):
+    code = "BNK000006"
+
+    def __init__(self) -> None:
+        title = "Business Date Mismatch"
+        http_status = 409
+        description = "The close_date is not the current business date."
+        translation = "A data a fechar não é a data de movimento atual."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
 class CustomerNotFound(QIException):
     code = "BNK001001"
 
@@ -185,4 +196,59 @@ class DestinationAccountNotActive(QIException):
         http_status = 409
         description = "The destination account is blocked or closed and cannot receive money."
         translation = "A conta de destino está bloqueada ou encerrada e não pode receber dinheiro."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class ProductNotFound(QIException):
+    code = "BNK005001"
+
+    def __init__(self) -> None:
+        title = "Product Not Found"
+        http_status = 404
+        description = "The product_key does not exist."
+        translation = "Produto não encontrado."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class PriceAlreadyPublished(QIException):
+    code = "BNK005004"
+
+    def __init__(self) -> None:
+        title = "Price Already Published"
+        http_status = 409
+        description = "There is already a price for this product on this date."
+        translation = "Já existe preço deste produto nesta data."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidPrice(QIException):
+    code = "BNK005005"
+
+    def __init__(self) -> None:
+        title = "Invalid Price"
+        http_status = 422
+        description = "The unit_price must be greater than zero and the date cannot be after the business date."
+        translation = "O preço precisa ser maior que zero e a data não pode ser depois da data de movimento."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class PriceSourceUnavailable(QIException):
+    code = "BNK005006"
+
+    def __init__(self) -> None:
+        title = "Price Source Unavailable"
+        http_status = 502
+        description = "An external price or rate source is down, timed out or answered an error."
+        translation = "Uma fonte externa de preço ou taxa está fora do ar ou respondeu erro. Nada foi gravado."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidPriceSourceResponse(QIException):
+    code = "BNK005007"
+
+    def __init__(self) -> None:
+        title = "Invalid Price Source Response"
+        http_status = 502
+        description = "An external price or rate source answered something that makes no sense."
+        translation = "Uma fonte externa de preço ou taxa respondeu algo sem sentido. Nada foi gravado."
         super().__init__(title, self.code, http_status, description, translation)

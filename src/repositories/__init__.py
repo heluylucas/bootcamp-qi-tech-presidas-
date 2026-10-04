@@ -1,2 +1,5 @@
+from repositories.business_day_repository import BusinessDayRepository
 from repositories.customer_repository import CustomerRepository
 from repositories.account_repository import AccountRepository
+from repositories.product_repository import ProductRepository
+from repositories.reference_rate_repository import ReferenceRateRepository
