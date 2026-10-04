@@ -58,6 +58,32 @@ services:
       db:
         condition: service_healthy
 
+  mock:
+    # Finge ser as fontes de preço de fora: a administradora do fundo, o
+    # Tesouro e o Banco Central (RN-FEC-04). Ele sobe VAZIO; quem ensina o
+    # que ele responde é o mock-init (logo abaixo) e os testes
+    # (tests/utils/price_source_mock.py).
+    #
+    # A versão fica fixa de propósito: com "latest", o mock de amanhã
+    # pode responder diferente do de hoje sem ninguém ter mexido aqui.
+    image: mockserver/mockserver:mockserver-5.11.1
+    command: -logLevel ERROR -serverPort 1080
+    ports:
+      # Os testes rodam na sua máquina e ensinam o mock por esta porta.
+      # MOCK_PORT=1081 (ou outra livre) no seu .env se a 1080 estiver ocupada.
+      - "${MOCK_PORT:-1080}:1080"
+
+  mock-init:
+    # Roda uma vez e termina: ensina ao mock os próximos 60 dias úteis
+    # pelas fórmulas da RN-PRO-06, para a demonstração manual funcionar
+    # sem preparar nada. Só biblioteca padrão do Python, nada a instalar.
+    image: python:3.11-slim
+    volumes:
+      - ./mock:/mock
+    command: python /mock/mock_init.py
+    depends_on:
+      - mock
+
   db:
     build: ./database/.
     environment:
