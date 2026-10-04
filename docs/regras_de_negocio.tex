@@ -835,7 +835,7 @@ Conferência: todo produto de cada carteira tem risco menor ou igual ao máximo 
   \item[RN-CAR-01 \obr] Só sugere carteira para cliente com perfil válido. Sem perfil $\to$ 409
   (\tb{BNK004005}); perfil vencido $\to$ 409 (\tb{BNK004004}).
   \item[RN-CAR-02 \dec] Valor mínimo para sugestão: \rs 1.000,00 (garante que cada fatia respeite a
-  aplicação mínima do produto). Abaixo $\to$ 422 (\tb{BNK006006}).
+  aplicação mínima do produto). Abaixo $\to$ 422 (\tb{BNK006001}).
   \item[RN-CAR-03 \dec] \textbf{Cálculo:} para cada item, \tb{valor = floor(total} $\times$
   \tb{peso / 10000)}. Os centavos que sobram do arredondamento vão para o item de maior peso.
   Assim a soma dos itens é \emph{exatamente} o valor pedido.
@@ -872,15 +872,15 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
 
 \begin{regras}
   \item[RN-ORD-01 \obr] O cliente precisa existir (404) e ter uma conta \tb{ACTIVE} (409,
-  \tb{BNK006007} se não tiver conta; \tb{BNK002005} se ela estiver bloqueada).
+  \tb{BNK007006} se não tiver conta; \tb{BNK002005} se ela estiver bloqueada).
   \item[RN-ORD-02 \obr] Precisa ter perfil de suitability válido (409, \tb{BNK004005} ou
   \tb{BNK004004}).
   \item[RN-ORD-03 \obr] O produto precisa existir (404, \tb{BNK005001}), estar disponível (409,
   \tb{BNK005002}) e ter preço do dia (409, \tb{BNK005003}).
   \item[RN-ORD-04 \obr] \textbf{Adequação ao perfil:} risco do produto $\le$ risco máximo do perfil.
-  Senão $\to$ 422 (\tb{BNK006003}). \dec{} No MVP a regra \textbf{bloqueia}; aceitar com ``termo
+  Senão $\to$ 422 (\tb{BNK007003}). \dec{} No MVP a regra \textbf{bloqueia}; aceitar com ``termo
   de ciência'' fica como \ext.
-  \item[RN-ORD-05 \obr] Valor $\ge$ aplicação mínima do produto (422, \tb{BNK006002}) e saldo da
+  \item[RN-ORD-05 \obr] Valor $\ge$ aplicação mínima do produto (422, \tb{BNK007002}) e saldo da
   conta $\ge$ valor (409, \tb{BNK003003}).
   \item[RN-ORD-06 \dec] \textbf{Quantidade:} \tb{quantidade = valor / preço unitário}, truncada
   em 8 casas decimais. O valor debitado da conta é exatamente o valor pedido.
@@ -898,9 +898,9 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   \item[RN-ORD-09 \dec] \textbf{Resgate não depende do perfil.} Mesmo com perfil vencido, o cliente
   sempre pode tirar o dinheiro (princípio de proteção ao cliente).
   \item[RN-ORD-10 \obr] Precisa existir posição com quantidade suficiente; senão $\to$ 409
-  (\tb{BNK006004}).
+  (\tb{BNK007004}).
   \item[RN-ORD-11 \dec] Produto com liquidez \tb{AT_MATURITY} só pode ser resgatado na data de
-  vencimento ou depois. Antes $\to$ 422 (\tb{BNK006005}).
+  vencimento ou depois. Antes $\to$ 422 (\tb{BNK007005}).
   \item[RN-ORD-12 \dec] O resgate pode ser por valor (\tb{amount}) ou total
   (\tb{redeem_all: true}). Por valor: \tb{quantidade = valor / preço}, truncada em 8 casas. Total:
   quantidade = toda a posição e valor = \tb{floor(quantidade} $\times$ \tb{preço)} em centavos.
@@ -1231,13 +1231,14 @@ BNK005003 & 409 & Price Unavailable & Nenhum preço até hoje. \\
 BNK005004 & 409 & Price Already Published & Já existe preço nessa data. \\
 BNK005005 & 422 & Invalid Price & Preço $\le 0$ ou data futura. \\
 \midrule
-BNK006001 & 404 & Order Not Found & Ordem inexistente ou de outro cliente. \\
-BNK006002 & 422 & Below Minimum Application & Valor menor que o mínimo do produto. \\
-BNK006003 & 422 & Product Not Suitable & Risco do produto acima do perfil. \\
-BNK006004 & 409 & Insufficient Position & Resgate maior que a posição. \\
-BNK006005 & 422 & Redemption Not Allowed & Resgate antes do vencimento (liquidez no vencimento). \\
-BNK006006 & 422 & Suggestion Amount Too Low & Sugestão abaixo de \rs 1.000,00. \\
-BNK006007 & 409 & No Active Account & Cliente sem conta ativa para liquidar a ordem. \\
+BNK006001 & 422 & Suggestion Amount Too Low & Sugestão abaixo de \rs 1.000,00. \\
+\midrule
+BNK007001 & 404 & Order Not Found & Ordem inexistente ou de outro cliente. \\
+BNK007002 & 422 & Below Minimum Application & Valor menor que o mínimo do produto. \\
+BNK007003 & 422 & Product Not Suitable & Risco do produto acima do perfil. \\
+BNK007004 & 409 & Insufficient Position & Resgate maior que a posição. \\
+BNK007005 & 422 & Redemption Not Allowed & Resgate antes do vencimento (liquidez no vencimento). \\
+BNK007006 & 409 & No Active Account & Cliente sem conta ativa para liquidar a ordem. \\
 \bottomrule
 \end{longtable}
 \endgroup
@@ -1308,11 +1309,11 @@ checa a idempotência, já com as travas; confere saldo $\ge$ valor; (7) calcula
 lançamento de débito, atualiza saldo; (9) grava ordem; (10) soma quantidade e custo na posição;
 (11) \tb{commit}; (12) 201.\\
 \textbf{Falhas:} perfil vencido $\to$ 409; produto de risco 3 para Conservador $\to$ 422
-\tb{BNK006003}; sem preço $\to$ 409 \tb{BNK005003}; saldo insuficiente $\to$ 409 (nada gravado).
+\tb{BNK007003}; sem preço $\to$ 409 \tb{BNK005003}; saldo insuficiente $\to$ 409 (nada gravado).
 
 \subsection{Resgate}
-Igual à aplicação, sem a checagem de perfil, com: posição suficiente (409 \tb{BNK006004}),
-liquidez (422 \tb{BNK006005} antes do vencimento), crédito na conta e redução proporcional do
+Igual à aplicação, sem a checagem de perfil, com: posição suficiente (409 \tb{BNK007004}),
+liquidez (422 \tb{BNK007005} antes do vencimento), crédito na conta e redução proporcional do
 custo.
 
 \subsection*{Principal desafio (candidato para a RFC)}
@@ -1457,6 +1458,11 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \item \textbf{Preço inicial parecido com o mercado} (Tesouro Selic $\approx$ \rs 17.000, cota
   $\approx$ \rs 1,00) --- descartada porque dificulta conferir as contas na mão. Ganharia se o
   objetivo fosse realismo visual. \emph{Escolhido:} todos começam em \rs 100,00.
+  \item \textbf{Códigos de erro com numeração livre} (o número do meio sem ligação com o módulo,
+  como era antes: os erros de ordens, Módulo 7, usavam \tb{BNK006}) --- descartada porque quem lê
+  \tb{BNK006xxx} espera um erro do Módulo 6, e a carteira (Módulo 6) ficava misturada com as
+  ordens. Ganharia se os módulos mudassem de número com frequência. \emph{Escolhido:} o número do
+  meio é o número do módulo (carteira \tb{BNK006}, ordens \tb{BNK007}).
 \end{enumerate}
 
 % =====================================================================
