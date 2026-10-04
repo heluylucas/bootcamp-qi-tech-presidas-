@@ -236,6 +236,7 @@ O registro completo, com o preço de cada alternativa, está na seção
 | Fórmula que depende só da data | Seno acumulado dia a dia (versão antiga do seed) | O mock não tem memória. |
 | Histórico de taxas em `reference_rate` | Uma taxa fixa / apagar a tabela | Uma taxa fixa criaria dois CDIs diferentes, e o relatório de receita precisa das taxas. |
 | Preço diário | Preço intradiário | Fundo tem uma cota por dia; renda fixa rende por dia útil. |
+| Preço só pelo fechamento do dia | Rota de publicação manual (`POST /product/{key}/price`) | Preço não se reescreve, o fechamento não deixa buraco e fim de semana usa o último preço: a rota só conseguia gravar dias que ninguém lê. E o teste dela apagava o banco inteiro. |
 
 **Fica para depois (incrementos):**
 
@@ -272,7 +273,7 @@ concordar com o desenho.
   usam a data de movimento.
 - **"Hoje" virou "data de movimento"** em: vencimento de produto
   (RN-PRO-03, RN-ORD-11), preço do dia (RN-PRO-04) e publicação de preço
-  (RN-PRO-05). A idade mínima (RN-CLI-05) e a validade do perfil (RN-SUI-05)
+  (RN-PRO-05, removida depois: ver Diário de mudanças). A idade mínima (RN-CLI-05) e a validade do perfil (RN-SUI-05)
   também tinham mudado, mas voltaram para a data real em 04/10 (ver Fase 1).
 - **RN-PRO-06** e parâmetros do seed: as fórmulas da seção 4, com a data âncora
   01/01/2026 e o `external_code` de cada produto.
@@ -355,12 +356,13 @@ o seed nas fórmulas que o mock vai usar.
 | `GET /products?type=&max_risk=` | Catálogo, com filtros por tipo e risco máximo. |
 | `GET /product/{key}` | Detalhe do produto + `price` do dia (`null` se não houver nenhum). |
 | `GET /product/{key}/prices?from=&to=` | Histórico de preços, do mais antigo ao mais novo. |
-| `POST /product/{key}/price` | Publica um preço manual: `{"reference_date", "unit_price"}`. |
 
-O `unit_price` entra e sai **como texto** (`"102.50000000"`), para ninguém
-ler como `float`. Erros novos: `BNK005001` (produto não existe), `BNK005004`
-(já tem preço nessa data) e `BNK005005` (preço ≤ 0 ou data depois da data de
-movimento).
+O `unit_price` sai **como texto** (`"102.50000000"`), para ninguém ler como
+`float`. Erro novo: `BNK005001` (produto não existe).
+
+> Esta fase também criou `POST /product/{key}/price` (publicação manual de
+> preço, `BNK005004` e `BNK005005`). Ela foi **removida** em 04/10: não havia
+> dia que ela pudesse corrigir (ver seção 8).
 
 **Testes:** `tests/integration/test_product.py`, com 27 casos. Primeiro
 falharam todos, depois passaram. `pytest -v`: 89 passed, também numa segunda
@@ -516,6 +518,7 @@ que está testada.
 | 04/10/2026 | 2 | Onda do fundo deslocada para `sen((d + 15)/7)` (outubro sobe). Seed novo, `reference_rate` com histórico, `external_code` e as 4 rotas de produto. Corrigido o `DbUtils.rollback()` com `%` no SQL. |
 | 04/10/2026 | 3 | MockServer e `mock-init` no compose (60 dias úteis ensinados pelas fórmulas, iguais ao seed até a 8ª casa). `PriceSourceMock` para os testes. CNPJ só com dígitos no caminho e preços como texto (RFC). |
 | 04/10/2026 | 4 | Connectors e `POST /internal/day_close` prontos. Corrigido o fluxo de clique duplo (reler a data depois da trava). `teach_day` passa a limpar o dia no mock antes de ensinar. |
+| 04/10/2026 | 2 | Removida a rota `POST /product/{key}/price` (RN-PRO-05, `BNK005004`, `BNK005005`) e os testes dela. Com isso nenhum teste chama mais o `DbUtils.rollback()`, e os dados criados pela suíte ficam no banco. |
 
 ---
 

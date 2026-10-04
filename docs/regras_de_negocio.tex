@@ -769,12 +769,10 @@ D+0. Liquidez com prazo real fica como \ext.}
   \tb{reference_date} menor ou igual à \textbf{data de movimento} (RN-GER-13). Se não existir
   nenhum $\to$ 409 (\tb{BNK005003}) e a operação não acontece. Num dia sem preço novo (fim de
   semana, fechamento que falhou), vale o último publicado.
-  \item[RN-PRO-05 \dec] \textbf{Publicação de preço/cota:} \tb{POST /product/\{key\}/price} grava o
-  preço de uma data. Preço menor ou igual a zero, ou data depois da data de movimento $\to$ 422
-  (\tb{BNK005005}). Já existe preço para aquela data $\to$ 409 (\tb{BNK005004}) --- preço
-  publicado não se reescreve (R4), garantido por \tb{UNIQUE(product_id, reference_date)}. O
-  caminho normal de preço novo é o fechamento do dia (Seção~\ref{sec:fechamento}); esta rota fica
-  para correções manuais.
+  \item[RN-PRO-05 \dec] \textbf{Removida.} Era a rota de publicação manual de preço
+  (\tb{POST /product/\{key\}/price}). Preço novo só entra pelo fechamento do dia
+  (Seção~\ref{sec:fechamento}); o motivo está nas alternativas descartadas. O número da regra e os
+  códigos \tb{BNK005004} e \tb{BNK005005} não são reaproveitados.
   \item[RN-PRO-06 \dec] \textbf{Preço simulado depende só da data.} O seed e o cenário do mock usam
   as mesmas fórmulas (tabela abaixo), em que $d$ é o número de dias úteis (segunda a sexta) depois
   da \textbf{data âncora fixa 01/01/2026}. Como a fórmula só usa a data, qualquer dia pode ser
@@ -1254,7 +1252,6 @@ GET & \rota|/customer/{ck}/suitabilities| & Histórico de avaliações. & 200; 4
 GET & \rota|/products| & Catálogo. Query: \tb{type}, \tb{max_risk}. & 200. \\
 GET & \rota|/product/{product_key}| & Detalhe + preço do dia. & 200; 404. \\
 GET & \rota|/product/{product_key}/prices| & Histórico de preços. Query: \tb{from}, \tb{to}. & 200; 404. \\
-POST & \rota|/product/{product_key}/price| & Publica preço/cota de uma data (correção manual). \tb{reference_date}, \tb{unit_price}. & 201; 404; 409 já existe preço na data; 422 preço $\le 0$ ou data depois da data de movimento. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Data de movimento e fechamento do dia}} \\
 GET & \rota|/internal/business_date| & Data de movimento atual. & 200 \tb{\{business_date\}}. \\
@@ -1343,8 +1340,6 @@ BNK004005 & 409 & Suitability Required & Aplicar ou pedir sugestão sem perfil. 
 BNK005001 & 404 & Product Not Found & \tb{product_key} não existe. \\
 BNK005002 & 409 & Product Not Available & Produto inativo ou vencido. \\
 BNK005003 & 409 & Price Unavailable & Nenhum preço até a data de movimento. \\
-BNK005004 & 409 & Price Already Published & Já existe preço nessa data. \\
-BNK005005 & 422 & Invalid Price & Preço $\le 0$ ou data depois da data de movimento. \\
 BNK005006 & 502 & Price Source Unavailable & Fonte externa de preço ou taxa fora do ar, com timeout ou respondendo erro. \\
 BNK005007 & 502 & Invalid Price Source Response & Fonte externa respondeu algo sem sentido (preço $\le 0$, data errada, produto ou taxa faltando). \\
 \midrule
@@ -1487,7 +1482,7 @@ Clientes & cria cliente e devolve key (não id); recusa CPF inválido com 422; r
 Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409; recusa conta para cliente inexistente com 404; conta de outro cliente dá 404; bloqueia e desbloqueia; não sai de CLOSED; não encerra com saldo; exige motivo; histórico registra todas as transições. \\
 Movimentações & depósito aumenta saldo; saque diminui saldo; \textbf{transferência debita valor + tarifa na origem e credita só o valor no destino}; recusa saldo insuficiente sem alterar nenhum saldo; recusa transferência para si mesmo; recusa destino inexistente; recusa conta bloqueada (origem e destino); recusa valor zero e acima do limite; mesmo Idempotency-Key não debita duas vezes; mesma chave com corpo diferente dá 409; sem chave dá 400; extrato reconstrói o saldo; extrato pagina; comprovante de outra conta dá 404; tipo INVESTMENT_APPLY recusado na rota de transação. \\
 Suitability & calcula cada um dos três perfis; trava da Q3 força Conservador; recusa respostas incompletas; recusa opção de outra pergunta; refazer mantém histórico e muda o perfil atual; cliente sem perfil dá 404. \\
-Produtos & lista catálogo; filtra por risco; publica preço; recusa preço repetido na mesma data; recusa preço negativo e data depois da data de movimento. \\
+Produtos & lista catálogo; filtra por risco e por tipo; detalhe traz o preço do dia; histórico de preços no período; produto inexistente dá 404. \\
 Fechamento do dia & devolve a data de movimento; fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova. \\
 Carteira & soma dos pesos de cada carteira-modelo é 10.000; sugestão soma exatamente o valor pedido (inclusive com centavos quebrados); recusa sem perfil; recusa valor abaixo do mínimo. \\
 Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate devolve custo, resultado e rentabilidade (inclusive na repetição idempotente); resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate funciona mesmo sem perfil válido; mesmo Idempotency-Key não aplica duas vezes; ordem de outro cliente dá 404. \\
@@ -1628,6 +1623,13 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \tb{BNK006xxx} espera um erro do Módulo 6, e a carteira (Módulo 6) ficava misturada com as
   ordens. Ganharia se os módulos mudassem de número com frequência. \emph{Escolhido:} o número do
   meio é o número do módulo (carteira \tb{BNK006}, ordens \tb{BNK007}).
+  \item \textbf{Rota de publicação manual de preço} (\tb{POST /product/\{key\}/price}, a antiga
+  RN-PRO-05, ``para correções'') --- descartada porque não havia o que corrigir: preço publicado não
+  se reescreve (R4), o fechamento é tudo ou nada e não deixa dia sem preço (RN-FEC-06), e fim de
+  semana usa o último preço (RN-PRO-04). Os únicos dias livres eram os anteriores ao seed, que
+  ninguém lê. O teste dela ainda recriava o banco inteiro para liberar uma data. Ganharia se
+  existisse um produto sem fonte externa nem fórmula, cujo preço alguém precisasse digitar.
+  \emph{Escolhido:} preço novo só entra pelo fechamento do dia.
 \end{enumerate}
 
 % =====================================================================
