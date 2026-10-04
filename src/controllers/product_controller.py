@@ -1,10 +1,6 @@
-from decimal import Decimal
-
-from sqlalchemy.exc import IntegrityError
-
 from controllers.base_controller import BaseController
 from dtos.product_dto import price_to_dict, product_to_dict, product_with_price_to_dict
-from errors import InvalidPrice, PriceAlreadyPublished, ProductNotFound
+from errors import ProductNotFound
 from repositories import BusinessDayRepository, ProductRepository
 from utils.dates import parse_date
 
@@ -34,28 +30,6 @@ class ProductController(BaseController):
 
         prices = ProductRepository.list_prices(self.context, product.id, from_date, to_date)
         return {"items": [price_to_dict(price) for price in prices]}
-
-    def publish_price(self, product_key: str, payload: dict) -> dict:
-        reference_date = parse_date(payload["reference_date"], "reference_date")
-        unit_price = Decimal(payload["unit_price"])
-        product = self._get_product(product_key)
-        business_date = BusinessDayRepository.get_current(self.context).reference_date
-
-        if unit_price <= 0 or reference_date > business_date:
-            raise InvalidPrice()
-
-        if ProductRepository.get_price_by_date(self.context, product.id, reference_date) is not None:
-            raise PriceAlreadyPublished()
-
-        # Duas publicações da mesma data ao mesmo tempo passam as duas pela
-        # busca acima; o UNIQUE(product_id, reference_date) recusa a segunda.
-        try:
-            price = ProductRepository.create_price(self.context, product.id, reference_date, unit_price)
-        except IntegrityError:
-            raise PriceAlreadyPublished()
-
-        self.session.commit()
-        return price_to_dict(price)
 
     def _get_product(self, product_key: str):
         product = ProductRepository.get_by_key(self.context, product_key)

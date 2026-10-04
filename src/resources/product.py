@@ -19,8 +19,3 @@ class ProductResource:
     def on_get_prices(self, product_key: str, request: Request) -> JSONResponse:
         prices = ProductController().list_prices(product_key, dict(request.query_params))
         return JSONResponse(content=prices, status_code=status.HTTP_200_OK)
-
-    @SchemaHandler.validate("post_product_price.json")
-    def on_post_price(self, product_key: str, payload: dict) -> JSONResponse:
-        price = ProductController().publish_price(product_key, payload)
-        return JSONResponse(content=price, status_code=status.HTTP_201_CREATED)

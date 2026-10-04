@@ -33,14 +33,6 @@ class ProductRepository:
         )
 
     @staticmethod
-    def get_price_by_date(context: Context, product_id: int, day: date) -> Optional[ProductPrice]:
-        return (
-            context.db_session.query(ProductPrice)
-            .filter(ProductPrice.product_id == product_id, ProductPrice.reference_date == day)
-            .first()
-        )
-
-    @staticmethod
     def list_prices(
         context: Context, product_id: int, from_date: Optional[date], to_date: Optional[date]
     ) -> List[ProductPrice]:

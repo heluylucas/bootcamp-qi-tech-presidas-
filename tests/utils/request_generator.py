@@ -65,12 +65,6 @@ class RequestGenerator:
         return response.response_status, response.response_json
 
     @staticmethod
-    def post_product_price(product_key: str, payload: dict):
-        endpoint = f"/product/{product_key}/price"
-        response = ClientRequisition.send("POST", endpoint, payload=payload, headers=HEADERS)
-        return response.response_status, response.response_json
-
-    @staticmethod
     def get_account_status_events(customer_key: str, account_key: str):
         endpoint = f"/customer/{customer_key}/account/{account_key}/status_events"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS)

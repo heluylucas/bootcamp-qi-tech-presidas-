@@ -210,27 +210,6 @@ class ProductNotFound(QIException):
         super().__init__(title, self.code, http_status, description, translation)
 
 
-class PriceAlreadyPublished(QIException):
-    code = "BNK005004"
-
-    def __init__(self) -> None:
-        title = "Price Already Published"
-        http_status = 409
-        description = "There is already a price for this product on this date."
-        translation = "Já existe preço deste produto nesta data."
-        super().__init__(title, self.code, http_status, description, translation)
-
-
-class InvalidPrice(QIException):
-    code = "BNK005005"
-
-    def __init__(self) -> None:
-        title = "Invalid Price"
-        http_status = 422
-        description = "The unit_price must be greater than zero and the date cannot be after the business date."
-        translation = "O preço precisa ser maior que zero e a data não pode ser depois da data de movimento."
-        super().__init__(title, self.code, http_status, description, translation)
-
 
 class PriceSourceUnavailable(QIException):
     code = "BNK005006"

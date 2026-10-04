@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from tests.utils import DbUtils, RequestGenerator
+from tests.utils import RequestGenerator
 
 
 PRODUCT_TYPES = {"PUBLIC_BOND", "PRIVATE_BOND", "FUND"}
@@ -102,86 +102,6 @@ class TestProductPrices:
         product = product_named("FGV Quant Capital FIM")
 
         status, body = RequestGenerator.get_product_prices(product["product_key"], query_params)
-
-        assert status == 400
-        assert body["code"] == "BNK000001"
-
-
-class TestPublishPrice:
-    def test_publish_price(self):
-        # Data antes da série do seed, então sem preço. O banco recriado
-        # garante que ela continua livre quando a suíte roda de novo.
-        DbUtils.rollback()
-        product = product_named("FGV Quant Capital FIM")
-        reference_date = (business_date() - timedelta(days=100)).isoformat()
-
-        status, body = RequestGenerator.post_product_price(
-            product["product_key"], {"reference_date": reference_date, "unit_price": "102.5"}
-        )
-
-        assert status == 201
-        assert body == {"reference_date": reference_date, "unit_price": "102.50000000"}
-        _, history = RequestGenerator.get_product_prices(
-            product["product_key"], {"from": reference_date, "to": reference_date}
-        )
-        assert history["items"] == [body]
-
-    def test_price_already_published(self):
-        product = product_named("FGV Quant Capital FIM")
-
-        status, body = RequestGenerator.post_product_price(
-            product["product_key"], {"reference_date": business_date().isoformat(), "unit_price": "100"}
-        )
-
-        assert status == 409
-        assert body["code"] == "BNK005004"
-
-    @pytest.mark.parametrize("unit_price", ["0", "-1.5", "0.00000000"])
-    def test_price_not_positive(self, unit_price):
-        product = product_named("FGV Quant Capital FIM")
-        reference_date = (business_date() - timedelta(days=200)).isoformat()
-
-        status, body = RequestGenerator.post_product_price(
-            product["product_key"], {"reference_date": reference_date, "unit_price": unit_price}
-        )
-
-        assert status == 422
-        assert body["code"] == "BNK005005"
-
-    def test_date_after_business_date(self):
-        product = product_named("FGV Quant Capital FIM")
-        tomorrow = (business_date() + timedelta(days=1)).isoformat()
-
-        status, body = RequestGenerator.post_product_price(
-            product["product_key"], {"reference_date": tomorrow, "unit_price": "100"}
-        )
-
-        assert status == 422
-        assert body["code"] == "BNK005005"
-
-    def test_publish_price_product_not_found(self):
-        status, body = RequestGenerator.post_product_price(
-            str(uuid.uuid4()), {"reference_date": "2026-01-02", "unit_price": "100"}
-        )
-
-        assert status == 404
-        assert body["code"] == "BNK005001"
-
-    @pytest.mark.parametrize(
-        "payload",
-        [
-            {"reference_date": "2026-01-02"},
-            {"unit_price": "100"},
-            {"reference_date": "2026-01-02", "unit_price": 100.5},
-            {"reference_date": "2026-01-02", "unit_price": "1.123456789"},
-            {"reference_date": "2026-02-30", "unit_price": "100"},
-            {"reference_date": "2026-01-02", "unit_price": "100", "extra": 1},
-        ],
-    )
-    def test_malformed_payload(self, payload):
-        product = product_named("FGV Quant Capital FIM")
-
-        status, body = RequestGenerator.post_product_price(product["product_key"], payload)
 
         assert status == 400
         assert body["code"] == "BNK000001"
