@@ -1,3 +1,14 @@
+-- Data de movimento (RN-GER-13): o "hoje" do banco. Uma linha por dia aberto,
+-- nunca alterada; a data atual é a maior reference_date. Nasce com a data real
+-- e só avança pelo fechamento do dia.
+CREATE TABLE business_day(
+    id                              SERIAL PRIMARY KEY,
+    reference_date                  DATE NOT NULL UNIQUE,
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO business_day (reference_date) VALUES (CURRENT_DATE);
+
 CREATE TABLE customer(
     id                              SERIAL PRIMARY KEY,
     customer_key                    CHAR(36) NOT NULL UNIQUE,

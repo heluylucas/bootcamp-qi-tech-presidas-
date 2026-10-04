@@ -9,7 +9,7 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import AccountResource, CustomerResource, HealthCheckResource
+from resources import AccountResource, BusinessDayResource, CustomerResource, HealthCheckResource
 from utils.logger import setup_logging
 
 
@@ -135,6 +135,10 @@ def create_app() -> FastAPI:
         health_check_resource.on_get_health_check,
         methods=["GET"]
     )
+
+    business_day_resource = BusinessDayResource()
+
+    application.add_api_route("/internal/business_date", business_day_resource.on_get, methods=["GET"])
 
     customer_resource = CustomerResource()
 

@@ -12,6 +12,11 @@ class RequestGenerator:
     """Uma chamada por rota da API, cada uma devolvendo (status, json)."""
 
     @staticmethod
+    def get_business_date():
+        response = ClientRequisition.send("GET", "/internal/business_date", headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
     def post_customer(payload: dict):
         response = ClientRequisition.send("POST", "/customer", payload=payload, headers=HEADERS)
         return response.response_status, response.response_json
