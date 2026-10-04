@@ -989,7 +989,7 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   \item[RN-ORD-09 \dec] \textbf{Resgate não depende do perfil.} Mesmo com perfil vencido, o cliente
   sempre pode tirar o dinheiro (princípio de proteção ao cliente).
   \item[RN-ORD-10 \obr] Precisa existir posição com quantidade suficiente; senão $\to$ 409
-  (\tb{BNK006004}).
+  (\tb{BNK007004}).
   \item[RN-ORD-11 \dec] Produto com liquidez \tb{AT_MATURITY} só pode ser resgatado quando a data
   de movimento chega ao vencimento. Antes $\to$ 422 (\tb{BNK007005}).
   \item[RN-ORD-12 \dec] O resgate pode ser por valor (\tb{amount}) ou total
@@ -1622,7 +1622,7 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   semana; depois disso, o fechamento só abre dias úteis e a RN-PRO-04 cobre os dias sem linha.
   \item \textbf{Preço inicial parecido com o mercado} (Tesouro Selic $\approx$ \rs 17.000, cota
   $\approx$ \rs 1,00) --- descartada porque dificulta conferir as contas na mão. Ganharia se o
-  objetivo fosse realismo visual. \emph{Escolhido:} todos começam em \rs 100,00.
+  objetivo fosse realismo visual. \emph{Escolhido:} todos valem \rs 100,00 na data âncora.
   \item \textbf{Códigos de erro com numeração livre} (o número do meio sem ligação com o módulo,
   como era antes: os erros de ordens, Módulo 7, usavam \tb{BNK006}) --- descartada porque quem lê
   \tb{BNK006xxx} espera um erro do Módulo 6, e a carteira (Módulo 6) ficava misturada com as
