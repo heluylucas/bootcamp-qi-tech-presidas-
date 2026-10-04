@@ -800,7 +800,7 @@ CDB \banco{} Liquidez & \banco & sem vencimento & (nulo: emissão própria) & $1
 LCI \banco{} 2027 & \banco & 01/03/2027 & (nulo: emissão própria) & $100 \times (1 + c \times 0{,}93)^{d}$ \\
 Tesouro Prefixado 2029 & Tesouro Nacional & 01/01/2029 & \tb{TESOURO PREFIXADO 2029} & $100 \times 1{,}13^{\,d/252}$ \\
 Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $100 \times (1{,}045 \times 1{,}06)^{\,d/252}$ \\
-\fundo{} FIM & \fundo & --- & CNPJ fictício \tb{12.345.678/0001-95} & $100 \times (1{,}10 \times 0{,}99)^{\,d/252} \times (1 + 3\% \times \sin(d/7))$ \\
+\fundo{} FIM & \fundo & --- & CNPJ fictício \tb{12.345.678/0001-95} & $100 \times (1{,}10 \times 0{,}99)^{\,d/252} \times (1 + 3\% \times \sin((d + 15)/7))$ \\
 \bottomrule
 \end{longtable}
 \endgroup
@@ -816,9 +816,10 @@ Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $
         por produto, sempre existe preço de hoje). No fim de semana $d$ não muda, então o preço
         repete o de sexta.
   \item Fundo: $(1{,}10 \times 0{,}99)^{d/252}$ é uma tendência de 10\% ao ano já descontada a
-        taxa de administração de 1\% (RN-REC-04). A onda $3\% \times \sin(d/7)$ faz a cota subir
-        e descer: no pior dia ela cai cerca de 0,4\%, o que basta para mostrar um resgate com
-        prejuízo.
+        taxa de administração de 1\% (RN-REC-04). A onda $3\% \times \sin((d + 15)/7)$ faz a cota
+        subir e descer: no pior dia ela cai cerca de 0,4\%, o que basta para mostrar um resgate
+        com prejuízo. O deslocamento de 15 dias úteis põe outubro de 2026 (época da
+        apresentação) numa subida, com pico perto de 30/10; em novembro a cota cai.
   \item Preços arredondados em 8 casas (\tb{NUMERIC(20,8)}, RN-PRO-07).
   \item CDB e LCI: \tb{own_issue = true}, \tb{cdi_percentage_bps} \tb{9500} e \tb{9300}. Fundo:
         \tb{admin_fee_bps = 100}. Todos com \tb{is_active = true}.
@@ -867,17 +868,21 @@ produção, mudando só o endereço.
 \textbf{Serviço (connector)} & \textbf{Pedido ao mock} & \textbf{Resposta (inspirada no contrato real)} \\
 \midrule
 \endhead
-Administradora (\tb{FundAdminConnector}) & \tb{GET /fund-admin/funds/\{cnpj\}/quotes?date=AAAA-MM-DD} & \tb{\{"CNPJ_FUNDO", "DT_COMPTC", "VL_QUOTA", "VL_PATRIM_LIQ", "NR_COTST"\}} --- campos do Informe Diário da CVM. \\
+Administradora (\tb{FundAdminConnector}) & \tb{GET /fund-admin/funds/\{cnpj\}/quotes?date=AAAA-MM-DD}, com o \tb{cnpj} só com dígitos (a barra do CNPJ quebraria o caminho) & \tb{\{"CNPJ_FUNDO", "DT_COMPTC", "VL_QUOTA", "VL_PATRIM_LIQ", "NR_COTST"\}} --- campos do Informe Diário da CVM. \\
 Tesouro (\tb{TreasuryConnector}) & \tb{GET /treasury/prices?date=AAAA-MM-DD} & \tb{\{"date", "bonds": [\{"name", "maturity_date", "unit_price"\}]\}}. \\
 Banco Central (\tb{CentralBankConnector}) & \tb{GET /bcb/dados/serie/bcdata.sgs.\{série\}/dados?formato=json\&dataInicial=DD/MM/AAAA\&dataFinal=DD/MM/AAAA}, série 4389 (CDI) e 1178 (Selic), anualizadas base 252 & \tb{[\{"data": "DD/MM/AAAA", "valor": "14.90"\}]} --- mesmo formato da API pública do Banco Central. \tb{valor} em \% ao ano, vira bps ($\times 100$). \\
 \bottomrule
 \end{longtable}
 \endgroup
 
+Nos três serviços, preços e taxas vão \textbf{como texto} (\tb{"103.99176299"}), como já faz a
+API do Banco Central: assim o connector lê \tb{Decimal}, nunca \tb{float} (R6).
+
 \textbf{Quem ensina o mock.} O MockServer sobe vazio. Um container que roda uma vez
-(\tb{mock-init}) ensina a ele os próximos 60 dias úteis pelas fórmulas da RN-PRO-06, para a
-demonstração manual. Os testes ensinam as próprias respostas (números redondos, erros, queda de
-conexão) com \textbf{prioridade maior}, sem apagar o cenário da demonstração.
+(\tb{mock-init}) ensina a ele os próximos 60 dias úteis, a partir da data real em que o compose
+sobe, pelas fórmulas da RN-PRO-06, para a demonstração manual. Os testes ensinam as próprias
+respostas (números redondos, erros, queda de conexão) com \textbf{prioridade maior}, sem apagar o
+cenário da demonstração; cada resposta de teste vale para uma chamada só e depois o cenário volta.
 
 \textbf{Por que diário, e não intradiário.} Fundo de investimento tem uma cota por dia útil (a
 cota de fechamento), e renda fixa rende por dia útil. Preço minuto a minuto só existe para ações e
