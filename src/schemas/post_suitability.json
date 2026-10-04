@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["answers"],
+  "properties": {
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question_code", "option_code"],
+        "properties": {
+          "question_code": {
+            "type": "string"
+          },
+          "option_code": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}
