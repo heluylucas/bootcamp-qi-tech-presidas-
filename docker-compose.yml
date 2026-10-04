@@ -38,6 +38,13 @@ services:
       # A senha que protege os endpoints internos. O padrao vale pra
       # estudar; num sistema de verdade, isso nunca teria valor padrao.
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-default_token}
+      # As fontes de preço do fechamento do dia. Aqui dentro, quem faz o
+      # papel delas é o mock, que atende pelo nome "mock" (mesma regra do
+      # DATABASE_URL). Cada serviço tem o seu prefixo dentro do mock; em
+      # produção, só estes endereços mudariam.
+      FUND_ADMIN_API_URL: http://mock:1080/fund-admin
+      TREASURY_API_URL: http://mock:1080/treasury
+      CENTRAL_BANK_API_URL: http://mock:1080/bcb
     volumes:
       # Monta o codigo pra dentro do container: salvou o arquivo,
       # a API recarrega sozinha (o --reload ali embaixo).
