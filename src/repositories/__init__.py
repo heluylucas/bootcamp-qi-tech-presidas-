@@ -1,2 +1,3 @@
 from repositories.customer_repository import CustomerRepository
 from repositories.account_repository import AccountRepository
+from repositories.suitability_repository import SuitabilityRepository
