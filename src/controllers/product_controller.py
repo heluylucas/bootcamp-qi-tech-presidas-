@@ -1,13 +1,12 @@
-from datetime import date
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy.exc import IntegrityError
 
 from controllers.base_controller import BaseController
 from dtos.product_dto import price_to_dict, product_to_dict, product_with_price_to_dict
-from errors import InvalidPrice, InvalidSchema, PriceAlreadyPublished, ProductNotFound
+from errors import InvalidPrice, PriceAlreadyPublished, ProductNotFound
 from repositories import BusinessDayRepository, ProductRepository
+from utils.dates import parse_date
 
 
 class ProductController(BaseController):
@@ -65,14 +64,3 @@ class ProductController(BaseController):
             raise ProductNotFound()
 
         return product
-
-
-def parse_date(text: Optional[str], field: str) -> Optional[date]:
-    """O schema só confere a cara AAAA-MM-DD; "2026-02-30" só cai aqui."""
-    if text is None:
-        return None
-
-    try:
-        return date.fromisoformat(text)
-    except ValueError:
-        raise InvalidSchema(f"{field} is not a valid date")
