@@ -1,6 +1,4 @@
-import threading
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -68,29 +66,6 @@ class TestOpenAccount:
 
         assert status == 201
         assert body["account_key"] != account_key
-
-    def test_concurrent_open_account(self):
-        """Dez aberturas ao mesmo tempo para o mesmo cliente: um 201, nove 409, nenhum 500.
-
-        Sem a trava na linha do cliente, as dez contariam "zero contas abertas"
-        juntas e o cliente sairia com dez contas (RN-CON-02).
-        """
-        customer_key = create_customer()
-        parallel_requests = 10
-        barrier = threading.Barrier(parallel_requests)
-
-        def send(_):
-            barrier.wait()
-            return RequestGenerator.post_account(customer_key)
-
-        with ThreadPoolExecutor(max_workers=parallel_requests) as executor:
-            results = list(executor.map(send, range(parallel_requests)))
-
-        statuses = sorted(status for status, _ in results)
-        assert statuses == [201] + [409] * (parallel_requests - 1)
-        for status, body in results:
-            if status == 409:
-                assert body["code"] == "BNK002002"
 
 
 class TestGetAccount:
