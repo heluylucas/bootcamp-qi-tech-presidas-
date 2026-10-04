@@ -839,8 +839,10 @@ produção, mudando só o endereço.
   movimento. \tb{POST /internal/day_close} com \tb{\{"close_date": "AAAA-MM-DD"\}} fecha esse dia e
   abre o próximo dia útil. As duas são internas (só \tb{INTERNAL-TOKEN}).
   \item[RN-FEC-02 \dec] \textbf{Contra clique duplo.} O \tb{close_date} precisa ser a data de
-  movimento atual, conferida com a linha de \tb{business_day} travada (\tb{FOR UPDATE}).
-  Diferente $\to$ 409 (\tb{BNK000006}) e nada muda. Assim, dois pedidos iguais fecham um dia só.
+  movimento atual: trava a linha de \tb{business_day} (\tb{FOR UPDATE}) e \textbf{relê} a data
+  atual depois da trava. Diferente $\to$ 409 (\tb{BNK000006}) e nada muda. Assim, dois pedidos
+  iguais fecham um dia só; o \tb{UNIQUE} de \tb{business_day}, \tb{product_price} e
+  \tb{reference_rate} é a rede de segurança.
   \item[RN-FEC-03 \dec] \textbf{Próximo dia útil.} Sexta fecha para segunda; sábado e domingo nunca
   são abertos pelo fechamento. Feriados ficam como \ext.
   \item[RN-FEC-04 \dec] \textbf{O que se pergunta lá fora}, sempre para o novo dia: a cota do
@@ -855,7 +857,8 @@ produção, mudando só o endereço.
   casos nada é gravado e a data de movimento não muda.
   \item[RN-FEC-07 \dec] \textbf{O que é gravado}, num \tb{commit} só: um preço por produto em
   \tb{product_price}, o CDI e a Selic em \tb{reference_rate} e a nova linha de \tb{business_day}.
-  Resposta 201 com a nova data, os preços e as taxas.
+  Resposta 201: \tb{\{"business_date", "prices": [\{"product_key", "name", "unit_price"\}],
+  "rates": [\{"code", "annual_rate_bps"\}]\}}.
   \item[RN-FEC-08 \dec] \textbf{Simplificações do MVP.} As chamadas externas acontecem com a trava
   da data segurada (no máximo 5 s por serviço), então fechamentos simultâneos ficam em fila. Ordens
   não travam a data de movimento: uma ordem que começou antes do fechamento usa o preço do dia em

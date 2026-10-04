@@ -224,7 +224,9 @@ escrita. O cliente recebe 422 (\tb{BNK004002}).
   \item O schema exige \tb{close_date} (data \tb{AAAA-MM-DD}) e nada mais.
   \item Trava a linha atual de \tb{business_day} (a de maior \tb{reference_date}) com
         \tb{FOR UPDATE}.
-  \item Confere \tb{close_date} = data de movimento atual.
+  \item Confere \tb{close_date} = data de movimento atual, \textbf{relida depois da trava}: quem
+        esperou a trava de outro fechamento ainda tem nas mãos a linha antiga (ela continua
+        existindo), e só a releitura mostra a data já avançada.
   \item Calcula o próximo dia útil (sexta $\to$ segunda).
   \item Pergunta lá fora, para o novo dia: a cota do fundo (administradora), o preço dos três
         títulos (Tesouro), o CDI e a Selic (Banco Central). Cada chamada tem timeout de 5 s.

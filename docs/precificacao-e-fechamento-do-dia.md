@@ -204,8 +204,13 @@ Duas regras para quem escreve teste:
   inteiro e só anda para frente, então cada execução da suíte a deixa mais
   adiante. Confira **relações** ("a posição vale cotas × cota do dia") e leia
   a data atual por `GET /internal/business_date`.
-- **Não apagar o mock** (`Mock().clear()`). Ensine as respostas do teste com
-  **prioridade maior**, que ganham das respostas do cenário de demonstração.
+- **Não apagar o mock inteiro.** Use `PriceSourceMock.teach_day(dia)`: ele
+  apaga só o que o mock sabia **daquele dia** e ensina as quatro respostas
+  do teste, com prioridade maior. Para simular uma falha, use
+  `teach_day(dia, skip="fund")` e depois `PriceSourceMock.server_error("fund", dia)`.
+- Depois de rodar a suíte, a demonstração manual precisa de ambiente novo:
+  `docker compose down -v` e `docker compose up -d`. Os testes apagaram do
+  mock os primeiros dias do cenário.
 
 ### Na demonstração manual
 
@@ -251,7 +256,7 @@ Legenda: ✅ pronto · 🔄 em andamento · ⬜ não começou
 | 1 | Data de movimento: tabela e rota | ✅ |
 | 2 | Módulo 5 (produtos e preços) já com data de movimento, histórico de taxas e seed novo | ✅ |
 | 3 | MockServer no compose, `mock-init` e utilitários de teste | ✅ |
-| 4 | Connectors e `POST /internal/day_close` | ⬜ |
+| 4 | Connectors e `POST /internal/day_close` | ✅ |
 | 5 | Teste ponta a ponta: aplica → vira o dia → posição → resgate (com o módulo 7) | ⬜ |
 | 6 | Roteiro de demonstração no README | ⬜ |
 
@@ -423,10 +428,74 @@ fechamento que as usam.
 compose subiu. Se a data de movimento passar disso, o fechamento recebe 404
 do mock (vai virar 502). `docker compose down -v` e `up` recomeçam tudo.
 
-### Fase 4: connectors e fechamento do dia ⬜
+### Fase 4: connectors e fechamento do dia ✅
 
-**Planejado:** três connectors sobre o `RestConnector` que já existe, a rota
-`POST /internal/day_close` e os testes da seção 6.
+**Objetivo:** o dia virar de verdade, buscando preço lá fora.
+
+**O que mudou:**
+
+- `src/connectors/price_source_connector.py`: `FundAdminConnector`,
+  `TreasuryConnector` e `CentralBankConnector`, sobre o `RestConnector` do
+  repositório-base. Timeout de 5 s. Quando não há resposta (fora do ar,
+  timeout, conexão derrubada), eles devolvem `None`, e quem decide que isso
+  vira 502 é o controller. O `INTERNAL-TOKEN` desta API **não** é mandado
+  para fora.
+- Os endereços vêm de variável de ambiente (`FUND_ADMIN_API_URL`,
+  `TREASURY_API_URL`, `CENTRAL_BANK_API_URL`). No compose apontam para o
+  mock; em produção mudaria só isso.
+- `POST /internal/day_close` no `BusinessDayController`. Ele faz os passos
+  da seção 3 nesta ordem:
+  1. trava a data e **relê** a data atual;
+  2. pergunta à administradora, ao Tesouro e ao Banco Central (CDI e Selic),
+     conferindo cada resposta;
+  3. calcula o CDB e a LCI;
+  4. grava tudo e dá `commit` uma vez só.
+- Models e repositories novos: `ReferenceRate` / `ReferenceRateRepository`;
+  `BusinessDayRepository` ganhou `get_current_for_update` e `create`.
+- Erros: `BNK000006` (409), `BNK005006` e `BNK005007` (502).
+- O `parse_date` saiu do controller de produto para `src/utils/dates.py`,
+  junto com o `next_business_day`.
+
+**Um furo no fluxo da RFC, corrigido:** com dois fechamentos ao mesmo tempo,
+o segundo esperava a trava e depois conferia a data com a linha **antiga**
+(ela continua existindo), e fecharia o dia de novo. Agora a data é relida
+depois da trava. Conferido com três pedidos simultâneos: um 201 e dois 409,
+um dia só gravado. RFC e fluxos atualizados.
+
+**Como o fechamento recusa uma resposta "sem sentido" (502 `BNK005007`):**
+
+- data diferente da pedida, ou CNPJ diferente do produto;
+- título faltando;
+- campo faltando, ou corpo que não é o formato combinado;
+- preço ou taxa ≤ 0, que não é número, ou que veio como número JSON em vez
+  de texto;
+- mais de uma taxa na lista.
+
+**Testes:** `tests/integration/test_day_close.py`, com 22 casos:
+
+- abre o próximo dia útil, e sexta → segunda;
+- grava 6 preços e 2 taxas, e o produto mostra a cota que o mock respondeu;
+- CDB = preço anterior × (1 + c × 95%);
+- `close_date` errado e clique duplo dão 409 sem mudar nada;
+- erro 500 em cada uma das 4 fontes, conexão derrubada e 6 tipos de resposta
+  sem sentido dão 502, sem gravar nada e sem mudar a data.
+
+Primeiro falharam todos, depois passaram. `pytest -v`: **116 passed**, em
+três rodadas seguidas.
+
+**Ajuste no `PriceSourceMock`:** a primeira rodada (antes da rota existir)
+deixou respostas ensinadas e não consumidas no mock, que atrapalhariam a
+rodada seguinte. Agora o `teach_day` apaga primeiro o que o mock sabia
+daquele dia (`Mock().clear_request`). O teste do cenário da demonstração
+passou a conferir um dia 30 dias úteis à frente, que a suíte não alcança.
+
+**Demonstração manual conferida:** com ambiente novo e sem ensinar nada,
+`POST /internal/day_close {"close_date": "2026-10-04"}` abriu 05/10 com os
+preços da tabela da seção 4 (fundo 103,99176299).
+
+**Ficou de fora:** um teste automático de *timeout* de verdade (5 s de
+espera deixariam a suíte lenta). O caminho é o mesmo da conexão derrubada,
+que está testada.
 
 ### Fase 5: ponta a ponta ⬜
 
@@ -446,6 +515,7 @@ do mock (vai virar 502). `docker compose down -v` e `up` recomeçam tudo.
 | 04/10/2026 | 1 | Idade mínima e validade do perfil voltaram para a data real (RFC ajustada). Tabela `business_day` e `GET /internal/business_date` prontas. |
 | 04/10/2026 | 2 | Onda do fundo deslocada para `sen((d + 15)/7)` (outubro sobe). Seed novo, `reference_rate` com histórico, `external_code` e as 4 rotas de produto. Corrigido o `DbUtils.rollback()` com `%` no SQL. |
 | 04/10/2026 | 3 | MockServer e `mock-init` no compose (60 dias úteis ensinados pelas fórmulas, iguais ao seed até a 8ª casa). `PriceSourceMock` para os testes. CNPJ só com dígitos no caminho e preços como texto (RFC). |
+| 04/10/2026 | 4 | Connectors e `POST /internal/day_close` prontos. Corrigido o fluxo de clique duplo (reler a data depois da trava). `teach_day` passa a limpar o dia no mock antes de ensinar. |
 
 ---
 
@@ -465,8 +535,9 @@ Central é igual ao da API pública real). Trocar o mock pelo serviço real é
 mudar só o endereço numa variável de ambiente.
 
 **E se dois colegas chamarem o fechamento ao mesmo tempo?**
-O primeiro trava a data de movimento. O segundo espera, encontra a data já
-avançada e recebe 409. Fecha-se um dia só.
+O primeiro trava a data de movimento. O segundo espera, relê a data depois
+da trava, encontra a data já avançada e recebe 409. Fecha-se um dia só
+(testado com três pedidos ao mesmo tempo: um 201 e dois 409).
 
 **Por que os testes não podem conferir uma data fixa?**
 Porque a data de movimento é uma só para o banco inteiro e só anda para
