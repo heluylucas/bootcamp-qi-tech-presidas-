@@ -1,3 +1,4 @@
 from resources.health_check import HealthCheckResource
 from resources.customer import CustomerResource
 from resources.account import AccountResource
+from resources.suitability import SuitabilityResource

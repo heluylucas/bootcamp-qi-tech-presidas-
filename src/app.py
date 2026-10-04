@@ -9,7 +9,7 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import AccountResource, CustomerResource, HealthCheckResource
+from resources import AccountResource, CustomerResource, HealthCheckResource, SuitabilityResource
 from utils.logger import setup_logging
 
 
@@ -150,6 +150,18 @@ def create_app() -> FastAPI:
     application.add_api_route(
         f"{account_path}/status_events",
         account_resource.on_get_status_events,
+        methods=["GET"]
+    )
+
+    suitability_resource = SuitabilityResource()
+    suitability_path = "/customer/{customer_key}/suitability"
+
+    application.add_api_route("/suitability_questions", suitability_resource.on_get_questions, methods=["GET"])
+    application.add_api_route(suitability_path, suitability_resource.on_post, methods=["POST"])
+    application.add_api_route(suitability_path, suitability_resource.on_get, methods=["GET"])
+    application.add_api_route(
+        "/customer/{customer_key}/suitabilities",
+        suitability_resource.on_get_history,
         methods=["GET"]
     )
 
