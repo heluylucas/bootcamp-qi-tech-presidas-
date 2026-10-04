@@ -142,7 +142,7 @@ disputam a mesma primeira trava: um passa e o outro espera.
 \subsubsection*{Aplicação --- caminho feliz}
 \begin{enumerate}
   \item O schema exige \tb{product_key}, \tb{side = APPLY}, \tb{amount} e \tb{Idempotency-Key}.
-  \item Busca o cliente e a sua conta não encerrada. Se não tiver, 409 (\tb{BNK006007}).
+  \item Busca o cliente e a sua conta não encerrada. Se não tiver, 409 (\tb{BNK007006}).
   \item Busca \tb{product}. Confere \tb{is_active} e que o vencimento não passou.
   \item Busca a \tb{suitability_assessment} mais recente. Confere \tb{valid_until} $>$ agora,
         \tb{risk_level} $\leq$ \tb{max_risk_level} do perfil e \tb{amount} $\geq$
@@ -167,7 +167,7 @@ aberta, a trava da conta enfileira todas as ordens daquele cliente. Por isso a p
 criada no passo 6 sem risco de duas ordens simultâneas tentarem criá-la.
 
 \textbf{Aplicação --- falha: produto acima do perfil (a mais provável).} O passo 4 recusa antes de
-qualquer trava ou escrita. O cliente recebe 422 (\tb{BNK006003}). Perfil vencido ou inexistente
+qualquer trava ou escrita. O cliente recebe 422 (\tb{BNK007003}). Perfil vencido ou inexistente
 recusa no mesmo passo, com 409 (\tb{BNK004004} / \tb{BNK004005}).
 
 \textbf{Aplicação --- falha: exceção entre os passos 10 e 12 (a mais cara).} O débito já está na
@@ -180,7 +180,7 @@ nunca sai da conta sem virar posição}.
 \begin{itemize}
   \item \textbf{Sem checagem de perfil no passo 4.} O cliente sempre pode tirar o dinheiro, mesmo
         com perfil vencido. No lugar dela: produto com \tb{liquidity = AT_MATURITY} e hoje $<$
-        \tb{maturity_date} dá 422 (\tb{BNK006005}).
+        \tb{maturity_date} dá 422 (\tb{BNK007005}).
   \item \textbf{No passo 8,} com a posição travada, confere
         \tb{position.quantity} $\geq$ quantidade a resgatar, sendo essa quantidade
         \tb{amount / unit_price} ou toda a posição se \tb{redeem_all}.
@@ -190,7 +190,7 @@ nunca sai da conta sem virar posição}.
 \end{itemize}
 
 \textbf{Resgate --- falha: valor maior que a posição.} O passo 8 recusa com a posição travada, e
-nada foi escrito. O cliente recebe 409 (\tb{BNK006004}).
+nada foi escrito. O cliente recebe 409 (\tb{BNK007004}).
 
 % ---------------------------------------------------------------------
 \subsubsection*{Suitability --- caminho feliz}
