@@ -906,9 +906,18 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   quantidade = toda a posição e valor = \tb{floor(quantidade} $\times$ \tb{preço)} em centavos.
   \item[RN-ORD-13 \dec] \textbf{Custo médio:} no resgate parcial, o \tb{invested_amount} diminui na
   mesma proporção da quantidade resgatada. Isso permite calcular o ganho da parte que ficou.
+  O custo que sai é \tb{floor(invested_amount} $\times$ \tb{quantidade resgatada / quantidade da
+  posição)} em centavos; no resgate total, sai o \tb{invested_amount} inteiro.
   \item[RN-ORD-14 \obr] Posição que zera \textbf{não é apagada} (R4); fica com quantidade 0.
   \item[RN-ORD-15 \obr] Mesma atomicidade e idempotência da aplicação, com a transação
   \tb{INVESTMENT_REDEEM} creditando a conta.
+  \item[RN-ORD-16 \dec] \textbf{Rentabilidade no resgate:} a ordem guarda em \tb{cost_amount} o
+  custo que saiu da posição (RN-ORD-13); na aplicação, \tb{cost_amount} = \tb{amount}. A resposta
+  do resgate traz, além da quantidade e do preço, o \tb{cost_amount}, o \textbf{resultado}
+  (\tb{result_amount} = \tb{amount} $-$ \tb{cost_amount}, pode ser negativo) e a
+  \textbf{rentabilidade} (\tb{return_bps} = resultado $\times$ 10000 / custo, truncada em direção
+  ao zero; 0 se o custo for 0). Como o custo fica gravado na ordem, a repetição idempotente e o
+  \tb{GET} da ordem devolvem os mesmos números, mesmo que a posição já tenha mudado.
 \end{regras}
 
 \subsection{Posição e rentabilidade}
@@ -927,8 +936,10 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
 Quantidade: $1500 / 1{,}23456789 = 1215{,}00001105$ cotas (truncado). No dia seguinte a cota vai
 a \rs 1,24000000: valor atual $= 1215{,}00001105 \times 1{,}24 = $ \rs 1.506,60; resultado
 \rs 6,60; rentabilidade 44 pb (0,44\%). Se ele resgatar \rs 500,00 nesse dia, saem
-$500 / 1{,}24 = 403{,}22580645$ cotas; ficam $811{,}77420460$ cotas e o custo cai
-proporcionalmente para cerca de \rs 1.002,19.
+$500 / 1{,}24 = 403{,}22580645$ cotas; ficam $811{,}77420460$ cotas. O custo que sai é
+$\lfloor 150000 \times 403{,}22580645 / 1215{,}00001105 \rfloor = 49780$ centavos (\rs 497,80), e o
+custo da posição cai para \rs 1.002,20. A resposta do resgate mostra resultado de \rs 2,20 e
+rentabilidade de 44 pb, a mesma da posição antes do resgate.
 
 % =====================================================================
 \section{Módulo 8 --- Modelo de receita (como o banco ganha dinheiro)}\label{sec:receita}
@@ -1070,7 +1081,7 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \tb{product_price} & \tb{product_id} FK; \tb{reference_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, reference_date)}. \\
 \tb{model_portfolio} & \tb{profile_id} FK UNIQUE; \tb{name}. \\
 \tb{model_portfolio_item} & \tb{model_portfolio_id} FK; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(model_portfolio_id, product_id)}. A soma de 10.000 é conferida por um teste. \\
-\tb{investment_order} & \tb{order_key}; \tb{customer_id} FK; \tb{account_id} FK; \tb{product_id} FK; \tb{side} (\tb{APPLY}/\tb{REDEEM}); \tb{amount BIGINT CHECK (> 0)}; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{transaction_id} FK $\to$ transaction (o movimento de dinheiro); \tb{status} (\tb{EXECUTED}); \tb{idempotency_key}; \tb{request_hash}; \tb{created_at}. \tb{UNIQUE(customer_id, idempotency_key)}. \\
+\tb{investment_order} & \tb{order_key}; \tb{customer_id} FK; \tb{account_id} FK; \tb{product_id} FK; \tb{side} (\tb{APPLY}/\tb{REDEEM}); \tb{amount BIGINT CHECK (> 0)}; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{transaction_id} FK $\to$ transaction (o movimento de dinheiro); \tb{status} (\tb{EXECUTED}); \tb{idempotency_key}; \tb{request_hash}; \tb{created_at}. \tb{UNIQUE(customer_id, idempotency_key)}. \\
 \tb{position} & \tb{customer_id} FK; \tb{product_id} FK; \tb{quantity NUMERIC(24,8) NOT NULL CHECK (>= 0)}; \tb{invested_amount BIGINT NOT NULL CHECK (>= 0)}; \tb{updated_at}. \tb{UNIQUE(customer_id, product_id)}. \\
 \bottomrule
 \end{longtable}
@@ -1150,7 +1161,7 @@ POST & \rota|/product/{product_key}/price| & Publica preço/cota de uma data (us
 GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Ordens e posição}} \\
-POST & \rota|/customer/{ck}/investment_order| & Aplica ou resgata. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço; 200 repetição idempotente; 400 schema/sem chave; 404 cliente ou produto; 409 sem conta ativa, sem perfil válido, saldo ou posição insuficiente, produto indisponível, sem preço, chave reutilizada; 422 abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
+POST & \rota|/customer/{ck}/investment_order| & Aplica ou resgata. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço (no resgate, também custo, resultado e rentabilidade); 200 repetição idempotente; 400 schema/sem chave; 404 cliente ou produto; 409 sem conta ativa, sem perfil válido, saldo ou posição insuficiente, produto indisponível, sem preço, chave reutilizada; 422 abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
 GET & \rota|/customer/{ck}/investment_orders| & Histórico de ordens. Query: \tb{page}, \tb{limit}, \tb{product_key}. & 200; 404. \\
 GET & \rota|/customer/{ck}/investment_order/{order_key}| & Detalhe da ordem. & 200; 404 (inclusive de outro cliente). \\
 GET & \rota|/customer/{ck}/positions| & Posição consolidada e rentabilidade. & 200; 404. \\
@@ -1313,7 +1324,7 @@ lançamento de débito, atualiza saldo; (9) grava ordem; (10) soma quantidade e 
 \subsection{Resgate}
 Igual à aplicação, sem a checagem de perfil, com: posição suficiente (409 \tb{BNK006004}),
 liquidez (422 \tb{BNK006005} antes do vencimento), crédito na conta e redução proporcional do
-custo.
+custo; a ordem guarda o custo que saiu e a resposta traz resultado e rentabilidade (RN-ORD-16).
 
 \subsection*{Principal desafio (candidato para a RFC)}
 
@@ -1371,7 +1382,7 @@ Movimentações & depósito aumenta saldo; saque diminui saldo; \textbf{transfer
 Suitability & calcula cada um dos três perfis; trava da Q3 força Conservador; recusa respostas incompletas; recusa opção de outra pergunta; refazer mantém histórico e muda o perfil atual; cliente sem perfil dá 404. \\
 Produtos & lista catálogo; filtra por risco; publica preço; recusa preço repetido na mesma data; recusa preço negativo e data futura. \\
 Carteira & soma dos pesos de cada carteira-modelo é 10.000; sugestão soma exatamente o valor pedido (inclusive com centavos quebrados); recusa sem perfil; recusa valor abaixo do mínimo. \\
-Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate funciona mesmo sem perfil válido; mesmo Idempotency-Key não aplica duas vezes; ordem de outro cliente dá 404. \\
+Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate devolve custo, resultado e rentabilidade (inclusive na repetição idempotente); resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate funciona mesmo sem perfil válido; mesmo Idempotency-Key não aplica duas vezes; ordem de outro cliente dá 404. \\
 Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. \\
 Concorrência \ext & dispara N transferências em paralelo (threads) de uma conta e confere que o saldo final nunca fica negativo e bate com o extrato. \\
 \bottomrule
@@ -1405,6 +1416,12 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \item \textbf{Preço calculado em tempo real por fórmula ou buscado num serviço externo} ---
   descartada no MVP porque aumenta muito o código e cria dependência externa (timeout, falha).
   Ganharia se tivéssemos ativos de mercado (ações). Fica como \ext{} com connector + Mockserver.
+  \item \textbf{Rotina agendada (cron) que publica o preço todo dia} --- descartada porque a banca
+  sobe o banco do zero e o seed já cria o preço de hoje; um agendador seria mais um processo no
+  compose sem ganho na avaliação. Se o sistema ficar no ar por dias, a RN-PRO-04 usa o último preço
+  publicado. Ganharia num banco que fica no ar por semanas: em produção seria o job de fim de dia
+  que recebe a cota da administradora do fundo e o CDI da B3 e chama a mesma
+  \tb{POST /product/\{key\}/price}.
   \item \textbf{Perguntas do suitability no código} --- descartada porque mudar uma pergunta exigiria
   mudar código, e não daria para guardar a resposta escolhida com integridade. Ganharia pela
   simplicidade se o questionário nunca mudasse.
@@ -1663,6 +1680,7 @@ erDiagram
     string side "APPLY ou REDEEM"
     bigint amount
     numeric quantity
+    bigint cost_amount
   }
   position {
     int id PK
@@ -1763,6 +1781,31 @@ HTTP/1.1 201 Created
   "quantity": "1215.00001105",
   "status": "EXECUTED",
   "transaction_key": "f5d6..."
+}
+\end{lstlisting}
+
+\subsection*{Resgate}
+\begin{lstlisting}
+POST /customer/9c2f.../investment_order
+Idempotency-Key: 7a6b5c4d-...
+{
+  "product_key": "55ee...",
+  "side": "REDEEM",
+  "amount": 50000
+}
+
+HTTP/1.1 201 Created
+{
+  "order_key": "c4d5...",
+  "side": "REDEEM",
+  "amount": 50000,
+  "unit_price": "1.24000000",
+  "quantity": "403.22580645",
+  "cost_amount": 49780,
+  "result_amount": 220,
+  "return_bps": 44,
+  "status": "EXECUTED",
+  "transaction_key": "a1b2..."
 }
 \end{lstlisting}
 

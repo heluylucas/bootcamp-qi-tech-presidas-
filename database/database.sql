@@ -353,6 +353,7 @@ CREATE TABLE investment_order(
     amount                          BIGINT NOT NULL CHECK (amount > 0),
     quantity                        NUMERIC(24,8) NOT NULL CHECK (quantity > 0),
     unit_price                      NUMERIC(20,8) NOT NULL CHECK (unit_price > 0),
+    cost_amount                     BIGINT NOT NULL CHECK (cost_amount >= 0),
     transaction_id                  INTEGER NOT NULL UNIQUE REFERENCES transaction(id),
     status                          VARCHAR(8) NOT NULL DEFAULT 'EXECUTED' CHECK (status IN ('EXECUTED')),
     idempotency_key                 CHAR(36) NOT NULL,

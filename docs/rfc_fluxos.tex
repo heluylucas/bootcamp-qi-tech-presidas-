@@ -155,8 +155,8 @@ disputam a mesma primeira trava: um passa e o outro espera.
   \item Calcula \tb{quantity = amount / unit_price}, truncada em 8 casas.
   \item Grava \tb{transaction} \tb{INVESTMENT_APPLY} e um \tb{ledger_entry} \tb{DEBIT}, e
         atualiza \tb{balance}.
-  \item Grava \tb{investment_order} com \tb{quantity}, \tb{unit_price} e \tb{transaction_id}.
-        Ordem: \tb{EXECUTED}.
+  \item Grava \tb{investment_order} com \tb{quantity}, \tb{unit_price}, \tb{cost_amount}
+        (= \tb{amount}) e \tb{transaction_id}. Ordem: \tb{EXECUTED}.
   \item Soma \tb{quantity} e \tb{amount} em \tb{position.quantity} e
         \tb{position.invested_amount}.
   \item \tb{commit}; 201 com \tb{order_key}, \tb{quantity} e \tb{unit_price}.
@@ -187,6 +187,10 @@ nunca sai da conta sem virar posição}.
   \item \textbf{Passos 10 a 12 invertidos:} \tb{INVESTMENT_REDEEM} com \tb{ledger_entry}
         \tb{CREDIT}. A posição perde a quantidade resgatada, e \tb{invested_amount} cai na mesma
         proporção. Uma posição zerada fica com \tb{quantity = 0} e não é apagada.
+  \item \textbf{No passo 11,} a ordem guarda em \tb{cost_amount} o custo que saiu da posição
+        (\tb{floor} proporcional; no resgate total, o \tb{invested_amount} inteiro). A resposta
+        201 traz também \tb{cost_amount}, \tb{result_amount} = \tb{amount} $-$ \tb{cost_amount} e
+        \tb{return_bps} (RN-ORD-16).
 \end{itemize}
 
 \textbf{Resgate --- falha: valor maior que a posição.} O passo 8 recusa com a posição travada, e
