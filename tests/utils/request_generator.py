@@ -44,6 +44,28 @@ class RequestGenerator:
         return response.response_status, response.response_json
 
     @staticmethod
+    def get_products(query_params: dict = None):
+        response = ClientRequisition.send("GET", "/products", headers=HEADERS, query_params=query_params)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def get_product(product_key: str):
+        response = ClientRequisition.send("GET", f"/product/{product_key}", headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def get_product_prices(product_key: str, query_params: dict = None):
+        endpoint = f"/product/{product_key}/prices"
+        response = ClientRequisition.send("GET", endpoint, headers=HEADERS, query_params=query_params)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def post_product_price(product_key: str, payload: dict):
+        endpoint = f"/product/{product_key}/price"
+        response = ClientRequisition.send("POST", endpoint, payload=payload, headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
     def get_account_status_events(customer_key: str, account_key: str):
         endpoint = f"/customer/{customer_key}/account/{account_key}/status_events"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
