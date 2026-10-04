@@ -43,3 +43,13 @@ class RequestGenerator:
         endpoint = f"/customer/{customer_key}/account/{account_key}/status_events"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
         return response.response_status, response.response_json
+
+    @staticmethod
+    def post_transaction(customer_key: str, account_key: str, payload: dict, idempotency_key):
+        """idempotency_key=None não manda o cabeçalho: é assim que se testa a falta dele."""
+        endpoint = f"/customer/{customer_key}/account/{account_key}/transaction"
+        headers = dict(HEADERS)
+        if idempotency_key is not None:
+            headers["Idempotency-Key"] = idempotency_key
+        response = ClientRequisition.send("POST", endpoint, payload=payload, headers=headers)
+        return response.response_status, response.response_json
