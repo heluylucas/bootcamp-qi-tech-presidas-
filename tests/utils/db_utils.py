@@ -63,7 +63,7 @@ class DbUtils:
                 for query in RESET_QUERIES:
                     connection.exec_driver_sql(query)
 
-                connection.exec_driver_sql(SCHEMA_FILE.read_text())
+                connection.exec_driver_sql(SCHEMA_FILE.read_text(encoding="utf-8").replace("%", "%%"))
         except OperationalError:
             message = DATABASE_OFFLINE.format(host=engine.url.host, port=engine.url.port)
             raise RuntimeError(message) from None
