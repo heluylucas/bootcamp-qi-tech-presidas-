@@ -139,6 +139,7 @@ def create_app() -> FastAPI:
     business_day_resource = BusinessDayResource()
 
     application.add_api_route("/internal/business_date", business_day_resource.on_get, methods=["GET"])
+    application.add_api_route("/internal/day_close", business_day_resource.on_post_close, methods=["POST"])
 
     customer_resource = CustomerResource()
 
