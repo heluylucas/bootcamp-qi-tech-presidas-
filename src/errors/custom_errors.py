@@ -186,3 +186,58 @@ class DestinationAccountNotActive(QIException):
         description = "The destination account is blocked or closed and cannot receive money."
         translation = "A conta de destino está bloqueada ou encerrada e não pode receber dinheiro."
         super().__init__(title, self.code, http_status, description, translation)
+
+
+class SuitabilityNotFound(QIException):
+    code = "BNK004001"
+
+    def __init__(self) -> None:
+        title = "Suitability Not Found"
+        http_status = 404
+        description = "The customer has never answered the suitability questionnaire."
+        translation = "O cliente ainda não respondeu o questionário de perfil de investidor."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class IncompleteAnswers(QIException):
+    code = "BNK004002"
+
+    def __init__(self) -> None:
+        title = "Incomplete Answers"
+        http_status = 422
+        description = "Every question must be answered exactly once, and only existing questions can be answered."
+        translation = "Cada pergunta do questionário precisa de exatamente uma resposta."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidOption(QIException):
+    code = "BNK004003"
+
+    def __init__(self) -> None:
+        title = "Invalid Option"
+        http_status = 422
+        description = "The option_code does not belong to the question."
+        translation = "A opção escolhida não pertence a esta pergunta."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class SuitabilityExpired(QIException):
+    code = "BNK004004"
+
+    def __init__(self) -> None:
+        title = "Suitability Expired"
+        http_status = 409
+        description = "The investor profile is more than 24 months old and must be answered again."
+        translation = "O perfil de investidor tem mais de 24 meses e precisa ser refeito."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class SuitabilityRequired(QIException):
+    code = "BNK004005"
+
+    def __init__(self) -> None:
+        title = "Suitability Required"
+        http_status = 409
+        description = "The customer needs an investor profile before this operation."
+        translation = "O cliente precisa responder o questionário de perfil de investidor antes desta operação."
+        super().__init__(title, self.code, http_status, description, translation)
