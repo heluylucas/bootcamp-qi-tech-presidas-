@@ -69,3 +69,26 @@ class RequestGenerator:
         endpoint = f"/customer/{customer_key}/account/{account_key}/status_events"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
         return response.response_status, response.response_json
+
+    @staticmethod
+    def get_suitability_questions():
+        response = ClientRequisition.send("GET", "/suitability_questions", headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def post_suitability(customer_key: str, payload: dict):
+        endpoint = f"/customer/{customer_key}/suitability"
+        response = ClientRequisition.send("POST", endpoint, payload=payload, headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def get_suitability(customer_key: str):
+        endpoint = f"/customer/{customer_key}/suitability"
+        response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def get_suitabilities(customer_key: str):
+        endpoint = f"/customer/{customer_key}/suitabilities"
+        response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
+        return response.response_status, response.response_json

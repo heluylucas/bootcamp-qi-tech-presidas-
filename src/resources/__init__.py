@@ -2,4 +2,5 @@ from resources.health_check import HealthCheckResource
 from resources.business_day import BusinessDayResource
 from resources.customer import CustomerResource
 from resources.account import AccountResource
+from resources.suitability import SuitabilityResource
 from resources.product import ProductResource

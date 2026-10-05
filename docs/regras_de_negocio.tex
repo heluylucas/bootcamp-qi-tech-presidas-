@@ -709,16 +709,16 @@ Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1
 \begin{regras}
   \item[RN-SUI-01 \obr] Só um cliente existente responde o questionário (404 se não existir).
   \item[RN-SUI-02 \obr] Todas as sete perguntas precisam de exatamente uma resposta. Falta pergunta,
-  pergunta repetida $\to$ 422 (\tb{BNK004002}). Opção que não pertence à pergunta $\to$ 422
-  (\tb{BNK004003}).
+  pergunta repetida ou pergunta que não existe $\to$ 422 (\tb{BNK004002}). Opção que não pertence
+  à pergunta $\to$ 422 (\tb{BNK004003}).
   \item[RN-SUI-03 \dec] Perfil = faixa da soma dos pontos (tabela acima).
   \item[RN-SUI-04 \dec] \textbf{Trava de segurança:} quem responde (1) na Q3 (``resgataria tudo'')
   ou (1) na Q5 (``preciso a qualquer momento'') é \textbf{Conservador}, qualquer que seja a soma. A
-  resposta guarda o motivo (\tb{forced_by_rule = true}).
+  resposta guarda o motivo: \tb{forced_by_rule = true} quando a trava \textbf{mudou} o perfil (pelos
+  pontos seria Moderado ou Arrojado). Se os pontos já davam Conservador, \tb{forced_by_rule = false}.
   \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until} \tb{TIMESTAMPTZ} = hora real
   da resposta + 24 meses, não a data de movimento, ver RN-GER-13). Vencido (hora real depois de
-  \tb{valid_until}), o
-  cliente não faz novas aplicações nem pede sugestão até refazer (409, \tb{BNK004004}).
+  \tb{valid_until}), o cliente não faz novas aplicações nem pede sugestão até refazer (409, \tb{BNK004004}).
   \item[RN-SUI-06 \obr] Refazer o questionário cria uma avaliação \textbf{nova}; as antigas continuam
   guardadas (R4). O perfil atual é sempre a avaliação mais recente.
   \item[RN-SUI-07 \dec] Cada avaliação guarda as respostas escolhidas (\tb{suitability_answer}),
@@ -1623,6 +1623,21 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \tb{BNK006xxx} espera um erro do Módulo 6, e a carteira (Módulo 6) ficava misturada com as
   ordens. Ganharia se os módulos mudassem de número com frequência. \emph{Escolhido:} o número do
   meio é o número do módulo (carteira \tb{BNK006}, ordens \tb{BNK007}).
+  \item \textbf{\tb{forced_by_rule = true} sempre que Q3 ou Q5 for (1)} --- descartada porque quem
+  responde tudo (1) soma 7 pontos e já é Conservador pelos pontos; dizer que foi a trava seria
+  explicar o perfil com um motivo falso. Ganharia se o campo quisesse dizer ``marcou uma resposta de
+  alerta'', e não ``o perfil foi forçado''. \emph{Escolhido:} \tb{true} só quando a trava muda o
+  resultado (RN-SUI-04).
+  \item \textbf{Recusar no schema (400) pergunta que não existe} (listando Q1 a Q7 no JSON Schema)
+  --- descartada porque as perguntas moram no banco (decisão 6) e o schema não consulta o banco:
+  toda pergunta nova no seed exigiria mudar o schema junto. Ganharia se o questionário nunca
+  mudasse. \emph{Escolhido:} o schema confere só o formato (texto e número inteiro); pergunta
+  inexistente é conteúdo e dá 422 \tb{BNK004002}, como falta ou repetição (RN-SUI-02).
+  \item \textbf{Paginar o histórico de suitability} (\tb{GET /customer/\{ck\}/suitabilities} com
+  \tb{page} e \tb{limit}) --- descartada pelo mesmo motivo do histórico de status: um cliente
+  responde o questionário poucas vezes (o perfil vale 24 meses), e a paginação traria schema de
+  query e mais um 400 sem ganho. Ganharia se o perfil fosse refeito automaticamente com frequência.
+  \emph{Escolhido:} devolve \tb{\{items\}} completo, da avaliação mais nova para a mais antiga.
   \item \textbf{Rota de publicação manual de preço} (\tb{POST /product/\{key\}/price}, a antiga
   RN-PRO-05, ``para correções'') --- descartada porque não havia o que corrigir: preço publicado não
   se reescreve (R4), o fechamento é tudo ou nada e não deixa dia sem preço (RN-FEC-06), e fim de
@@ -1630,6 +1645,7 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   ninguém lê. O teste dela ainda recriava o banco inteiro para liberar uma data. Ganharia se
   existisse um produto sem fonte externa nem fórmula, cujo preço alguém precisasse digitar.
   \emph{Escolhido:} preço novo só entra pelo fechamento do dia.
+
 \end{enumerate}
 
 % =====================================================================
