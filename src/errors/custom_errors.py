@@ -285,3 +285,14 @@ class InvalidPriceSourceResponse(QIException):
         description = "An external price or rate source answered something that makes no sense."
         translation = "Uma fonte externa de preço ou taxa respondeu algo sem sentido. Nada foi gravado."
         super().__init__(title, self.code, http_status, description, translation)
+
+
+class SuggestionAmountTooLow(QIException):
+    code = "PPP006001"
+
+    def __init__(self) -> None:
+        title = "Suggestion Amount Too Low"
+        http_status = 422
+        description = "The amount for a portfolio suggestion must be at least 100000 cents (R$ 1,000.00)."
+        translation = "O valor mínimo para pedir uma sugestão de carteira é R$ 1.000,00."
+        super().__init__(title, self.code, http_status, description, translation)
