@@ -26,16 +26,16 @@ Para isso funcionar, precisamos responder três perguntas:
 
 ## 2. Os conceitos (leia isto primeiro)
 
-| Termo | O que é | Exemplo |
-|---|---|---|
-| **Data de movimento** | O "hoje" do banco. É uma data guardada no banco de dados que **só avança quando alguém manda**. Não é o relógio do computador. | O relógio diz 03/10, mas a data de movimento pode estar em 07/10 depois de alguns fechamentos. |
-| **Fechamento do dia** | A rota `POST /internal/day_close`. Ela busca os preços do próximo dia lá fora, grava tudo e avança a data de movimento. Em banco de verdade isso se chama "virada de data". | Fecha 05/10 → abre 06/10. |
-| **Fonte externa** | Quem publica o preço na vida real: o Tesouro, a administradora do fundo, o Banco Central. | A administradora publica a cota do fundo todo fim de tarde. |
-| **MockServer** | Um programa que **finge ser** essas fontes externas. Ele sobe junto com o `docker compose` e responde o que a gente ensinar. | "Quando pedirem a cota de 06/10, responda 102,00." |
-| **Connector** | O código, em `src/connectors/`, que faz a chamada HTTP para a fonte externa. É o mesmo código que iria para produção, só muda o endereço. | `FundAdminConnector` pergunta a cota do fundo. |
-| **Emissão própria** | Papel que **o próprio banco** emitiu (CDB e LCI do Triple P Bank). Ninguém de fora publica o preço dele: o banco calcula. | CDB rende 95% do CDI. |
-| **CDI** | A taxa de juros de referência entre bancos. Vem do Banco Central, uma por dia útil. | 14,9% ao ano. |
-| **Cota** | A "fatia" de um fundo. Valor da posição = quantidade de cotas × valor da cota do dia. | 15 cotas × R$ 104,00 = R$ 1.560,00. |
+| Termo                 | O que é                                                                                                                                                                     | Exemplo                                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Data de movimento** | O "hoje" do banco. É uma data guardada no banco de dados que **só avança quando alguém manda**. Não é o relógio do computador.                                              | O relógio diz 03/10, mas a data de movimento pode estar em 07/10 depois de alguns fechamentos. |
+| **Fechamento do dia** | A rota `POST /internal/day_close`. Ela busca os preços do próximo dia lá fora, grava tudo e avança a data de movimento. Em banco de verdade isso se chama "virada de data". | Fecha 05/10 → abre 06/10.                                                                      |
+| **Fonte externa**     | Quem publica o preço na vida real: o Tesouro, a administradora do fundo, o Banco Central.                                                                                   | A administradora publica a cota do fundo todo fim de tarde.                                    |
+| **MockServer**        | Um programa que **finge ser** essas fontes externas. Ele sobe junto com o `docker compose` e responde o que a gente ensinar.                                                | "Quando pedirem a cota de 06/10, responda 102,00."                                             |
+| **Connector**         | O código, em `src/connectors/`, que faz a chamada HTTP para a fonte externa. É o mesmo código que iria para produção, só muda o endereço.                                   | `FundAdminConnector` pergunta a cota do fundo.                                                 |
+| **Emissão própria**   | Papel que **o próprio banco** emitiu (CDB e LCI do Triple P Bank). Ninguém de fora publica o preço dele: o banco calcula.                                                   | CDB rende 95% do CDI.                                                                          |
+| **CDI**               | A taxa de juros de referência entre bancos. Vem do Banco Central, uma por dia útil.                                                                                         | 14,9% ao ano.                                                                                  |
+| **Cota**              | A "fatia" de um fundo. Valor da posição = quantidade de cotas × valor da cota do dia.                                                                                       | 15 cotas × R$ 104,00 = R$ 1.560,00.                                                            |
 
 ---
 
@@ -95,15 +95,15 @@ As fórmulas usam `d` = **número de dias úteis desde 01/01/2026** (a "data
 calculado direto, sem saber o preço de ontem. Isso é importante porque o
 MockServer **não tem memória**: ele só responde ao que perguntam.
 
-| Ativo | Quem calcula | Preço no dia `d` | O que acontece no dia a dia |
-|---|---|---|---|
-| Tesouro Selic 2031 | Mock (Tesouro) | `100 × 1,15^(d/252)` | Sobe um pouco todo dia |
-| Tesouro Prefixado 2029 | Mock (Tesouro) | `100 × 1,13^(d/252)` | Sobe um pouco todo dia |
-| Tesouro IPCA+ 2035 | Mock (Tesouro) | `100 × (1,045 × 1,06)^(d/252)` | Sobe um pouco todo dia |
-| CDI e Selic | Mock (Banco Central) | 14,9% e 15% ao ano | Uma taxa nova por dia útil |
-| CDB Triple P Bank | **O banco** | preço de ontem × (1 + CDI do dia × 95%) | Rende pelo CDI que chegou |
-| LCI Triple P Bank | **O banco** | preço de ontem × (1 + CDI do dia × 93%) | Rende pelo CDI que chegou |
-| FGV Quant Capital | Mock (administradora) | `100 × (1,10 × 0,99)^(d/252) × (1 + 3% × sen((d + 15)/7))` | **Sobe e desce** |
+| Ativo                  | Quem calcula          | Preço no dia `d`                                           | O que acontece no dia a dia |
+| ---------------------- | --------------------- | ---------------------------------------------------------- | --------------------------- |
+| Tesouro Selic 2031     | Mock (Tesouro)        | `100 × 1,15^(d/252)`                                       | Sobe um pouco todo dia      |
+| Tesouro Prefixado 2029 | Mock (Tesouro)        | `100 × 1,13^(d/252)`                                       | Sobe um pouco todo dia      |
+| Tesouro IPCA+ 2035     | Mock (Tesouro)        | `100 × (1,045 × 1,06)^(d/252)`                             | Sobe um pouco todo dia      |
+| CDI e Selic            | Mock (Banco Central)  | 14,9% e 15% ao ano                                         | Uma taxa nova por dia útil  |
+| CDB Triple P Bank      | **O banco**           | preço de ontem × (1 + CDI do dia × 95%)                    | Rende pelo CDI que chegou   |
+| LCI Triple P Bank      | **O banco**           | preço de ontem × (1 + CDI do dia × 93%)                    | Rende pelo CDI que chegou   |
+| FGV Quant Capital      | Mock (administradora) | `100 × (1,10 × 0,99)^(d/252) × (1 + 3% × sen((d + 15)/7))` | **Sobe e desce**            |
 
 O "CDI do dia" é a taxa anual convertida para um dia útil:
 `(1 + 14,9%)^(1/252) − 1 ≈ 0,0551%`.
@@ -124,13 +124,13 @@ O "CDI do dia" é a taxa anual convertida para um dia útil:
 **Números reais das fórmulas** (para conferir na mão; o seed do banco dá
 exatamente estes valores):
 
-| Data | Dia | `d` | Fundo | Tesouro Selic | CDB |
-|---|---|---|---|---|---|
-| 01/10/2026 | qui | 195 | 103,65374249 | 111,42138869 | 110,74981589 |
-| 02/10/2026 | sex | 196 | 103,79148268 | 111,48320134 | 110,80782057 |
-| 05/10/2026 | seg | 197 | 103,99176299 | 111,54504829 | 110,86585562 |
-| 06/10/2026 | ter | 198 | 104,25128086 | 111,60692954 | 110,92392107 |
-| 19/10/2026 | seg | 207 | 108,20038986 | 112,16540797 | 111,44788055 |
+| Data       | Dia | `d` | Fundo        | Tesouro Selic | CDB          |
+| ---------- | --- | --- | ------------ | ------------- | ------------ |
+| 01/10/2026 | qui | 195 | 103,65374249 | 111,42138869  | 110,74981589 |
+| 02/10/2026 | sex | 196 | 103,79148268 | 111,48320134  | 110,80782057 |
+| 05/10/2026 | seg | 197 | 103,99176299 | 111,54504829  | 110,86585562 |
+| 06/10/2026 | ter | 198 | 104,25128086 | 111,60692954  | 110,92392107 |
+| 19/10/2026 | seg | 207 | 108,20038986 | 112,16540797  | 111,44788055 |
 
 > Em outubro de 2026 a cota do fundo **sobe o mês inteiro** (pico perto de
 > 30/10, por volta de 110,8). Em novembro ela **cai** até cerca de 01/12. Ou
@@ -147,13 +147,13 @@ minuto a minuto só existe em ações e cripto, que estão fora do escopo.
 
 Exemplo com números redondos, do jeito que os testes vão fazer:
 
-| Passo | Requisição | Data de movimento | Cota | O que acontece |
-|---|---|---|---|---|
-| 1 | Cliente aplica R$ 1.500 no fundo | 05/10 | 100,00 | Recebe 15 cotas. R$ 1.500 saem do saldo e aparecem no extrato como débito. |
-| 2 | `POST /internal/day_close` | 05/10 → **06/10** | 102,00 | Preço novo gravado, dia virou. |
-| 3 | `POST /internal/day_close` | 06/10 → **07/10** | 104,00 | Mais um dia. |
-| 4 | `GET /customer/{ck}/positions` | 07/10 | 104,00 | Posição vale 15 × 104 = **R$ 1.560**. Resultado R$ 60, rentabilidade 400 pb (4%). |
-| 5 | Resgate total | 07/10 | 104,00 | R$ 1.560 voltam para a conta (crédito no extrato). A resposta mostra `result_amount: 6000` e `return_bps: 400`. |
+| Passo | Requisição                       | Data de movimento | Cota   | O que acontece                                                                                                  |
+| ----- | -------------------------------- | ----------------- | ------ | --------------------------------------------------------------------------------------------------------------- |
+| 1     | Cliente aplica R$ 1.500 no fundo | 05/10             | 100,00 | Recebe 15 cotas. R$ 1.500 saem do saldo e aparecem no extrato como débito.                                      |
+| 2     | `POST /internal/day_close`       | 05/10 → **06/10** | 102,00 | Preço novo gravado, dia virou.                                                                                  |
+| 3     | `POST /internal/day_close`       | 06/10 → **07/10** | 104,00 | Mais um dia.                                                                                                    |
+| 4     | `GET /customer/{ck}/positions`   | 07/10             | 104,00 | Posição vale 15 × 104 = **R$ 1.560**. Resultado R$ 60, rentabilidade 400 pb (4%).                               |
+| 5     | Resgate total                    | 07/10             | 104,00 | R$ 1.560 voltam para a conta (crédito no extrato). A resposta mostra `result_amount: 6000` e `return_bps: 400`. |
 
 Os passos 2 e 3 levam milissegundos. É isso que deixa a banca ver a
 rentabilidade mudar ao vivo.
@@ -167,11 +167,11 @@ Ele volta, com ganho ou perda, só no resgate.
 
 O fechamento é **tudo ou nada**: ou grava tudo, ou não grava nada.
 
-| O que aconteceu | Resposta | O que muda no banco |
-|---|---|---|
-| O `close_date` não é a data atual (por exemplo, clique duplo) | 409 `PPP000006` | Nada |
-| Fonte externa fora do ar, demorou mais de 5 s ou respondeu erro | 502 `PPP005006` | Nada |
-| Fonte respondeu algo sem sentido (cota zero, data errada, título faltando) | 502 `PPP005007` | Nada |
+| O que aconteceu                                                            | Resposta        | O que muda no banco |
+| -------------------------------------------------------------------------- | --------------- | ------------------- |
+| O `close_date` não é a data atual (por exemplo, clique duplo)              | 409 `PPP000006` | Nada                |
+| Fonte externa fora do ar, demorou mais de 5 s ou respondeu erro            | 502 `PPP005006` | Nada                |
+| Fonte respondeu algo sem sentido (cota zero, data errada, título faltando) | 502 `PPP005007` | Nada                |
 
 Se o fechamento falhar, a data de movimento não anda, e o sistema continua
 usando o último preço publicado. É só chamar de novo quando a fonte voltar.
@@ -226,19 +226,19 @@ README na Fase 6).
 O registro completo, com o preço de cada alternativa, está na seção
 "Decisões e alternativas descartadas" da RFC. Resumo:
 
-| Escolhemos | No lugar de | Por quê |
-|---|---|---|
-| Data de movimento própria | Relógio real | Com o relógio, o "amanhã" demora 24 horas: não dá para mostrar nem testar. |
-| Idade e validade do perfil pelo relógio real | Pela data de movimento | São regras da lei; a data de movimento do simulador fica à frente do calendário e aceitaria um menor de verdade. |
-| Fechamento chamado por rota | Agendador (cron) | A banca precisa controlar quando o dia vira. Em produção, um agendador chamaria a mesma rota. |
-| Connectors + MockServer | Banco calculando tudo por função SQL | Em produção o banco **recebe** a cota do fundo, não inventa. E mostra o que a Aula 3 ensinou. |
-| Buscar preço uma vez por dia | Buscar na hora em que o cliente pede | O cliente não fica dependendo de serviço externo, e todos veem o mesmo preço no dia. |
-| Fórmula que depende só da data | Seno acumulado dia a dia (versão antiga do seed) | O mock não tem memória. |
-| Histórico de taxas em `reference_rate` | Uma taxa fixa / apagar a tabela | Uma taxa fixa criaria dois CDIs diferentes, e o relatório de receita precisa das taxas. |
-| Preço diário | Preço intradiário | Fundo tem uma cota por dia; renda fixa rende por dia útil. |
-| Preço só pelo fechamento do dia | Rota de publicação manual (`POST /product/{key}/price`) | Preço não se reescreve, o fechamento não deixa buraco e fim de semana usa o último preço: a rota só conseguia gravar dias que ninguém lê. E o teste dela apagava o banco inteiro. |
-| LCI como oferta com prazo de 12 meses (vencimento por aplicação) | LCI com vencimento fixo e prazo mínimo checado na aplicação | Emissão própria é uma emissão nova a cada aplicação. Com vencimento fixo, a LCI ficaria bloqueada nos últimos 9 meses. O prazo mínimo do CMN virou `CHECK` no banco. |
-| Seed só com o preço de hoje | Seed com os últimos 30 dias | Nenhuma regra lê preço de antes do banco nascer: aplicação, resgate e fechamento só usam o último preço até a data de movimento. O histórico era só decoração. |
+| Escolhemos                                                       | No lugar de                                                 | Por quê                                                                                                                                                                           |
+| ---------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Data de movimento própria                                        | Relógio real                                                | Com o relógio, o "amanhã" demora 24 horas: não dá para mostrar nem testar.                                                                                                        |
+| Idade e validade do perfil pelo relógio real                     | Pela data de movimento                                      | São regras da lei; a data de movimento do simulador fica à frente do calendário e aceitaria um menor de verdade.                                                                  |
+| Fechamento chamado por rota                                      | Agendador (cron)                                            | A banca precisa controlar quando o dia vira. Em produção, um agendador chamaria a mesma rota.                                                                                     |
+| Connectors + MockServer                                          | Banco calculando tudo por função SQL                        | Em produção o banco **recebe** a cota do fundo, não inventa. E mostra o que a Aula 3 ensinou.                                                                                     |
+| Buscar preço uma vez por dia                                     | Buscar na hora em que o cliente pede                        | O cliente não fica dependendo de serviço externo, e todos veem o mesmo preço no dia.                                                                                              |
+| Fórmula que depende só da data                                   | Seno acumulado dia a dia (versão antiga do seed)            | O mock não tem memória.                                                                                                                                                           |
+| Histórico de taxas em `reference_rate`                           | Uma taxa fixa / apagar a tabela                             | Uma taxa fixa criaria dois CDIs diferentes, e o relatório de receita precisa das taxas.                                                                                           |
+| Preço diário                                                     | Preço intradiário                                           | Fundo tem uma cota por dia; renda fixa rende por dia útil.                                                                                                                        |
+| Preço só pelo fechamento do dia                                  | Rota de publicação manual (`POST /product/{key}/price`)     | Preço não se reescreve, o fechamento não deixa buraco e fim de semana usa o último preço: a rota só conseguia gravar dias que ninguém lê. E o teste dela apagava o banco inteiro. |
+| LCI como oferta com prazo de 12 meses (vencimento por aplicação) | LCI com vencimento fixo e prazo mínimo checado na aplicação | Emissão própria é uma emissão nova a cada aplicação. Com vencimento fixo, a LCI ficaria bloqueada nos últimos 9 meses. O prazo mínimo do CMN virou `CHECK` no banco.              |
+| Seed só com o preço de hoje                                      | Seed com os últimos 30 dias                                 | Nenhuma regra lê preço de antes do banco nascer: aplicação, resgate e fechamento só usam o último preço até a data de movimento. O histórico era só decoração.                    |
 
 **Fica para depois (incrementos):**
 
@@ -254,15 +254,15 @@ O registro completo, com o preço de cada alternativa, está na seção
 
 Legenda: ✅ pronto · 🔄 em andamento · ⬜ não começou
 
-| Fase | O que entrega | Status |
-|---|---|---|
-| 0 | RFC com todas as regras, rotas, erros, contratos e decisões | ✅ |
-| 1 | Data de movimento: tabela e rota | ✅ |
-| 2 | Módulo 5 (produtos e preços) já com data de movimento, histórico de taxas e seed novo | ✅ |
-| 3 | MockServer no compose, `mock-init` e utilitários de teste | ✅ |
-| 4 | Connectors e `POST /internal/day_close` | ✅ |
-| 5 | Teste ponta a ponta: aplica → vira o dia → posição → resgate (com o módulo 7) | ⬜ |
-| 6 | Roteiro de demonstração no README | ⬜ |
+| Fase | O que entrega                                                                         | Status |
+| ---- | ------------------------------------------------------------------------------------- | ------ |
+| 0    | RFC com todas as regras, rotas, erros, contratos e decisões                           | ✅     |
+| 1    | Data de movimento: tabela e rota                                                      | ✅     |
+| 2    | Módulo 5 (produtos e preços) já com data de movimento, histórico de taxas e seed novo | ✅     |
+| 3    | MockServer no compose, `mock-init` e utilitários de teste                             | ✅     |
+| 4    | Connectors e `POST /internal/day_close`                                               | ✅     |
+| 5    | Teste ponta a ponta: aplica → vira o dia → posição → resgate (com o módulo 7)         | ⬜     |
+| 6    | Roteiro de demonstração no README                                                     | ⬜     |
 
 ### Fase 0: RFC ✅
 
@@ -355,11 +355,11 @@ o seed nas fórmulas que o mock vai usar.
 
 **Rotas novas (Módulo 5):**
 
-| Rota | O que faz |
-|---|---|
-| `GET /products?type=&max_risk=` | Catálogo, com filtros por tipo e risco máximo. |
-| `GET /product/{key}` | Detalhe do produto + `price` do dia (`null` se não houver nenhum). |
-| `GET /product/{key}/prices?from=&to=` | Histórico de preços, do mais antigo ao mais novo. |
+| Rota                                  | O que faz                                                          |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `GET /products?type=&max_risk=`       | Catálogo, com filtros por tipo e risco máximo.                     |
+| `GET /product/{key}`                  | Detalhe do produto + `price` do dia (`null` se não houver nenhum). |
+| `GET /product/{key}/prices?from=&to=` | Histórico de preços, do mais antigo ao mais novo.                  |
 
 O `unit_price` sai **como texto** (`"102.50000000"`), para ninguém ler como
 `float`. Erro novo: `PPP005001` (produto não existe).
@@ -499,7 +499,7 @@ passou a conferir um dia 30 dias úteis à frente, que a suíte não alcança.
 `POST /internal/day_close {"close_date": "2026-10-04"}` abriu 05/10 com os
 preços da tabela da seção 4 (fundo 103,99176299).
 
-**Ficou de fora:** um teste automático de *timeout* de verdade (5 s de
+**Ficou de fora:** um teste automático de _timeout_ de verdade (5 s de
 espera deixariam a suíte lenta). O caminho é o mesmo da conexão derrubada,
 que está testada.
 
@@ -515,17 +515,17 @@ que está testada.
 
 ## 10. Diário de mudanças
 
-| Data | Fase | O que mudou |
-|---|---|---|
-| 03/10/2026 | 0 | RFC atualizada com data de movimento, fechamento do dia, contratos dos mocks, histórico de taxas e fórmulas novas. Documento criado. |
-| 04/10/2026 | 1 | Idade mínima e validade do perfil voltaram para a data real (RFC ajustada). Tabela `business_day` e `GET /internal/business_date` prontas. |
-| 04/10/2026 | 2 | Onda do fundo deslocada para `sen((d + 15)/7)` (outubro sobe). Seed novo, `reference_rate` com histórico, `external_code` e as 4 rotas de produto. Corrigido o `DbUtils.rollback()` com `%` no SQL. |
-| 04/10/2026 | 3 | MockServer e `mock-init` no compose (60 dias úteis ensinados pelas fórmulas, iguais ao seed até a 8ª casa). `PriceSourceMock` para os testes. CNPJ só com dígitos no caminho e preços como texto (RFC). |
-| 04/10/2026 | 4 | Connectors e `POST /internal/day_close` prontos. Corrigido o fluxo de clique duplo (reler a data depois da trava). `teach_day` passa a limpar o dia no mock antes de ensinar. |
-| 04/10/2026 | 2 | Removida a rota `POST /product/{key}/price` (RN-PRO-05, `PPP005004`, `PPP005005`) e os testes dela. Com isso nenhum teste chama mais o `DbUtils.rollback()`, e os dados criados pela suíte ficam no banco. |
-| 05/10/2026 | 2 | Seed de preços e taxas reduzido ao dia em que o banco nasce (eram 30 dias). RFC ajustada. |
-| 05/10/2026 | 2 | LCI virou "LCI Triple P Bank 12 meses": `term_months` e `tax_exempt` em `product`, `CHECK` do prazo mínimo de 9 meses (Res. CMN 5.119 e 5.168/2024). RFC: RN-PRO-09, RN-ORD-17, RN-FEC-09 (rascunho, liquidação no vencimento) e "Do MVP à produção". O fechamento continua calculando a LCI igual. |
-| 05/10/2026 | — | Banco renomeado de Quant Bank para **Triple P Bank**; códigos de erro de `BNK` para `PPP` (mesmo formato); serviço `triple-p-bank-api`. O fundo continua FGV Quant Capital. |
+| Data       | Fase | O que mudou                                                                                                                                                                                                                                                                                         |
+| ---------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 03/10/2026 | 0    | RFC atualizada com data de movimento, fechamento do dia, contratos dos mocks, histórico de taxas e fórmulas novas. Documento criado.                                                                                                                                                                |
+| 04/10/2026 | 1    | Idade mínima e validade do perfil voltaram para a data real (RFC ajustada). Tabela `business_day` e `GET /internal/business_date` prontas.                                                                                                                                                          |
+| 04/10/2026 | 2    | Onda do fundo deslocada para `sen((d + 15)/7)` (outubro sobe). Seed novo, `reference_rate` com histórico, `external_code` e as 4 rotas de produto. Corrigido o `DbUtils.rollback()` com `%` no SQL.                                                                                                 |
+| 04/10/2026 | 3    | MockServer e `mock-init` no compose (60 dias úteis ensinados pelas fórmulas, iguais ao seed até a 8ª casa). `PriceSourceMock` para os testes. CNPJ só com dígitos no caminho e preços como texto (RFC).                                                                                             |
+| 04/10/2026 | 4    | Connectors e `POST /internal/day_close` prontos. Corrigido o fluxo de clique duplo (reler a data depois da trava). `teach_day` passa a limpar o dia no mock antes de ensinar.                                                                                                                       |
+| 04/10/2026 | 2    | Removida a rota `POST /product/{key}/price` (RN-PRO-05, `PPP005004`, `PPP005005`) e os testes dela. Com isso nenhum teste chama mais o `DbUtils.rollback()`, e os dados criados pela suíte ficam no banco.                                                                                          |
+| 05/10/2026 | 2    | Seed de preços e taxas reduzido ao dia em que o banco nasce (eram 30 dias). RFC ajustada.                                                                                                                                                                                                           |
+| 05/10/2026 | 2    | LCI virou "LCI Triple P Bank 12 meses": `term_months` e `tax_exempt` em `product`, `CHECK` do prazo mínimo de 9 meses (Res. CMN 5.119 e 5.168/2024). RFC: RN-PRO-09, RN-ORD-17, RN-FEC-09 (rascunho, liquidação no vencimento) e "Do MVP à produção". O fechamento continua calculando a LCI igual. |
+| 05/10/2026 | —    | Banco renomeado de Quant Bank para **Triple P Bank**; códigos de erro de `PPP` para `PPP` (mesmo formato); serviço `triple-p-bank-api`. O fundo continua FGV Quant Capital.                                                                                                                         |
 
 ---
 

@@ -156,6 +156,18 @@ docker compose up
 O `-v` apaga o volume do banco, e **leva junto tudo que você criou na
 mão**.
 
+### Testes do mock (`test_price_source_mock.py`) dando 404
+
+Cada `pytest` fecha alguns dias e avança a data de movimento. O `mock-init`
+só ensina ao mock 60 dias úteis a partir do dia em que o compose subiu.
+Depois de várias rodadas sem recriar o banco, a suíte alcança os dias que
+esses testes conferem, e o mock responde 404. Recrie tudo:
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
 ---
 
 ## 4. As pastas

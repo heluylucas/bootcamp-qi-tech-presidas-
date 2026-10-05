@@ -79,7 +79,7 @@ class TestDeposit:
         status, body = deposit(customer_key, account_key, DEPOSIT_LIMIT + 1)
 
         assert status == 422
-        assert body["code"] == "BNK003005"
+        assert body["code"] == "PPP003005"
         assert balance_of(customer_key, account_key) == 0
 
 
@@ -112,7 +112,7 @@ class TestWithdrawal:
         status, body = withdraw(customer_key, account_key, 10001)
 
         assert status == 409
-        assert body["code"] == "BNK003003"
+        assert body["code"] == "PPP003003"
         assert balance_of(customer_key, account_key) == 10000
 
     def test_withdrawal_above_limit(self):
@@ -122,7 +122,7 @@ class TestWithdrawal:
         status, body = withdraw(customer_key, account_key, WITHDRAWAL_LIMIT + 1)
 
         assert status == 422
-        assert body["code"] == "BNK003005"
+        assert body["code"] == "PPP003005"
         assert balance_of(customer_key, account_key) == WITHDRAWAL_LIMIT * 2
 
 
@@ -163,7 +163,7 @@ class TestTransfer:
         status, body = transfer(origin_customer, origin_account, destination_account, 10000)
 
         assert status == 409
-        assert body["code"] == "BNK003003"
+        assert body["code"] == "PPP003003"
         assert balance_of(origin_customer, origin_account) == 10000
         assert balance_of(destination_customer, destination_account) == 0
 
@@ -174,7 +174,7 @@ class TestTransfer:
         status, body = transfer(customer_key, account_key, account_key, 1000)
 
         assert status == 422
-        assert body["code"] == "BNK003006"
+        assert body["code"] == "PPP003006"
         assert balance_of(customer_key, account_key) == 10000
 
     def test_destination_not_found(self):
@@ -184,7 +184,7 @@ class TestTransfer:
         status, body = transfer(customer_key, account_key, str(uuid.uuid4()), 1000)
 
         assert status == 404
-        assert body["code"] == "BNK003002"
+        assert body["code"] == "PPP003002"
         assert balance_of(customer_key, account_key) == 10000
 
     @pytest.mark.parametrize("target_status", ["BLOCKED", "CLOSED"])
@@ -199,7 +199,7 @@ class TestTransfer:
         status, body = transfer(origin_customer, origin_account, destination_account, 1000)
 
         assert status == 409
-        assert body["code"] == "BNK003007"
+        assert body["code"] == "PPP003007"
         assert balance_of(origin_customer, origin_account) == 10000
 
     def test_origin_not_active(self):
@@ -211,7 +211,7 @@ class TestTransfer:
         status, body = transfer(origin_customer, origin_account, destination_account, 1000)
 
         assert status == 409
-        assert body["code"] == "BNK002005"
+        assert body["code"] == "PPP002005"
         assert balance_of(origin_customer, origin_account) == 10000
 
     def test_transfer_above_limit(self):
@@ -222,7 +222,7 @@ class TestTransfer:
         status, body = transfer(origin_customer, origin_account, destination_account, TRANSFER_LIMIT + 1)
 
         assert status == 422
-        assert body["code"] == "BNK003005"
+        assert body["code"] == "PPP003005"
         assert balance_of(origin_customer, origin_account) == TRANSFER_LIMIT * 2
 
     def test_transfer_at_limit(self):
@@ -243,7 +243,7 @@ class TestTransfer:
         status, body = transfer(attacker_customer, victim_account, attacker_account, 1000)
 
         assert status == 404
-        assert body["code"] == "BNK002001"
+        assert body["code"] == "PPP002001"
 
 
 class TestTransactionRefusals:
@@ -255,7 +255,7 @@ class TestTransactionRefusals:
         status, body = send(customer_key, account_key, {"type": transaction_type, "amount": amount})
 
         assert status == 422
-        assert body["code"] == "BNK003004"
+        assert body["code"] == "PPP003004"
 
     @pytest.mark.parametrize(
         "payload",
@@ -278,7 +278,7 @@ class TestTransactionRefusals:
         status, body = send(customer_key, account_key, payload)
 
         assert status == 400
-        assert body["code"] == "BNK000001"
+        assert body["code"] == "PPP000001"
 
     def test_missing_idempotency_key(self):
         customer_key, account_key = open_account()
@@ -288,7 +288,7 @@ class TestTransactionRefusals:
         )
 
         assert status == 400
-        assert body["code"] == "BNK000003"
+        assert body["code"] == "PPP000003"
         assert balance_of(customer_key, account_key) == 0
 
     @pytest.mark.parametrize("transaction_type", ["DEPOSIT", "WITHDRAWAL"])
@@ -300,7 +300,7 @@ class TestTransactionRefusals:
         status, body = send(customer_key, account_key, {"type": transaction_type, "amount": 1000})
 
         assert status == 409
-        assert body["code"] == "BNK002005"
+        assert body["code"] == "PPP002005"
 
     def test_account_of_another_customer(self):
         """R8: a conta existe, mas não é deste cliente. Resposta igual à de inexistente."""
@@ -310,7 +310,7 @@ class TestTransactionRefusals:
         status, body = deposit(other_customer_key, account_key, 1000)
 
         assert status == 404
-        assert body["code"] == "BNK002001"
+        assert body["code"] == "PPP002001"
 
     def test_account_not_found(self):
         customer_key = create_customer()
@@ -318,10 +318,10 @@ class TestTransactionRefusals:
         status, body = deposit(customer_key, str(uuid.uuid4()), 1000)
 
         assert status == 404
-        assert body["code"] == "BNK002001"
+        assert body["code"] == "PPP002001"
 
     def test_customer_not_found(self):
         status, body = deposit(str(uuid.uuid4()), str(uuid.uuid4()), 1000)
 
         assert status == 404
-        assert body["code"] == "BNK001001"
+        assert body["code"] == "PPP001001"
