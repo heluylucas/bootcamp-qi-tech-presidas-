@@ -102,3 +102,9 @@ class RequestGenerator:
             headers["Idempotency-Key"] = idempotency_key
         response = ClientRequisition.send("POST", endpoint, payload=payload, headers=headers)
         return response.response_status, response.response_json
+
+    @staticmethod
+    def get_portfolio_suggestion(customer_key: str, query_params: dict = None):
+        endpoint = f"/customer/{customer_key}/portfolio_suggestion"
+        response = ClientRequisition.send("GET", endpoint, headers=HEADERS, query_params=query_params)
+        return response.response_status, response.response_json
