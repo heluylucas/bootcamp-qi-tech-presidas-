@@ -11,6 +11,7 @@ from errors import (
     CustomerNotFound,
     DestinationAccountNotActive,
     DestinationAccountNotFound,
+    IdempotencyKeyReused,
     InsufficientBalance,
     InvalidAmount,
     MissingIdempotencyKey,
@@ -31,13 +32,18 @@ AMOUNT_LIMITS = {
 # gravado em transaction.fee_amount: se mudar aqui, o histórico não muda.
 TRANSFER_FEE = 200
 
+# Tamanho da coluna transaction.idempotency_key (CHAR(36), o tamanho de um UUID).
+IDEMPOTENCY_KEY_MAX_LENGTH = 36
+
 
 class TransactionController(BaseController):
     def __init__(self) -> None:
         super().__init__(__name__)
 
-    def create(self, customer_key: str, account_key: str, payload: dict, idempotency_key: Optional[str]) -> dict:
-        if idempotency_key is None:
+    def create(self, customer_key: str, account_key: str, payload: dict, idempotency_key: Optional[str]) -> tuple:
+        """Devolve (resposta, criada). criada=False é a repetição de um pedido já feito."""
+        # Vazia conta como ausente; maior que a coluna CHAR(36) viraria 500 no banco.
+        if not idempotency_key or len(idempotency_key) > IDEMPOTENCY_KEY_MAX_LENGTH:
             raise MissingIdempotencyKey()
 
         transaction_type = payload["type"]
@@ -72,8 +78,18 @@ class TransactionController(BaseController):
         # Daqui em diante, status e saldo são lidos com as contas travadas (RN-MOV-08).
         origin, destination = self.lock_accounts(origin, destination)
 
-        # TODO(módulo 3): idempotência (Passo 4) — com as contas já travadas, procurar a
-        # transação desta (conta, chave) e devolver a original em vez de gravar outra.
+        # Idempotência DEPOIS da trava (rfc_fluxos): um reenvio que chega enquanto o
+        # original roda espera a trava e encontra a transação já gravada, em vez de
+        # ver o saldo debitado e levar um falso "saldo insuficiente".
+        request_hash = hash_request(payload)
+        previous = TransactionRepository.get_by_idempotency_key(self.context, origin.id, idempotency_key)
+
+        if previous is not None:
+            if previous.request_hash != request_hash:
+                raise IdempotencyKeyReused()
+
+            balance = TransactionRepository.get_balance_after(self.context, previous.id, origin.id)
+            return transaction_to_dict(previous, balance), False
 
         if origin.status.enumerator != "ACTIVE":
             raise AccountNotActive()
@@ -94,7 +110,7 @@ class TransactionController(BaseController):
             transaction, balance = self.transfer(origin, destination, amount, payload, idempotency_key)
 
         self.session.commit()
-        return transaction_to_dict(transaction, balance)
+        return transaction_to_dict(transaction, balance), True
 
     def lock_accounts(self, origin: Account, destination: Optional[Account]) -> tuple:
         """Trava as contas sempre em ordem crescente de id.

@@ -176,6 +176,7 @@ def create_app() -> FastAPI:
     application.add_api_route("/products", product_resource.on_get_list, methods=["GET"])
     application.add_api_route(product_path, product_resource.on_get, methods=["GET"])
     application.add_api_route(f"{product_path}/prices", product_resource.on_get_prices, methods=["GET"])
+
     transaction_resource = TransactionResource()
 
     application.add_api_route(f"{account_path}/transaction", transaction_resource.on_post, methods=["POST"])

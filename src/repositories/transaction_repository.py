@@ -11,6 +11,29 @@ class TransactionRepository:
         return context.db_session.query(TransactionType).filter(TransactionType.enumerator == enumerator).first()
 
     @staticmethod
+    def get_by_idempotency_key(context: Context, requester_account_id: int, idempotency_key: str) -> Optional[Transaction]:
+        return (
+            context.db_session.query(Transaction)
+            .filter(
+                Transaction.requester_account_id == requester_account_id,
+                Transaction.idempotency_key == idempotency_key,
+            )
+            .first()
+        )
+
+    @staticmethod
+    def get_balance_after(context: Context, transaction_id: int, account_id: int) -> Optional[int]:
+        """O saldo da conta logo depois desta transação: o do último lançamento dela ali."""
+        entry = (
+            context.db_session.query(LedgerEntry)
+            .filter(LedgerEntry.transaction_id == transaction_id, LedgerEntry.account_id == account_id)
+            .order_by(LedgerEntry.id.desc())
+            .first()
+        )
+
+        return entry.balance_after if entry else None
+
+    @staticmethod
     def create(
         context: Context,
         type_id: int,
