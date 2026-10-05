@@ -9,7 +9,7 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import AccountResource, CustomerResource, HealthCheckResource, SuitabilityResource
+from resources import AccountResource, BusinessDayResource, CustomerResource, HealthCheckResource, ProductResource, SuitabilityResource
 from utils.logger import setup_logging
 
 
@@ -136,6 +136,11 @@ def create_app() -> FastAPI:
         methods=["GET"]
     )
 
+    business_day_resource = BusinessDayResource()
+
+    application.add_api_route("/internal/business_date", business_day_resource.on_get, methods=["GET"])
+    application.add_api_route("/internal/day_close", business_day_resource.on_post_close, methods=["POST"])
+
     customer_resource = CustomerResource()
 
     application.add_api_route("/customer", customer_resource.on_post, methods=["POST"])
@@ -164,6 +169,13 @@ def create_app() -> FastAPI:
         suitability_resource.on_get_history,
         methods=["GET"]
     )
+    
+    product_resource = ProductResource()
+    product_path = "/product/{product_key}"
+
+    application.add_api_route("/products", product_resource.on_get_list, methods=["GET"])
+    application.add_api_route(product_path, product_resource.on_get, methods=["GET"])
+    application.add_api_route(f"{product_path}/prices", product_resource.on_get_prices, methods=["GET"])
 
     register_error_handlers(application)
 

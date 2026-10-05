@@ -38,6 +38,13 @@ services:
       # A senha que protege os endpoints internos. O padrao vale pra
       # estudar; num sistema de verdade, isso nunca teria valor padrao.
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-default_token}
+      # As fontes de preço do fechamento do dia. Aqui dentro, quem faz o
+      # papel delas é o mock, que atende pelo nome "mock" (mesma regra do
+      # DATABASE_URL). Cada serviço tem o seu prefixo dentro do mock; em
+      # produção, só estes endereços mudariam.
+      FUND_ADMIN_API_URL: http://mock:1080/fund-admin
+      TREASURY_API_URL: http://mock:1080/treasury
+      CENTRAL_BANK_API_URL: http://mock:1080/bcb
     volumes:
       # Monta o codigo pra dentro do container: salvou o arquivo,
       # a API recarrega sozinha (o --reload ali embaixo).
@@ -57,6 +64,32 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  mock:
+    # Finge ser as fontes de preço de fora: a administradora do fundo, o
+    # Tesouro e o Banco Central (RN-FEC-04). Ele sobe VAZIO; quem ensina o
+    # que ele responde é o mock-init (logo abaixo) e os testes
+    # (tests/utils/price_source_mock.py).
+    #
+    # A versão fica fixa de propósito: com "latest", o mock de amanhã
+    # pode responder diferente do de hoje sem ninguém ter mexido aqui.
+    image: mockserver/mockserver:mockserver-5.11.1
+    command: -logLevel ERROR -serverPort 1080
+    ports:
+      # Os testes rodam na sua máquina e ensinam o mock por esta porta.
+      # MOCK_PORT=1081 (ou outra livre) no seu .env se a 1080 estiver ocupada.
+      - "${MOCK_PORT:-1080}:1080"
+
+  mock-init:
+    # Roda uma vez e termina: ensina ao mock os próximos 60 dias úteis
+    # pelas fórmulas da RN-PRO-06, para a demonstração manual funcionar
+    # sem preparar nada. Só biblioteca padrão do Python, nada a instalar.
+    image: python:3.11-slim
+    volumes:
+      - ./mock:/mock
+    command: python /mock/mock_init.py
+    depends_on:
+      - mock
 
   db:
     build: ./database/.

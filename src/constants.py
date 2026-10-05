@@ -32,7 +32,23 @@ BYPASS_ENDPOINTS = [
     "/health_check",
 ]
 
-REQUIRED_VARIABLES = ["DATABASE_URL", "INTERNAL_TOKEN"]
+# As fontes de preço que o fechamento do dia consulta (RN-FEC-04). No
+# compose, as três apontam para o mock; em produção, para os serviços
+# reais. O código dos connectors é o mesmo nos dois casos.
+FUND_ADMIN_API_URL = os.environ.get("FUND_ADMIN_API_URL")
+TREASURY_API_URL = os.environ.get("TREASURY_API_URL")
+CENTRAL_BANK_API_URL = os.environ.get("CENTRAL_BANK_API_URL")
+
+# Segundos que o fechamento espera cada fonte antes de desistir (RN-FEC-06).
+PRICE_SOURCE_TIMEOUT = 5
+
+REQUIRED_VARIABLES = [
+    "DATABASE_URL",
+    "INTERNAL_TOKEN",
+    "FUND_ADMIN_API_URL",
+    "TREASURY_API_URL",
+    "CENTRAL_BANK_API_URL",
+]
 
 
 def check_variables():

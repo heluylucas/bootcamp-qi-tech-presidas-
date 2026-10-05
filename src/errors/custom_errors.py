@@ -1,6 +1,17 @@
 from errors import QIException
 
 
+class BusinessDateMismatch(QIException):
+    code = "BNK000006"
+
+    def __init__(self) -> None:
+        title = "Business Date Mismatch"
+        http_status = 409
+        description = "The close_date is not the current business date."
+        translation = "A data a fechar não é a data de movimento atual."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
 class CustomerNotFound(QIException):
     code = "BNK001001"
 
@@ -240,4 +251,35 @@ class SuitabilityRequired(QIException):
         http_status = 409
         description = "The customer needs an investor profile before this operation."
         translation = "O cliente precisa responder o questionário de perfil de investidor antes desta operação."
+class ProductNotFound(QIException):
+    code = "BNK005001"
+
+    def __init__(self) -> None:
+        title = "Product Not Found"
+        http_status = 404
+        description = "The product_key does not exist."
+        translation = "Produto não encontrado."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+
+class PriceSourceUnavailable(QIException):
+    code = "BNK005006"
+
+    def __init__(self) -> None:
+        title = "Price Source Unavailable"
+        http_status = 502
+        description = "An external price or rate source is down, timed out or answered an error."
+        translation = "Uma fonte externa de preço ou taxa está fora do ar ou respondeu erro. Nada foi gravado."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InvalidPriceSourceResponse(QIException):
+    code = "BNK005007"
+
+    def __init__(self) -> None:
+        title = "Invalid Price Source Response"
+        http_status = 502
+        description = "An external price or rate source answered something that makes no sense."
+        translation = "Uma fonte externa de preço ou taxa respondeu algo sem sentido. Nada foi gravado."
         super().__init__(title, self.code, http_status, description, translation)
