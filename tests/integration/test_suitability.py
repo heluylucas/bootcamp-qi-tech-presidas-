@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import datetime
 
 import pytest
 
@@ -23,12 +23,17 @@ def answers(default: int, **overrides) -> dict:
     return {"answers": items}
 
 
-def add_two_years(day: date) -> date:
-    # 29/02 + 24 meses cai num ano sem 29/02: vira 28/02.
+def add_two_years(moment: datetime) -> datetime:
+    # Mantém a hora. 29/02 + 24 meses cai num ano sem 29/02: vira 28/02.
     try:
-        return day.replace(year=day.year + 2)
+        return moment.replace(year=moment.year + 2)
     except ValueError:
-        return day.replace(year=day.year + 2, day=28)
+        return moment.replace(year=moment.year + 2, day=28)
+
+
+def parse_utc(text: str) -> datetime:
+    """'2026-10-05T14:12:00Z', o formato de data com hora da API."""
+    return datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ")
 
 
 class TestListQuestions:
@@ -56,15 +61,15 @@ class TestListQuestions:
 
 class TestSubmitSuitability:
     @pytest.mark.parametrize(
-        "option, expected_score, expected_profile",
+        "option, expected_score, expected_profile, expected_max_risk",
         [
-            (1, 7, "CONSERVATIVE"),
-            (2, 14, "MODERATE"),
-            (3, 21, "AGGRESSIVE"),
-            (4, 28, "AGGRESSIVE"),
+            (1, 7, "CONSERVATIVE", 2),
+            (2, 14, "MODERATE", 3),
+            (3, 21, "AGGRESSIVE", 5),
+            (4, 28, "AGGRESSIVE", 5),
         ],
     )
-    def test_profile_by_score(self, option, expected_score, expected_profile):
+    def test_profile_by_score(self, option, expected_score, expected_profile, expected_max_risk):
         customer_key = create_customer()
 
         status, body = RequestGenerator.post_suitability(customer_key, answers(option))
@@ -72,6 +77,7 @@ class TestSubmitSuitability:
         assert status == 201
         assert body["score"] == expected_score
         assert body["profile"] == expected_profile
+        assert body["max_risk_level"] == expected_max_risk
         assert body["forced_by_rule"] is False
 
     def test_upper_limit_of_conservative(self):
@@ -104,6 +110,8 @@ class TestSubmitSuitability:
         assert status == 201
         assert body["score"] == 25
         assert body["profile"] == "CONSERVATIVE"
+        # O risco máximo segue o perfil final, não os pontos (que dariam Arrojado, 5).
+        assert body["max_risk_level"] == 2
         assert body["forced_by_rule"] is True
 
     def test_response_format(self):
@@ -118,14 +126,19 @@ class TestSubmitSuitability:
         assert body["answers"] == answers(2)["answers"]
 
     def test_valid_for_24_months(self):
-        # TODO(módulo 4): quando a data de movimento entrar, comparar com ela
-        # (GET /internal/business_date) em vez da data do created_at.
+        """RN-SUI-05: hora real da resposta + 24 meses, com hora (não a data de movimento, RN-GER-13).
+
+        A suíte deixa a data de movimento semanas à frente do calendário: se a
+        validade usasse ela, sairia adiantada e este teste pegaria.
+        """
         customer_key = create_customer()
 
         _, body = RequestGenerator.post_suitability(customer_key, answers(2))
 
-        answered_on = date.fromisoformat(body["created_at"][:10])
-        assert body["valid_until"] == add_two_years(answered_on).isoformat()
+        valid_until = parse_utc(body["valid_until"])
+        expected = add_two_years(parse_utc(body["created_at"]))
+        # O created_at é gravado pelo banco e a validade calculada na API: alguns milissegundos.
+        assert abs((valid_until - expected).total_seconds()) <= 5
 
     @pytest.mark.parametrize(
         "payload",
