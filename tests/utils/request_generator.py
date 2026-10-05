@@ -91,6 +91,9 @@ class RequestGenerator:
     def get_suitabilities(customer_key: str):
         endpoint = f"/customer/{customer_key}/suitabilities"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
     def post_transaction(customer_key: str, account_key: str, payload: dict, idempotency_key):
         """idempotency_key=None não manda o cabeçalho: é assim que se testa a falta dele."""
         endpoint = f"/customer/{customer_key}/account/{account_key}/transaction"
