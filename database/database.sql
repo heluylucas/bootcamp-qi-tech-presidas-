@@ -254,8 +254,8 @@ CREATE TABLE product_price(
 );
 
 INSERT INTO reference_rate (code, reference_date, annual_rate_bps) VALUES
-('CDI', CURRENT_DATE - 29, 1490),
-('SELIC', CURRENT_DATE - 29, 1500);
+('CDI', CURRENT_DATE, 1490),
+('SELIC', CURRENT_DATE, 1500);
 
 INSERT INTO product (product_key, name, type_id, issuer, indexer, rate_description, risk_level, liquidity,
                      maturity_date, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
@@ -272,19 +272,19 @@ FROM (VALUES
        maturity_date, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
 JOIN product_type t ON t.enumerator = v.type;
 
--- Preços dos últimos 30 dias corridos, pelas fórmulas da RN-PRO-06 (as mesmas do mock).
+-- Preço do dia em que o banco nasce, pelas fórmulas da RN-PRO-06 (as mesmas do mock).
+-- Os dias seguintes entram pelo fechamento do dia.
 -- d = dias úteis (segunda a sexta) depois da data âncora 01/01/2026. No fim de semana
--- d não muda, então o preço repete o de sexta. Todo produto vale 100,00 em d = 0.
+-- d não muda, então o preço é o de sexta. Todo produto vale 100,00 em d = 0.
 --   Títulos públicos: 100 * (1 + taxa anual)^(d/252). Selic 15%, Prefixado 13%, IPCA+ = 4,5% e 6%.
 --   CDB e LCI: 100 * (1 + c * percentual do CDI)^d, com c = (1 + CDI)^(1/252) - 1 (CDI de um dia útil).
 --   Fundo: 100 * (1,10 * 0,99)^(d/252) * (1 + 3% * sen((d + 15)/7)). A cota já vem líquida da
 --   taxa de administração (0,99, RN-REC-04); a onda faz a cota subir e descer. O "+ 15" põe
 --   outubro de 2026 numa subida (pico perto de 30/10); novembro cai.
 WITH series AS (
-    SELECT day::date AS day,
-           (SELECT COUNT(*) FROM generate_series(DATE '2026-01-02', day::date, INTERVAL '1 day') AS g
+    SELECT CURRENT_DATE AS day,
+           (SELECT COUNT(*) FROM generate_series(DATE '2026-01-02', CURRENT_DATE, INTERVAL '1 day') AS g
             WHERE EXTRACT(ISODOW FROM g) < 6) AS d
-    FROM generate_series(CURRENT_DATE - 29, CURRENT_DATE, INTERVAL '1 day') AS day
 ), cdi AS (
     SELECT power(1 + annual_rate_bps / 10000.0, 1 / 252.0) - 1 AS c
     FROM reference_rate WHERE code = 'CDI'

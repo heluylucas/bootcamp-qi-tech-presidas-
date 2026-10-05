@@ -237,6 +237,7 @@ O registro completo, com o preço de cada alternativa, está na seção
 | Histórico de taxas em `reference_rate` | Uma taxa fixa / apagar a tabela | Uma taxa fixa criaria dois CDIs diferentes, e o relatório de receita precisa das taxas. |
 | Preço diário | Preço intradiário | Fundo tem uma cota por dia; renda fixa rende por dia útil. |
 | Preço só pelo fechamento do dia | Rota de publicação manual (`POST /product/{key}/price`) | Preço não se reescreve, o fechamento não deixa buraco e fim de semana usa o último preço: a rota só conseguia gravar dias que ninguém lê. E o teste dela apagava o banco inteiro. |
+| Seed só com o preço de hoje | Seed com os últimos 30 dias | Nenhuma regra lê preço de antes do banco nascer: aplicação, resgate e fechamento só usam o último preço até a data de movimento. O histórico era só decoração. |
 
 **Fica para depois (incrementos):**
 
@@ -343,11 +344,12 @@ o seed nas fórmulas que o mock vai usar.
 
 - `reference_rate` virou histórico: ganhou `reference_date` e
   `UNIQUE(code, reference_date)`. O seed grava CDI 14,9% e Selic 15% com
-  data de hoje − 29.
+  a data de hoje (era hoje − 29 até 05/10).
 - `product.external_code`: como o Tesouro e a administradora chamam o
   produto (nulo no CDB e na LCI, que são do banco).
 - Seed de preços reescrito com as fórmulas da seção 4 (com a onda deslocada).
-  São 30 dias corridos por produto, e o fim de semana repete a sexta.
+  Eram 30 dias corridos por produto; desde 05/10 é **só o preço de hoje**
+  (ver seção 8).
 
 **Rotas novas (Módulo 5):**
 
@@ -519,6 +521,7 @@ que está testada.
 | 04/10/2026 | 3 | MockServer e `mock-init` no compose (60 dias úteis ensinados pelas fórmulas, iguais ao seed até a 8ª casa). `PriceSourceMock` para os testes. CNPJ só com dígitos no caminho e preços como texto (RFC). |
 | 04/10/2026 | 4 | Connectors e `POST /internal/day_close` prontos. Corrigido o fluxo de clique duplo (reler a data depois da trava). `teach_day` passa a limpar o dia no mock antes de ensinar. |
 | 04/10/2026 | 2 | Removida a rota `POST /product/{key}/price` (RN-PRO-05, `BNK005004`, `BNK005005`) e os testes dela. Com isso nenhum teste chama mais o `DbUtils.rollback()`, e os dados criados pela suíte ficam no banco. |
+| 05/10/2026 | 2 | Seed de preços e taxas reduzido ao dia em que o banco nasce (eram 30 dias). RFC ajustada. |
 
 ---
 

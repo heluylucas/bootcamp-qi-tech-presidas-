@@ -808,11 +808,11 @@ Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $
         $c \times$ \tb{cdi_percentage_bps} por dia útil: é a conta que o mercado faz para
         ``95\% do CDI'', e é a mesma que o fechamento do dia repete (RN-FEC-05).
   \item \tb{reference_rate} (histórico, RN-REC-08): o seed grava CDI \tb{1490} bps e Selic
-        \tb{1500} bps com data de hoje $-29$. O cenário padrão do mock repete esses valores todo dia.
+        \tb{1500} bps com a data de hoje. O cenário padrão do mock repete esses valores todo dia.
   \item Todos os produtos valem \rs 100,00 na data âncora ($d = 0$).
-  \item A série do seed tem uma linha por dia \textbf{corrido}, de hoje $-29$ até hoje (30 preços
-        por produto, sempre existe preço de hoje). No fim de semana $d$ não muda, então o preço
-        repete o de sexta.
+  \item O seed grava um preço por produto, o de hoje (o dia em que o banco nasce); os dias
+        seguintes entram pelo fechamento do dia. Se o banco nascer no fim de semana, $d$ não muda
+        e o preço é o de sexta.
   \item Fundo: $(1{,}10 \times 0{,}99)^{d/252}$ é uma tendência de 10\% ao ano já descontada a
         taxa de administração de 1\% (RN-REC-04). A onda $3\% \times \sin((d + 15)/7)$ faz a cota
         subir e descer: no pior dia ela cai cerca de 0,4\%, o que basta para mostrar um resgate
@@ -1202,9 +1202,8 @@ O diagrama no formato \emph{mermaid} (que o modelo de RFC usa) está no Apêndic
   \item Enumeradores: \tb{account_status}, \tb{transaction_type}, \tb{product_type}, \tb{investor_profile}.
   \item As 7 perguntas e 28 opções do questionário.
   \item A primeira data de movimento (\tb{business_day} = data real em que o banco nasce).
-  \item As taxas de referência (CDI e Selic, com data de hoje $-29$) e os 6 produtos com seus
-        preços dos últimos 30 dias pelas fórmulas da RN-PRO-06 (a cota do fundo já líquida da taxa
-        de administração).
+  \item As taxas de referência (CDI e Selic, com a data de hoje) e os 6 produtos com o preço de
+        hoje pelas fórmulas da RN-PRO-06 (a cota do fundo já líquida da taxa de administração).
   \item As 3 carteiras-modelo e seus itens.
 \end{enumerate}
 
@@ -1611,10 +1610,14 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   porque cada \tb{docker compose up} geraria preços diferentes, e um teste ou uma conta conferida
   na apresentação deixaria de bater. Ganharia se quiséssemos simular cenários de mercado.
   \emph{Escolhido:} oscilação determinística com seno da data (RN-PRO-06).
-  \item \textbf{Seed só com dias úteis} --- descartada porque, se o banco nascer num sábado ou
-  domingo, não haveria preço de hoje. Ganharia se o relatório precisasse distinguir dia útil de dia
-  corrido. \emph{Escolhido:} o seed tem uma linha por dia corrido, com o preço repetido no fim de
-  semana; depois disso, o fechamento só abre dias úteis e a RN-PRO-04 cobre os dias sem linha.
+  \item \textbf{Seed com os preços dos últimos 30 dias} (uma linha por dia corrido, de hoje $-29$
+  até hoje) --- descartada porque nenhuma regra lê preço anterior ao dia em que o banco nasce:
+  aplicação e resgate usam o último preço até a data de movimento (RN-PRO-04), o rendimento vem
+  dos preços que o fechamento grava depois, e o CDB/LCI do fechamento parte do preço de hoje. Os
+  30 dias eram só decoração. Ganharia se a demonstração precisasse de um gráfico de histórico
+  logo depois do \tb{docker compose up}, sem fechar nenhum dia. \emph{Escolhido:} o seed grava só
+  o preço de hoje; os dias seguintes entram pelo fechamento, que só abre dias úteis, e a RN-PRO-04
+  cobre os dias sem linha.
   \item \textbf{Preço inicial parecido com o mercado} (Tesouro Selic $\approx$ \rs 17.000, cota
   $\approx$ \rs 1,00) --- descartada porque dificulta conferir as contas na mão. Ganharia se o
   objetivo fosse realismo visual. \emph{Escolhido:} todos valem \rs 100,00 na data âncora.
