@@ -67,6 +67,27 @@ class TestGetProduct:
         assert float(body["price"]["unit_price"]) > 0
         assert len(body["price"]["unit_price"].split(".")[1]) == 8
 
+    def test_own_issue_letter_is_an_offer_with_term(self):
+        # Emissão própria: cada aplicação vence em data da aplicação + prazo (RN-PRO-09).
+        product = product_named("LCI Quant Bank 12 meses")
+
+        status, body = RequestGenerator.get_product(product["product_key"])
+
+        assert status == 200
+        assert body["term_months"] == 12
+        assert body["maturity_date"] is None
+        assert body["tax_exempt"] is True
+
+    def test_public_bond_has_fixed_maturity(self):
+        product = product_named("Tesouro Selic 2031")
+
+        status, body = RequestGenerator.get_product(product["product_key"])
+
+        assert status == 200
+        assert body["term_months"] is None
+        assert body["maturity_date"] == "2031-03-01"
+        assert body["tax_exempt"] is False
+
     def test_product_not_found(self):
         status, body = RequestGenerator.get_product(str(uuid.uuid4()))
 
