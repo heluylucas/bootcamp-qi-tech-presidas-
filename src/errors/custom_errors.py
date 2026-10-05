@@ -2,7 +2,7 @@ from errors import QIException
 
 
 class BusinessDateMismatch(QIException):
-    code = "BNK000006"
+    code = "PPP000006"
 
     def __init__(self) -> None:
         title = "Business Date Mismatch"
@@ -13,7 +13,7 @@ class BusinessDateMismatch(QIException):
 
 
 class CustomerNotFound(QIException):
-    code = "BNK001001"
+    code = "PPP001001"
 
     def __init__(self) -> None:
         title = "Customer Not Found"
@@ -24,7 +24,7 @@ class CustomerNotFound(QIException):
 
 
 class DocumentAlreadyRegistered(QIException):
-    code = "BNK001002"
+    code = "PPP001002"
 
     def __init__(self) -> None:
         title = "Document Already Registered"
@@ -35,7 +35,7 @@ class DocumentAlreadyRegistered(QIException):
 
 
 class InvalidDocumentNumber(QIException):
-    code = "BNK001003"
+    code = "PPP001003"
 
     def __init__(self) -> None:
         title = "Invalid Document Number"
@@ -46,7 +46,7 @@ class InvalidDocumentNumber(QIException):
 
 
 class UnderageCustomer(QIException):
-    code = "BNK001004"
+    code = "PPP001004"
 
     def __init__(self) -> None:
         title = "Underage Customer"
@@ -57,7 +57,7 @@ class UnderageCustomer(QIException):
 
 
 class AccountNotFound(QIException):
-    code = "BNK002001"
+    code = "PPP002001"
 
     def __init__(self) -> None:
         title = "Account Not Found"
@@ -68,7 +68,7 @@ class AccountNotFound(QIException):
 
 
 class AccountAlreadyExists(QIException):
-    code = "BNK002002"
+    code = "PPP002002"
 
     def __init__(self) -> None:
         title = "Account Already Exists"
@@ -79,7 +79,7 @@ class AccountAlreadyExists(QIException):
 
 
 class InvalidStatusTransition(QIException):
-    code = "BNK002003"
+    code = "PPP002003"
 
     def __init__(self) -> None:
         title = "Invalid Status Transition"
@@ -90,7 +90,7 @@ class InvalidStatusTransition(QIException):
 
 
 class AccountNotEmpty(QIException):
-    code = "BNK002004"
+    code = "PPP002004"
 
     def __init__(self) -> None:
         title = "Account Not Empty"
@@ -101,7 +101,7 @@ class AccountNotEmpty(QIException):
 
 
 class AccountNotActive(QIException):
-    code = "BNK002005"
+    code = "PPP002005"
 
     def __init__(self) -> None:
         title = "Account Not Active"
@@ -112,7 +112,7 @@ class AccountNotActive(QIException):
 
 
 class StatusReasonRequired(QIException):
-    code = "BNK002006"
+    code = "PPP002006"
 
     def __init__(self) -> None:
         title = "Status Reason Required"
@@ -123,7 +123,7 @@ class StatusReasonRequired(QIException):
 
 
 class TransactionNotFound(QIException):
-    code = "BNK003001"
+    code = "PPP003001"
 
     def __init__(self) -> None:
         title = "Transaction Not Found"
@@ -134,7 +134,7 @@ class TransactionNotFound(QIException):
 
 
 class DestinationAccountNotFound(QIException):
-    code = "BNK003002"
+    code = "PPP003002"
 
     def __init__(self) -> None:
         title = "Destination Account Not Found"
@@ -145,7 +145,7 @@ class DestinationAccountNotFound(QIException):
 
 
 class InsufficientBalance(QIException):
-    code = "BNK003003"
+    code = "PPP003003"
 
     def __init__(self) -> None:
         title = "Insufficient Balance"
@@ -156,7 +156,7 @@ class InsufficientBalance(QIException):
 
 
 class InvalidAmount(QIException):
-    code = "BNK003004"
+    code = "PPP003004"
 
     def __init__(self) -> None:
         title = "Invalid Amount"
@@ -167,7 +167,7 @@ class InvalidAmount(QIException):
 
 
 class AmountAboveLimit(QIException):
-    code = "BNK003005"
+    code = "PPP003005"
 
     def __init__(self) -> None:
         title = "Amount Above Limit"
@@ -178,7 +178,7 @@ class AmountAboveLimit(QIException):
 
 
 class SameAccountTransfer(QIException):
-    code = "BNK003006"
+    code = "PPP003006"
 
     def __init__(self) -> None:
         title = "Same Account Transfer"
@@ -189,7 +189,7 @@ class SameAccountTransfer(QIException):
 
 
 class DestinationAccountNotActive(QIException):
-    code = "BNK003007"
+    code = "PPP003007"
 
     def __init__(self) -> None:
         title = "Destination Account Not Active"
@@ -200,7 +200,7 @@ class DestinationAccountNotActive(QIException):
 
 
 class SuitabilityNotFound(QIException):
-    code = "BNK004001"
+    code = "PPP004001"
 
     def __init__(self) -> None:
         title = "Suitability Not Found"
@@ -211,7 +211,7 @@ class SuitabilityNotFound(QIException):
 
 
 class IncompleteAnswers(QIException):
-    code = "BNK004002"
+    code = "PPP004002"
 
     def __init__(self) -> None:
         title = "Incomplete Answers"
@@ -222,7 +222,7 @@ class IncompleteAnswers(QIException):
 
 
 class InvalidOption(QIException):
-    code = "BNK004003"
+    code = "PPP004003"
 
     def __init__(self) -> None:
         title = "Invalid Option"
@@ -233,7 +233,7 @@ class InvalidOption(QIException):
 
 
 class SuitabilityExpired(QIException):
-    code = "BNK004004"
+    code = "PPP004004"
 
     def __init__(self) -> None:
         title = "Suitability Expired"
@@ -244,7 +244,7 @@ class SuitabilityExpired(QIException):
 
 
 class SuitabilityRequired(QIException):
-    code = "BNK004005"
+    code = "PPP004005"
 
     def __init__(self) -> None:
         title = "Suitability Required"
@@ -252,7 +252,7 @@ class SuitabilityRequired(QIException):
         description = "The customer needs an investor profile before this operation."
         translation = "O cliente precisa responder o questionário de perfil de investidor antes desta operação."
 class ProductNotFound(QIException):
-    code = "BNK005001"
+    code = "PPP005001"
 
     def __init__(self) -> None:
         title = "Product Not Found"
@@ -264,7 +264,7 @@ class ProductNotFound(QIException):
 
 
 class PriceSourceUnavailable(QIException):
-    code = "BNK005006"
+    code = "PPP005006"
 
     def __init__(self) -> None:
         title = "Price Source Unavailable"
@@ -275,7 +275,7 @@ class PriceSourceUnavailable(QIException):
 
 
 class InvalidPriceSourceResponse(QIException):
-    code = "BNK005007"
+    code = "PPP005007"
 
     def __init__(self) -> None:
         title = "Invalid Price Source Response"

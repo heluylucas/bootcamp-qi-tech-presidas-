@@ -14,6 +14,8 @@ def product_to_dict(product: Product) -> dict:
         "risk_level": product.risk_level,
         "liquidity": product.liquidity,
         "maturity_date": product.maturity_date.isoformat() if product.maturity_date else None,
+        "term_months": product.term_months,
+        "tax_exempt": product.tax_exempt,
         "min_application": product.min_application,
         "is_active": product.is_active,
     }

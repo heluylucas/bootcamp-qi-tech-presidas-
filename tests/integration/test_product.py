@@ -51,7 +51,7 @@ class TestListProducts:
         status, body = RequestGenerator.get_products(query_params)
 
         assert status == 400
-        assert body["code"] == "BNK000001"
+        assert body["code"] == "PPP000001"
 
 
 class TestGetProduct:
@@ -67,11 +67,32 @@ class TestGetProduct:
         assert float(body["price"]["unit_price"]) > 0
         assert len(body["price"]["unit_price"].split(".")[1]) == 8
 
+    def test_own_issue_letter_is_an_offer_with_term(self):
+        # Emissão própria: cada aplicação vence em data da aplicação + prazo (RN-PRO-09).
+        product = product_named("LCI Triple P Bank 12 meses")
+
+        status, body = RequestGenerator.get_product(product["product_key"])
+
+        assert status == 200
+        assert body["term_months"] == 12
+        assert body["maturity_date"] is None
+        assert body["tax_exempt"] is True
+
+    def test_public_bond_has_fixed_maturity(self):
+        product = product_named("Tesouro Selic 2031")
+
+        status, body = RequestGenerator.get_product(product["product_key"])
+
+        assert status == 200
+        assert body["term_months"] is None
+        assert body["maturity_date"] == "2031-03-01"
+        assert body["tax_exempt"] is False
+
     def test_product_not_found(self):
         status, body = RequestGenerator.get_product(str(uuid.uuid4()))
 
         assert status == 404
-        assert body["code"] == "BNK005001"
+        assert body["code"] == "PPP005001"
 
 
 class TestProductPrices:
@@ -95,7 +116,7 @@ class TestProductPrices:
         status, body = RequestGenerator.get_product_prices(str(uuid.uuid4()))
 
         assert status == 404
-        assert body["code"] == "BNK005001"
+        assert body["code"] == "PPP005001"
 
     @pytest.mark.parametrize("query_params", [{"from": "01/10/2026"}, {"to": "2026-02-30"}, {"page": "1"}])
     def test_invalid_period(self, query_params):
@@ -104,4 +125,4 @@ class TestProductPrices:
         status, body = RequestGenerator.get_product_prices(product["product_key"], query_params)
 
         assert status == 400
-        assert body["code"] == "BNK000001"
+        assert body["code"] == "PPP000001"

@@ -74,7 +74,7 @@ class TestDayClose:
         assert selic["price"]["unit_price"] == "123.45000000"
 
     def test_own_issue_grows_by_cdi(self):
-        previous = Decimal(product_named("CDB Quant Bank Liquidez")["price"]["unit_price"])
+        previous = Decimal(product_named("CDB Triple P Bank Liquidez")["price"]["unit_price"])
 
         status, _ = close_day(cdi="14.90")
 
@@ -82,7 +82,7 @@ class TestDayClose:
         # CDB = preço anterior × (1 + c × 95%), c = CDI de um dia útil (RN-FEC-05).
         daily_cdi = (Decimal("1.149") ** (Decimal(1) / Decimal(252))) - 1
         expected = (previous * (1 + daily_cdi * Decimal("0.95"))).quantize(Decimal("0.00000001"), ROUND_HALF_UP)
-        assert Decimal(product_named("CDB Quant Bank Liquidez")["price"]["unit_price"]) == expected
+        assert Decimal(product_named("CDB Triple P Bank Liquidez")["price"]["unit_price"]) == expected
 
 
 class TestDayCloseRefused:
@@ -92,7 +92,7 @@ class TestDayCloseRefused:
         status, body = RequestGenerator.post_day_close({"close_date": (today - timedelta(days=1)).isoformat()})
 
         assert status == 409
-        assert body["code"] == "BNK000006"
+        assert body["code"] == "PPP000006"
         assert business_date() == today
 
     def test_double_click_closes_one_day(self):
@@ -102,7 +102,7 @@ class TestDayCloseRefused:
         status, body = RequestGenerator.post_day_close({"close_date": today.isoformat()})
 
         assert status == 409
-        assert body["code"] == "BNK000006"
+        assert body["code"] == "PPP000006"
         assert business_date() == next_business_day(today)
 
     @pytest.mark.parametrize("payload", [{}, {"close_date": "05/10/2026"}, {"close_date": "2026-10-05", "x": 1}])
@@ -110,7 +110,7 @@ class TestDayCloseRefused:
         status, body = RequestGenerator.post_day_close(payload)
 
         assert status == 400
-        assert body["code"] == "BNK000001"
+        assert body["code"] == "PPP000001"
 
 
 class TestPriceSourceFailure:
@@ -130,7 +130,7 @@ class TestPriceSourceFailure:
         status, body = RequestGenerator.post_day_close({"close_date": today.isoformat()})
 
         assert status == 502
-        assert body["code"] == "BNK005006"
+        assert body["code"] == "PPP005006"
         self.assert_nothing_changed(today, fund_price)
 
     def test_connection_dropped(self):
@@ -142,7 +142,7 @@ class TestPriceSourceFailure:
         status, body = RequestGenerator.post_day_close({"close_date": today.isoformat()})
 
         assert status == 502
-        assert body["code"] == "BNK005006"
+        assert body["code"] == "PPP005006"
         self.assert_nothing_changed(today, fund_price)
 
     def test_fund_quote_zero(self):
@@ -151,7 +151,7 @@ class TestPriceSourceFailure:
         status, body = close_day(fund="0")
 
         assert status == 502
-        assert body["code"] == "BNK005007"
+        assert body["code"] == "PPP005007"
         self.assert_nothing_changed(today, fund_price)
 
     def test_fund_quote_of_another_day(self):
@@ -163,7 +163,7 @@ class TestPriceSourceFailure:
         status, body = RequestGenerator.post_day_close({"close_date": today.isoformat()})
 
         assert status == 502
-        assert body["code"] == "BNK005007"
+        assert body["code"] == "PPP005007"
         self.assert_nothing_changed(today, fund_price)
 
     def test_treasury_bond_missing(self):
@@ -173,7 +173,7 @@ class TestPriceSourceFailure:
         status, body = close_day(treasury=without_ipca)
 
         assert status == 502
-        assert body["code"] == "BNK005007"
+        assert body["code"] == "PPP005007"
         self.assert_nothing_changed(today, fund_price)
 
     @pytest.mark.parametrize("rate", [[], [{"data": "x", "valor": "abc"}], {"valor": "14.90"}])
@@ -186,7 +186,7 @@ class TestPriceSourceFailure:
         status, body = RequestGenerator.post_day_close({"close_date": today.isoformat()})
 
         assert status == 502
-        assert body["code"] == "BNK005007"
+        assert body["code"] == "PPP005007"
         self.assert_nothing_changed(today, fund_price)
 
     def test_rate_of_another_day(self):
@@ -198,5 +198,5 @@ class TestPriceSourceFailure:
         status, body = RequestGenerator.post_day_close({"close_date": today.isoformat()})
 
         assert status == 502
-        assert body["code"] == "BNK005007"
+        assert body["code"] == "PPP005007"
         self.assert_nothing_changed(today, fund_price)

@@ -131,7 +131,7 @@ class BusinessDayController(BaseController):
             if not product.own_issue:
                 continue
 
-            # Sempre existe: o seed grava os 30 dias antes do banco nascer.
+            # Sempre existe: o seed grava o preço do dia em que o banco nasce.
             previous = ProductRepository.get_price_on(self.context, product.id, close_date).unit_price
             growth = 1 + daily_cdi * product.cdi_percentage_bps / 10000
             prices[product.id] = (previous * growth).quantize(EIGHT_PLACES, ROUND_HALF_UP)
@@ -140,7 +140,7 @@ class BusinessDayController(BaseController):
 
 
 def answer_of(response: Optional[BaseConnectorResponse]):
-    """Sem resposta (None) ou status diferente de 200: a fonte está fora do ar (BNK005006)."""
+    """Sem resposta (None) ou status diferente de 200: a fonte está fora do ar (PPP005006)."""
     if response is None or response.status != 200:
         raise PriceSourceUnavailable()
     return response.json

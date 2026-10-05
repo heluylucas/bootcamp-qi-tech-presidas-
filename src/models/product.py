@@ -38,6 +38,8 @@ class Product(Base):
     risk_level = Column(SmallInteger, nullable=False)
     liquidity = Column(String(11), nullable=False)
     maturity_date = Column(Date)
+    term_months = Column(SmallInteger)
+    tax_exempt = Column(Boolean, nullable=False, server_default="false")
     min_application = Column(BigInteger, nullable=False)
     is_active = Column(Boolean, nullable=False, server_default="true")
     own_issue = Column(Boolean, nullable=False, server_default="false")

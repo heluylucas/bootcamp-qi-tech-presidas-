@@ -9,7 +9,7 @@ resposta de erro que sai desta API. Qualquer erro — 400, 403, 404, 409,
     title        o nome do erro, em inglês, pra quem programa
     description  o que aconteceu, com detalhe
     translation  a frase em português, pronta pra mostrar ao usuário
-    code         o identificador estável (BNK000001, BNK001002, ...)
+    code         o identificador estável (PPP000001, PPP001002, ...)
     http_status  o número do HTTP
 
 Cinco campos e não um texto solto porque quem integra com a API precisa
@@ -17,8 +17,8 @@ programar em cima de ALGO. Se o combinado fosse a mensagem, mudar uma
 palavra quebraria o cliente de alguém. O `code` existe pra ser o
 contrato: ele nunca muda, e o texto pode melhorar à vontade.
 
-Os erros genéricos (BNK000...) moram aqui — os que toda API tem. Os das
-regras deste projeto (BNK001...) moram em custom_errors.py, ao lado.
+Os erros genéricos (PPP000...) moram aqui — os que toda API tem. Os das
+regras deste projeto (PPP001...) moram em custom_errors.py, ao lado.
 """
 import sys
 import inspect
@@ -83,7 +83,7 @@ class QIException(Exception):
 
 
 class MethodNotAllowed(QIException):
-    code = "BNK000405"
+    code = "PPP000405"
 
     def __init__(self) -> None:
         title = "Method not allowed"
@@ -94,7 +94,7 @@ class MethodNotAllowed(QIException):
 
 
 class InternalError(QIException):
-    code = "BNK000500"
+    code = "PPP000500"
 
     def __init__(self) -> None:
         title = "Internal Error"
@@ -105,7 +105,7 @@ class InternalError(QIException):
 
 
 class NotFoundResource(QIException):
-    code = "BNK000404"
+    code = "PPP000404"
 
     def __init__(self) -> None:
         title = "Resource not Found"
@@ -116,7 +116,7 @@ class NotFoundResource(QIException):
 
 
 class InvalidSchema(QIException):
-    code = "BNK000001"
+    code = "PPP000001"
 
     def __init__(self, __description) -> None:
         title = "Bad Request"
@@ -127,7 +127,7 @@ class InvalidSchema(QIException):
 
 
 class ForbiddenNotInternal(QIException):
-    code = "BNK000002"
+    code = "PPP000002"
 
     def __init__(self) -> None:
         title = "Forbidden"
@@ -138,7 +138,7 @@ class ForbiddenNotInternal(QIException):
 
 
 class InvalidParameter(QIException):
-    code = "BNK000005"
+    code = "PPP000005"
 
     def __init__(self, description) -> None:
         title = "Invalid Parameter"
@@ -148,7 +148,7 @@ class InvalidParameter(QIException):
 
 
 class MissingIdempotencyKey(QIException):
-    code = "BNK000003"
+    code = "PPP000003"
 
     def __init__(self) -> None:
         title = "Missing Idempotency Key"
@@ -159,7 +159,7 @@ class MissingIdempotencyKey(QIException):
 
 
 class IdempotencyKeyReused(QIException):
-    code = "BNK000004"
+    code = "PPP000004"
 
     def __init__(self) -> None:
         title = "Idempotency Key Reused"

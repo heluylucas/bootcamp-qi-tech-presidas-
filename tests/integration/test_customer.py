@@ -58,13 +58,13 @@ class TestCreateCustomer:
         status, body = RequestGenerator.post_customer(customer_payload(document_number=cpf))
 
         assert status == 422
-        assert body["code"] == "BNK001003"
+        assert body["code"] == "PPP001003"
 
     def test_all_digits_equal(self):
         status, body = RequestGenerator.post_customer(customer_payload(document_number="111.111.111-11"))
 
         assert status == 422
-        assert body["code"] == "BNK001003"
+        assert body["code"] == "PPP001003"
 
     def test_duplicate_document_number(self):
         payload = customer_payload()
@@ -73,7 +73,7 @@ class TestCreateCustomer:
         status, body = RequestGenerator.post_customer(customer_payload(document_number=payload["document_number"]))
 
         assert status == 409
-        assert body["code"] == "BNK001002"
+        assert body["code"] == "PPP001002"
 
     def test_duplicate_document_number_with_different_punctuation(self):
         cpf = RandomGenerator.generate_cpf()
@@ -82,7 +82,7 @@ class TestCreateCustomer:
         status, body = RequestGenerator.post_customer(customer_payload(document_number=without_punctuation(cpf)))
 
         assert status == 409
-        assert body["code"] == "BNK001002"
+        assert body["code"] == "PPP001002"
 
     def test_underage(self):
         # Dia 1 do mês, 17 anos atrás: menor de idade em qualquer dia do ano,
@@ -92,7 +92,7 @@ class TestCreateCustomer:
         status, body = RequestGenerator.post_customer(customer_payload(birth_date=birth_date.isoformat()))
 
         assert status == 422
-        assert body["code"] == "BNK001004"
+        assert body["code"] == "PPP001004"
 
     def test_birth_date_in_future(self):
         birth_date = date(date.today().year + 1, 1, 1)
@@ -100,7 +100,7 @@ class TestCreateCustomer:
         status, body = RequestGenerator.post_customer(customer_payload(birth_date=birth_date.isoformat()))
 
         assert status == 422
-        assert body["code"] == "BNK001004"
+        assert body["code"] == "PPP001004"
 
     @pytest.mark.parametrize("field", ["name", "document_number", "birth_date"])
     def test_missing_field(self, field):
@@ -110,7 +110,7 @@ class TestCreateCustomer:
         status, body = RequestGenerator.post_customer(payload)
 
         assert status == 400
-        assert body["code"] == "BNK000001"
+        assert body["code"] == "PPP000001"
 
     @pytest.mark.parametrize(
         "overrides",
@@ -131,7 +131,7 @@ class TestCreateCustomer:
         status, body = RequestGenerator.post_customer(customer_payload(**overrides))
 
         assert status == 400
-        assert body["code"] == "BNK000001"
+        assert body["code"] == "PPP000001"
 
 
 class TestGetCustomer:
@@ -149,4 +149,4 @@ class TestGetCustomer:
         status, body = RequestGenerator.get_customer(str(uuid.uuid4()))
 
         assert status == 404
-        assert body["code"] == "BNK001001"
+        assert body["code"] == "PPP001001"

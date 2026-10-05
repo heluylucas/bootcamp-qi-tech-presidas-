@@ -1,4 +1,4 @@
-# Quant Bank — Desafio Bootcamp QI Tech 2026
+# Triple P Bank — Desafio Bootcamp QI Tech 2026
 
 API de um banco digital com módulo de investimentos simulado (suitability, carteira sugerida,
 aplicação/resgate em renda fixa e no fundo fictício FGV Quant Capital). O time está aprendendo
@@ -7,7 +7,7 @@ desenvolvimento: explique em português simples o que mudou e por quê.
 ## Documentos de referência (fonte da verdade)
 
 - `docs/regras_de_negocio.tex`: pré-RFC com todas as regras (códigos RN-*), tabelas, rotas,
-  catálogo de erros (códigos BNK*), testes e decisões. Leia a seção do módulo antes de mexer nele.
+  catálogo de erros (códigos PPP*), testes e decisões. Leia a seção do módulo antes de mexer nele.
 - `docs/rfc_fluxos.tex`: fluxos passo a passo (ordem de travas, idempotência, falhas).
 - Se os dois divergirem, `regras_de_negocio.tex` vence. Se uma regra não estiver documentada,
   pergunte antes de inventar.
