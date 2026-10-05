@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "amount"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["DEPOSIT", "WITHDRAWAL", "TRANSFER"]
+    },
+    "amount": {
+      "type": "integer"
+    },
+    "destination_account_key": {
+      "type": "string",
+      "maxLength": 36
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 140
+    }
+  },
+  "if": {
+    "properties": {"type": {"const": "TRANSFER"}}
+  },
+  "then": {
+    "required": ["destination_account_key"]
+  },
+  "else": {
+    "not": {"required": ["destination_account_key"]}
+  }
+}
