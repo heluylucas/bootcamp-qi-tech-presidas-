@@ -9,7 +9,7 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import AccountResource, BusinessDayResource, CustomerResource, HealthCheckResource, ProductResource, SuitabilityResource, TransactionResource
+from resources import AccountResource, BusinessDayResource, CustomerResource, HealthCheckResource, PortfolioResource, ProductResource, SuitabilityResource, TransactionResource
 from utils.logger import setup_logging
 
 
@@ -179,6 +179,14 @@ def create_app() -> FastAPI:
     transaction_resource = TransactionResource()
 
     application.add_api_route(f"{account_path}/transaction", transaction_resource.on_post, methods=["POST"])
+
+    portfolio_resource = PortfolioResource()
+
+    application.add_api_route(
+        "/customer/{customer_key}/portfolio_suggestion",
+        portfolio_resource.on_get_suggestion,
+        methods=["GET"]
+    )
 
     register_error_handlers(application)
 
