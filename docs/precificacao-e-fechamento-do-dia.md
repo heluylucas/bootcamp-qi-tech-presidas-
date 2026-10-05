@@ -237,6 +237,7 @@ O registro completo, com o preço de cada alternativa, está na seção
 | Histórico de taxas em `reference_rate` | Uma taxa fixa / apagar a tabela | Uma taxa fixa criaria dois CDIs diferentes, e o relatório de receita precisa das taxas. |
 | Preço diário | Preço intradiário | Fundo tem uma cota por dia; renda fixa rende por dia útil. |
 | Preço só pelo fechamento do dia | Rota de publicação manual (`POST /product/{key}/price`) | Preço não se reescreve, o fechamento não deixa buraco e fim de semana usa o último preço: a rota só conseguia gravar dias que ninguém lê. E o teste dela apagava o banco inteiro. |
+| LCI como oferta com prazo de 12 meses (vencimento por aplicação) | LCI com vencimento fixo e prazo mínimo checado na aplicação | Emissão própria é uma emissão nova a cada aplicação. Com vencimento fixo, a LCI ficaria bloqueada nos últimos 9 meses. O prazo mínimo do CMN virou `CHECK` no banco. |
 | Seed só com o preço de hoje | Seed com os últimos 30 dias | Nenhuma regra lê preço de antes do banco nascer: aplicação, resgate e fechamento só usam o último preço até a data de movimento. O histórico era só decoração. |
 
 **Fica para depois (incrementos):**
@@ -244,7 +245,8 @@ O registro completo, com o preço de cada alternativa, está na seção
 - feriados no fechamento;
 - marcação a mercado do Prefixado e do IPCA+ (no mercado real eles caem
   quando os juros sobem);
-- benchmark contra o CDI usando o histórico de taxas.
+- benchmark contra o CDI usando o histórico de taxas;
+- liquidação automática no vencimento (RN-FEC-09), junto com o módulo 7.
 
 ---
 
@@ -522,6 +524,7 @@ que está testada.
 | 04/10/2026 | 4 | Connectors e `POST /internal/day_close` prontos. Corrigido o fluxo de clique duplo (reler a data depois da trava). `teach_day` passa a limpar o dia no mock antes de ensinar. |
 | 04/10/2026 | 2 | Removida a rota `POST /product/{key}/price` (RN-PRO-05, `BNK005004`, `BNK005005`) e os testes dela. Com isso nenhum teste chama mais o `DbUtils.rollback()`, e os dados criados pela suíte ficam no banco. |
 | 05/10/2026 | 2 | Seed de preços e taxas reduzido ao dia em que o banco nasce (eram 30 dias). RFC ajustada. |
+| 05/10/2026 | 2 | LCI virou "LCI Quant Bank 12 meses": `term_months` e `tax_exempt` em `product`, `CHECK` do prazo mínimo de 9 meses (Res. CMN 5.119 e 5.168/2024). RFC: RN-PRO-09, RN-ORD-17, RN-FEC-09 (rascunho, liquidação no vencimento) e "Do MVP à produção". O fechamento continua calculando a LCI igual. |
 
 ---
 

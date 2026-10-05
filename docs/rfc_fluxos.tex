@@ -143,7 +143,9 @@ disputam a mesma primeira trava: um passa e o outro espera.
 \begin{enumerate}
   \item O schema exige \tb{product_key}, \tb{side = APPLY}, \tb{amount} e \tb{Idempotency-Key}.
   \item Busca o cliente e a sua conta não encerrada. Se não tiver, 409 (\tb{BNK007006}).
-  \item Busca \tb{product}. Confere \tb{is_active} e que o vencimento não passou.
+  \item Busca \tb{product}. Confere \tb{is_active} e, se ele tem vencimento fixo, que
+        \tb{maturity_date} $>$ data de movimento (RN-PRO-03). Produto com prazo (LCI) não vence
+        como um todo: o vencimento é calculado no passo 11.
   \item Busca a \tb{suitability_assessment} mais recente. Confere \tb{valid_until} $\geq$ hora
         real,
         \tb{risk_level} $\leq$ \tb{max_risk_level} do perfil e \tb{amount} $\geq$
@@ -158,7 +160,8 @@ disputam a mesma primeira trava: um passa e o outro espera.
   \item Grava \tb{transaction} \tb{INVESTMENT_APPLY} e um \tb{ledger_entry} \tb{DEBIT}, e
         atualiza \tb{balance}.
   \item Grava \tb{investment_order} com \tb{quantity}, \tb{unit_price}, \tb{cost_amount}
-        (= \tb{amount}) e \tb{transaction_id}. Ordem: \tb{EXECUTED}.
+        (= \tb{amount}) e \tb{transaction_id}. Ordem: \tb{EXECUTED}. Se o produto tem prazo,
+        grava também \tb{maturity_date} = data de movimento + \tb{term_months} (RN-ORD-17).
   \item Soma \tb{quantity} e \tb{amount} em \tb{position.quantity} e
         \tb{position.invested_amount}.
   \item \tb{commit}; 201 com \tb{order_key}, \tb{quantity} e \tb{unit_price}.
@@ -182,7 +185,8 @@ nunca sai da conta sem virar posição}.
 \begin{itemize}
   \item \textbf{Sem checagem de perfil no passo 4.} O cliente sempre pode tirar o dinheiro, mesmo
         com perfil vencido. No lugar dela: produto com \tb{liquidity = AT_MATURITY} e data de movimento $<$
-        \tb{maturity_date} dá 422 (\tb{BNK007005}).
+        \tb{maturity_date} dá 422 (\tb{BNK007005}). Na LCI, o vencimento é o de cada aplicação
+        (RN-ORD-17), e quem devolve o dinheiro no vencimento é o fechamento do dia (RN-FEC-09).
   \item \textbf{No passo 8,} com a posição travada, confere
         \tb{position.quantity} $\geq$ quantidade a resgatar, sendo essa quantidade
         \tb{amount / unit_price} ou toda a posição se \tb{redeem_all}.

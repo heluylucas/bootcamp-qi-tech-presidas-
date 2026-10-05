@@ -734,7 +734,8 @@ Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1
 
 Todo produto, seja título ou fundo, é descrito pelos mesmos campos: nome, tipo, emissor,
 indexador, nível de risco (1 a 5), liquidez (\tb{DAILY} = resgate a qualquer dia;
-\tb{AT_MATURITY} = só no vencimento), data de vencimento (se houver) e aplicação mínima. O valor
+\tb{AT_MATURITY} = só no vencimento), vencimento fixo \emph{ou} prazo (RN-PRO-09), isenção de IR
+e aplicação mínima. O valor
 do investimento é sempre \textbf{quantidade $\times$ preço unitário do dia}. Para o \fundo{} o
 preço unitário é o \textbf{valor da cota}; para os títulos, é o preço unitário do papel.
 
@@ -747,7 +748,7 @@ preço unitário é o \textbf{valor da cota}; para os títulos, é o preço unit
 \endhead
 Tesouro Selic 2031 & Título público & 1 & diária & \rs 50,00 & 100\% da Selic \\
 CDB \banco{} Liquidez & Título privado & 2 & diária & \rs 50,00 & 95\% do CDI \\
-LCI \banco{} 2027 & Título privado & 2 & no vencimento & \rs 100,00 & 93\% do CDI, isento \\
+LCI \banco{} 12 meses & Título privado & 2 & no vencimento & \rs 100,00 & 93\% do CDI, isento \\
 Tesouro Prefixado 2029 & Título público & 2 & diária & \rs 50,00 & taxa fixa ao ano \\
 Tesouro IPCA+ 2035 & Título público & 3 & diária & \rs 50,00 & IPCA + taxa fixa \\
 \fundo{} FIM & Fundo multimercado & 3 & diária (D+0) & \rs 100,00 & varia com a cota \\
@@ -763,8 +764,10 @@ D+0. Liquidez com prazo real fica como \ext.}
   \item[RN-PRO-01 \dec] Os produtos são criados pelo seed do \tb{database.sql}. Não há rota para
   criar produto no MVP (\ext: rota interna de cadastro).
   \item[RN-PRO-02 \obr] Todo produto tem \tb{product_key} (UUID) e só ela sai na API.
-  \item[RN-PRO-03 \dec] Produto inativo (\tb{is_active = false}) ou com vencimento anterior à data
-  de movimento não aceita aplicação $\to$ 409 (\tb{BNK005002}).
+  \item[RN-PRO-03 \dec] Produto inativo (\tb{is_active = false}) ou vencido não aceita aplicação
+  $\to$ 409 (\tb{BNK005002}). Vencido $=$ \tb{maturity_date} $\le$ data de movimento: no dia do
+  vencimento o título já é liquidado (RN-FEC-09), então não aceita aplicação nova. Vale só para
+  quem tem vencimento fixo; produto com prazo (RN-PRO-09) nunca vence como um todo.
   \item[RN-PRO-04 \dec] O preço do dia é o registro de \tb{product_price} com a maior
   \tb{reference_date} menor ou igual à \textbf{data de movimento} (RN-GER-13). Se não existir
   nenhum $\to$ 409 (\tb{BNK005003}) e a operação não acontece. Num dia sem preço novo (fim de
@@ -781,6 +784,17 @@ D+0. Liquidez com prazo real fica como \ext.}
   \item[RN-PRO-07 \obr] Preço unitário em \tb{NUMERIC(20,8)}, nunca \tb{FLOAT} (R6).
   \item[RN-PRO-08 \dec] O catálogo pode ser filtrado por tipo e por risco máximo
   (\tb{GET /products?max_risk=2}) --- útil para mostrar ``o que cabe no meu perfil''.
+  \item[RN-PRO-09 \obr] \textbf{Vencimento fixo ou prazo.} Título de mercado (Tesouro) é um papel
+  só, com vencimento fixo em \tb{maturity_date}, que todos compram. Título de emissão própria
+  vendido como oferta (LCI) tem \tb{term_months}: \textbf{cada aplicação é uma emissão nova} e
+  vence em data de movimento da aplicação $+$ prazo (\tb{add_months}). Um produto tem um ou
+  outro, nunca os dois (\tb{CHECK} no banco). A LCI do MVP é vendida sempre com prazo de 12 meses.
+  \textbf{Prazo mínimo das letras isentas:} produto com \tb{tax_exempt = true} (LCI, LCA) precisa
+  de \tb{term_months} $\ge 9$. A Resolução CMN 5.119/2024 subiu o prazo mínimo da LCA de 90 dias
+  para 9 meses (e o da LCI para 12); a Resolução CMN 5.168/2024 baixou o da LCI sem correção por
+  índice de preços para 9 meses. O motivo: as letras isentas estavam sendo usadas como captação de
+  curtíssimo prazo com benefício fiscal. A regra fica num \tb{CHECK} do banco, então nem o seed
+  nem um \tb{UPDATE} manual conseguem gravar uma letra isenta de prazo curto.
 \end{regras}
 
 \subsection{Parâmetros do seed \dec}
@@ -795,7 +809,7 @@ Números fictícios usados pelo \tb{database.sql}. Mudou algum? Mude aqui e no s
 \endhead
 Tesouro Selic 2031 & Tesouro Nacional & 01/03/2031 & \tb{TESOURO SELIC 2031} & $100 \times 1{,}15^{\,d/252}$ \\
 CDB \banco{} Liquidez & \banco & sem vencimento & (nulo: emissão própria) & $100 \times (1 + c \times 0{,}95)^{d}$ \\
-LCI \banco{} 2027 & \banco & 01/03/2027 & (nulo: emissão própria) & $100 \times (1 + c \times 0{,}93)^{d}$ \\
+LCI \banco{} 12 meses & \banco & prazo de 12 meses por aplicação & (nulo: emissão própria) & $100 \times (1 + c \times 0{,}93)^{d}$ \\
 Tesouro Prefixado 2029 & Tesouro Nacional & 01/01/2029 & \tb{TESOURO PREFIXADO 2029} & $100 \times 1{,}13^{\,d/252}$ \\
 Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $100 \times (1{,}045 \times 1{,}06)^{\,d/252}$ \\
 \fundo{} FIM & \fundo & --- & CNPJ fictício \tb{12.345.678/0001-95} & $100 \times (1{,}10 \times 0{,}99)^{\,d/252} \times (1 + 3\% \times \sin((d + 15)/7))$ \\
@@ -819,6 +833,8 @@ Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $
         com prejuízo. O deslocamento de 15 dias úteis põe outubro de 2026 (época da
         apresentação) numa subida, com pico perto de 30/10; em novembro a cota cai.
   \item Preços arredondados em 8 casas (\tb{NUMERIC(20,8)}, RN-PRO-07).
+  \item LCI: \tb{term_months = 12}, \tb{tax_exempt = true}, \tb{maturity_date} nulo. CDB: sem
+        prazo e sem vencimento (simplificação, ver ``Do MVP à produção'').
   \item CDB e LCI: \tb{own_issue = true}, \tb{cdi_percentage_bps} \tb{9500} e \tb{9300}. Fundo:
         \tb{admin_fee_bps = 100}. Todos com \tb{is_active = true}.
 \end{itemize}
@@ -861,6 +877,18 @@ produção, mudando só o endereço.
   da data segurada (no máximo 5 s por serviço), então fechamentos simultâneos ficam em fila. Ordens
   não travam a data de movimento: uma ordem que começou antes do fechamento usa o preço do dia em
   que começou.
+  \item[RN-FEC-09 \dec] \textbf{Liquidação no vencimento (rascunho, depende do Módulo 7).} No
+  fechamento, na mesma transação (tudo ou nada, RN-FEC-06), o banco devolve o dinheiro do que
+  venceu no novo dia: (a) cada aplicação de produto com prazo cujo \tb{maturity_date} (gravado na
+  ordem, RN-ORD-17) seja $\le$ novo dia e que ainda não tenha sido liquidada; (b) as posições de
+  produto com vencimento fixo $\le$ novo dia. Cada liquidação é uma ordem \tb{REDEEM} ao preço do
+  novo dia, com transação \tb{INVESTMENT_REDEEM} e crédito na conta, reaproveitando o cálculo do
+  resgate (RN-ORD-12, RN-ORD-13, RN-ORD-16). Como a LCI é \tb{AT_MATURITY} e a RN-ORD-11 proíbe
+  resgate antecipado, cada aplicação continua inteira até vencer: não é preciso escolher ``qual
+  lote'' resgatar. Conta \tb{BLOCKED} recebe mesmo assim (o bloqueio impede o cliente de
+  movimentar, não o banco de devolver). A posição zera sem ser apagada (RN-ORD-14). Os detalhes
+  (travas, chave de idempotência determinística, coluna que distingue a liquidação do resgate do
+  cliente, teste) são fechados junto com o Módulo 7.
 \end{regras}
 
 \begingroup\small
@@ -905,7 +933,7 @@ casas decimais.
 \midrule
 Tesouro Selic 2031 & 50\% & 25\% & 10\% \\
 CDB \banco{} Liquidez & 30\% & 20\% & --- \\
-LCI \banco{} 2027 & 20\% & --- & --- \\
+LCI \banco{} 12 meses & 20\% & --- & --- \\
 Tesouro Prefixado 2029 & --- & 20\% & 20\% \\
 Tesouro IPCA+ 2035 & --- & 20\% & 30\% \\
 \fundo{} FIM & --- & 15\% & 40\% \\
@@ -979,6 +1007,9 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   custo na posição. Qualquer falha desfaz tudo.
   \item[RN-ORD-08 \obr] \textbf{Idempotência} conforme RN-GER-08, com
   \tb{UNIQUE(customer_id, idempotency_key)} em \tb{investment_order}.
+  \item[RN-ORD-17 \dec] \textbf{Vencimento da aplicação.} Aplicação em produto com prazo
+  (RN-PRO-09) grava na ordem o próprio \tb{maturity_date} $=$ data de movimento $+$
+  \tb{term_months}. É por ele que a RN-ORD-11 e a liquidação (RN-FEC-09) olham.
 \end{regras}
 
 \subsection{Regras de resgate}
@@ -989,7 +1020,8 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   \item[RN-ORD-10 \obr] Precisa existir posição com quantidade suficiente; senão $\to$ 409
   (\tb{BNK007004}).
   \item[RN-ORD-11 \dec] Produto com liquidez \tb{AT_MATURITY} só pode ser resgatado quando a data
-  de movimento chega ao vencimento. Antes $\to$ 422 (\tb{BNK007005}).
+  de movimento chega ao vencimento (o do produto ou, se ele tem prazo, o da aplicação,
+  RN-ORD-17). Antes $\to$ 422 (\tb{BNK007005}).
   \item[RN-ORD-12 \dec] O resgate pode ser por valor (\tb{amount}) ou total
   (\tb{redeem_all: true}). Por valor: \tb{quantidade = valor / preço}, truncada em 8 casas. Total:
   quantidade = toda a posição e valor = \tb{floor(quantidade} $\times$ \tb{preço)} em centavos.
@@ -1170,13 +1202,13 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{profile_id} FK; \tb{score SMALLINT}; \tb{forced_by_rule BOOLEAN}; \tb{valid_until TIMESTAMPTZ} (hora real + 24 meses); \tb{created_at}. (Uma linha por vez que o cliente responde; nunca é editada.) \\
 \tb{suitability_answer} & \tb{assessment_id} FK; \tb{question_id} FK; \tb{option_id} FK. \tb{UNIQUE(assessment_id, question_id)}. \\
 \tb{product_type} & Enumerador: \tb{PUBLIC_BOND}, \tb{PRIVATE_BOND}, \tb{FUND}. \\
-\tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (nulo no fundo); \tb{min_application BIGINT}; \tb{is_active BOOLEAN}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo); \tb{external_code VARCHAR(40)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo na emissão própria). \\
+\tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (vencimento fixo; nulo no fundo, no CDB e na LCI); \tb{term_months SMALLINT CHECK (> 0)} (prazo da oferta, RN-PRO-09); \tb{tax_exempt BOOLEAN NOT NULL DEFAULT false}; \tb{CHECK (maturity_date IS NULL OR term_months IS NULL)}; \tb{CHECK (NOT tax_exempt OR term_months >= 9)}; \tb{min_application BIGINT}; \tb{is_active BOOLEAN}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo); \tb{external_code VARCHAR(40)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo na emissão própria). \\
 \tb{business_day} & \tb{reference_date DATE NOT NULL UNIQUE}; \tb{created_at}. Uma linha por dia aberto, nunca alterada; a data de movimento é a maior \tb{reference_date} (RN-GER-13). \\
 \tb{reference_rate} & \tb{code} (\tb{CDI}, \tb{SELIC}); \tb{reference_date DATE NOT NULL}; \tb{annual_rate_bps INTEGER CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(code, reference_date)}. Histórico das taxas (RN-REC-08). \\
 \tb{product_price} & \tb{product_id} FK; \tb{reference_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, reference_date)}. \\
 \tb{model_portfolio} & \tb{profile_id} FK UNIQUE; \tb{name}. \\
 \tb{model_portfolio_item} & \tb{model_portfolio_id} FK; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(model_portfolio_id, product_id)}. A soma de 10.000 é conferida por um teste. \\
-\tb{investment_order} & \tb{order_key}; \tb{customer_id} FK; \tb{account_id} FK; \tb{product_id} FK; \tb{side} (\tb{APPLY}/\tb{REDEEM}); \tb{amount BIGINT CHECK (> 0)}; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{transaction_id} FK $\to$ transaction (o movimento de dinheiro); \tb{status} (\tb{EXECUTED}); \tb{idempotency_key}; \tb{request_hash}; \tb{created_at}. \tb{UNIQUE(customer_id, idempotency_key)}. \\
+\tb{investment_order} & \tb{order_key}; \tb{customer_id} FK; \tb{account_id} FK; \tb{product_id} FK; \tb{side} (\tb{APPLY}/\tb{REDEEM}); \tb{amount BIGINT CHECK (> 0)}; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{maturity_date DATE} (só na aplicação em produto com prazo, RN-ORD-17); \tb{transaction_id} FK $\to$ transaction (o movimento de dinheiro); \tb{status} (\tb{EXECUTED}); \tb{idempotency_key}; \tb{request_hash}; \tb{created_at}. \tb{UNIQUE(customer_id, idempotency_key)}. \\
 \tb{position} & \tb{customer_id} FK; \tb{product_id} FK; \tb{quantity NUMERIC(24,8) NOT NULL CHECK (>= 0)}; \tb{invested_amount BIGINT NOT NULL CHECK (>= 0)}; \tb{updated_at}. \tb{UNIQUE(customer_id, product_id)}. \\
 \bottomrule
 \end{longtable}
@@ -1648,8 +1680,42 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   ninguém lê. O teste dela ainda recriava o banco inteiro para liberar uma data. Ganharia se
   existisse um produto sem fonte externa nem fórmula, cujo preço alguém precisasse digitar.
   \emph{Escolhido:} preço novo só entra pelo fechamento do dia.
+  \item \textbf{LCI com vencimento fixo e prazo mínimo checado na aplicação} (coluna
+  \tb{min_remaining_months}, erro \tb{BNK005008} ``Minimum Term Not Met'', LCI movida para 2028 e
+  uma LCA 2027 que já nasceria bloqueada) --- descartada porque trata uma emissão própria como se
+  fosse um título do Tesouro: com vencimento fixo, a LCI fica bloqueada nos últimos 9 meses e
+  ``some'' da carteira Conservadora, e o mercado não funciona assim. Ganharia se o banco
+  revendesse letras já emitidas (mercado secundário), que têm vencimento fixo. \emph{Escolhido:}
+  LCI como oferta com prazo, vencimento por aplicação e prazo mínimo num \tb{CHECK} (RN-PRO-09).
+  \item \textbf{Ligar e desligar produto por rota} --- descartada por agora: não há cenário do
+  MVP que precise disso e traria rota, evento de estado e testes. Ganharia com cadastro de produto
+  por rota (\ext). \emph{Escolhido:} \tb{is_active} só no seed.
 
 \end{enumerate}
+
+\subsection{Do MVP à produção}
+
+O simulador roda em ambiente de desenvolvimento e testes. O que simplificamos, e o que mudaria em
+produção:
+
+\begingroup\small
+\begin{longtable}{@{}P{3.4cm}P{6.1cm}P{6.5cm}@{}}
+\toprule
+\textbf{Tema} & \textbf{No MVP} & \textbf{Em produção} \\
+\midrule
+\endhead
+Cadastro de produto & Seed do \tb{database.sql} (RN-PRO-01). & Rota interna com perfil de administrador; os mesmos \tb{CHECK} continuam barrando. \\
+Prazo mínimo LCI/LCA & \tb{CHECK} no banco ($\ge 9$ meses). & Igual, e a rota de cadastro devolveria um erro amigável antes. \\
+Vencimento da emissão própria & Prazo na oferta; vencimento gravado em cada aplicação (RN-ORD-17). & Igual. \\
+Prazos oferecidos & Um só (LCI 12 meses). & Vários (9, 12, 24 meses), cada um uma linha de produto com a sua taxa; sem mudar código. \\
+Preço de CDB/LCI & Uma série por produto; o rendimento é o mesmo por proporção. & PU por emissão, para registro na B3. \\
+Liquidação no vencimento & Rascunho (RN-FEC-09), entra com o Módulo 7 dentro do fechamento do dia. & Igual, com conciliação e aviso ao cliente. \\
+CDB Liquidez & Sem prazo e sem vencimento. & Também teria prazo (ex.: 2 anos), com resgate diário. \\
+Data de movimento & Avança por rota (\tb{day_close}). & Agendador chamando a mesma rota. \\
+Feriados & Ignorados. & Calendário da ANBIMA. \\
+\bottomrule
+\end{longtable}
+\endgroup
 
 % =====================================================================
 \section{Incrementos para se destacar}\label{sec:incrementos}
@@ -1838,6 +1904,9 @@ erDiagram
     char product_key UK
     smallint risk_level
     string liquidity
+    date maturity_date "vencimento fixo ou nulo"
+    smallint term_months "prazo da oferta ou nulo"
+    boolean tax_exempt
     bigint min_application
     boolean own_issue
     smallint admin_fee_bps
@@ -1869,6 +1938,7 @@ erDiagram
     bigint amount
     numeric quantity
     bigint cost_amount
+    date maturity_date "so aplicacao com prazo"
   }
   position {
     int id PK
