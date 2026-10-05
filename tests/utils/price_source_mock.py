@@ -38,11 +38,10 @@ class PriceSourceMock:
         selic: str = DEFAULT_SELIC,
         skip: Optional[str] = None,
     ) -> None:
-
-        mock = Mock()
-        for service in SERVICES:
-            mock.clear_request(*request_of(service, day))
-
+        # Não apaga nada: cada resposta de teste tem um id fixo por fonte e dia
+        # (expectation_id_for), e ensinar de novo SUBSTITUI a anterior. Assim a
+        # sobra de um teste que falhou no meio some, e o cenário da demonstração
+        # que o mock-init ensinou continua lá para as próximas rodadas da suíte.
         if skip != "fund":
             PriceSourceMock.fund_quote(day, fund)
         if skip != "treasury":
@@ -66,17 +65,17 @@ class PriceSourceMock:
     def answer(service: str, day: date, body, status_code: int = 200) -> None:
         """Qualquer corpo, inclusive um sem sentido, para um dos SERVICES."""
         path, query_params = request_of(service, day)
-        Mock().add_expectations(
-            BaseExpectation.generate_expectation(
-                "GET",
-                path,
-                query_params=query_params,
-                status_code=status_code,
-                response_json=body,
-                number_of_calls=1,
-                priority=TEST_PRIORITY,
-            )
+        expectation = BaseExpectation.generate_expectation(
+            "GET",
+            path,
+            query_params=query_params,
+            status_code=status_code,
+            response_json=body,
+            number_of_calls=1,
+            priority=TEST_PRIORITY,
         )
+        expectation["id"] = expectation_id_for(service, day)
+        Mock().add_expectations(expectation)
 
     @staticmethod
     def server_error(service: str, day: date) -> None:
@@ -87,16 +86,21 @@ class PriceSourceMock:
     def connection_dropped(service: str, day: date) -> None:
         """A conexão cai sem resposta nenhuma: o mesmo caminho de fora do ar ou timeout."""
         path, query_params = request_of(service, day)
-        Mock().add_expectations(
-            BaseExpectation.generate_error(
-                "GET",
-                path,
-                error_json={"dropConnection": True},
-                query_params=query_params,
-                number_of_calls=1,
-                priority=TEST_PRIORITY,
-            )
+        expectation = BaseExpectation.generate_error(
+            "GET",
+            path,
+            error_json={"dropConnection": True},
+            query_params=query_params,
+            number_of_calls=1,
+            priority=TEST_PRIORITY,
         )
+        expectation["id"] = expectation_id_for(service, day)
+        Mock().add_expectations(expectation)
+
+
+def expectation_id_for(service: str, day: date) -> str:
+    """Um id por fonte e dia: o MockServer troca a expectativa de mesmo id em vez de empilhar."""
+    return f"test-{service}-{day.isoformat()}"
 
 
 def request_of(service: str, day: date):
