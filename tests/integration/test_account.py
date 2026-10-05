@@ -39,7 +39,7 @@ class TestOpenAccount:
         status, body = RequestGenerator.post_account(str(uuid.uuid4()))
 
         assert status == 404
-        assert body["code"] == "BNK001001"
+        assert body["code"] == "PPP001001"
 
     def test_second_account_refused(self):
         customer_key, _ = open_account()
@@ -47,7 +47,7 @@ class TestOpenAccount:
         status, body = RequestGenerator.post_account(customer_key)
 
         assert status == 409
-        assert body["code"] == "BNK002002"
+        assert body["code"] == "PPP002002"
 
     def test_second_account_refused_while_blocked(self):
         customer_key, account_key = open_account()
@@ -56,7 +56,7 @@ class TestOpenAccount:
         status, body = RequestGenerator.post_account(customer_key)
 
         assert status == 409
-        assert body["code"] == "BNK002002"
+        assert body["code"] == "PPP002002"
 
     def test_new_account_after_closing(self):
         customer_key, account_key = open_account()
@@ -84,7 +84,7 @@ class TestGetAccount:
         status, body = RequestGenerator.get_account(customer_key, str(uuid.uuid4()))
 
         assert status == 404
-        assert body["code"] == "BNK002001"
+        assert body["code"] == "PPP002001"
 
     def test_account_of_another_customer(self):
         """R8: a conta existe, mas não é deste cliente. Resposta igual à de inexistente."""
@@ -95,9 +95,9 @@ class TestGetAccount:
         patch_status, patch_body = change_status(other_customer_key, account_key, "BLOCKED")
         events_status, events_body = RequestGenerator.get_account_status_events(other_customer_key, account_key)
 
-        assert (get_status, get_body["code"]) == (404, "BNK002001")
-        assert (patch_status, patch_body["code"]) == (404, "BNK002001")
-        assert (events_status, events_body["code"]) == (404, "BNK002001")
+        assert (get_status, get_body["code"]) == (404, "PPP002001")
+        assert (patch_status, patch_body["code"]) == (404, "PPP002001")
+        assert (events_status, events_body["code"]) == (404, "PPP002001")
 
 
 class TestChangeAccountStatus:
@@ -139,7 +139,7 @@ class TestChangeAccountStatus:
         status, body = change_status(customer_key, account_key, target)
 
         assert status == 409
-        assert body["code"] == "BNK002003"
+        assert body["code"] == "PPP002003"
 
     @pytest.mark.parametrize("target", ["BLOCKED", "CLOSED"])
     @pytest.mark.parametrize("payload_reason", [{}, {"reason": ""}, {"reason": "   "}])
@@ -149,7 +149,7 @@ class TestChangeAccountStatus:
         status, body = RequestGenerator.patch_account(customer_key, account_key, {"status": target, **payload_reason})
 
         assert status == 422
-        assert body["code"] == "BNK002006"
+        assert body["code"] == "PPP002006"
 
     def test_transition_checked_before_reason(self):
         """Conta CLOSED e sem motivo: a transição proibida é o erro que sai."""
@@ -159,7 +159,7 @@ class TestChangeAccountStatus:
         status, body = RequestGenerator.patch_account(customer_key, account_key, {"status": "BLOCKED"})
 
         assert status == 409
-        assert body["code"] == "BNK002003"
+        assert body["code"] == "PPP002003"
 
     @pytest.mark.parametrize(
         "payload",
@@ -178,7 +178,7 @@ class TestChangeAccountStatus:
         status, body = RequestGenerator.patch_account(customer_key, account_key, payload)
 
         assert status == 400
-        assert body["code"] == "BNK000001"
+        assert body["code"] == "PPP000001"
 
 
 class TestAccountStatusEvents:

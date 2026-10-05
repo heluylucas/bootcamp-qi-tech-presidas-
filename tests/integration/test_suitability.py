@@ -144,7 +144,7 @@ class TestSubmitSuitability:
         status, body = RequestGenerator.post_suitability(customer_key, payload)
 
         assert status == 422
-        assert body["code"] == "BNK004002"
+        assert body["code"] == "PPP004002"
 
     @pytest.mark.parametrize("option", [0, 5])
     def test_invalid_option(self, option):
@@ -153,7 +153,7 @@ class TestSubmitSuitability:
         status, body = RequestGenerator.post_suitability(customer_key, answers(2, Q4=option))
 
         assert status == 422
-        assert body["code"] == "BNK004003"
+        assert body["code"] == "PPP004003"
 
     @pytest.mark.parametrize(
         "payload",
@@ -174,13 +174,13 @@ class TestSubmitSuitability:
         status, body = RequestGenerator.post_suitability(customer_key, payload)
 
         assert status == 400
-        assert body["code"] == "BNK000001"
+        assert body["code"] == "PPP000001"
 
     def test_customer_not_found(self):
         status, body = RequestGenerator.post_suitability(str(uuid.uuid4()), answers(2))
 
         assert status == 404
-        assert body["code"] == "BNK001001"
+        assert body["code"] == "PPP001001"
 
     def test_refused_answers_record_nothing(self):
         customer_key = create_customer()
@@ -189,7 +189,7 @@ class TestSubmitSuitability:
         status, body = RequestGenerator.get_suitability(customer_key)
 
         assert status == 404
-        assert body["code"] == "BNK004001"
+        assert body["code"] == "PPP004001"
 
 
 class TestCurrentSuitability:
@@ -208,13 +208,13 @@ class TestCurrentSuitability:
         status, body = RequestGenerator.get_suitability(customer_key)
 
         assert status == 404
-        assert body["code"] == "BNK004001"
+        assert body["code"] == "PPP004001"
 
     def test_customer_not_found(self):
         status, body = RequestGenerator.get_suitability(str(uuid.uuid4()))
 
         assert status == 404
-        assert body["code"] == "BNK001001"
+        assert body["code"] == "PPP001001"
 
     def test_retake_changes_current_profile(self):
         customer_key = create_customer()
@@ -256,4 +256,4 @@ class TestSuitabilityHistory:
         status, body = RequestGenerator.get_suitabilities(str(uuid.uuid4()))
 
         assert status == 404
-        assert body["code"] == "BNK001001"
+        assert body["code"] == "PPP001001"

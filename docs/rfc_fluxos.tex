@@ -53,7 +53,7 @@ cliente recebe 500 com o banco intacto. O \tb{commit} é a última linha do cont
 
 \textbf{Abrir conta --- falha: dois pedidos simultâneos para o mesmo cliente.} Sem o passo 2, os dois
 contariam zero no passo 3 e o cliente ficaria com duas contas. Com ele, o segundo pedido espera a
-trava, conta uma conta ao ser liberado e recebe 409 (\tb{BNK002002}) sem ter escrito nada.
+trava, conta uma conta ao ser liberado e recebe 409 (\tb{PPP002002}) sem ter escrito nada.
 
 % ---------------------------------------------------------------------
 \subsubsection*{Transferência --- caminho feliz}
@@ -78,7 +78,7 @@ trava, conta uma conta ao ser liberado e recebe 409 (\tb{BNK002002}) sem ter esc
 
 \textbf{Transferência --- falha: saldo insuficiente (a mais provável).} O passo 6 recusa. Nenhuma
 escrita aconteceu, então o \tb{rollback} só libera as travas. O cliente recebe 409
-(\tb{BNK003003}) e os dois saldos continuam iguais.
+(\tb{PPP003003}) e os dois saldos continuam iguais.
 
 \textbf{Transferência --- falha: duas transferências da mesma conta ao mesmo tempo (a mais cara).}
 A conta tem \rs 100 e chegam dois pedidos de \rs 80.
@@ -112,7 +112,7 @@ A conta tem \rs 100 e chegam dois pedidos de \rs 80.
   \draw[ret] (\xd,-5.9) -- node[lbl,above] {trava concedida; saldo 18} (\xb,-5.9);
   \node[font=\footnotesize,anchor=east] at (\xb-0.15,-6.6) {$18 \geq 80 + 2$: não};
   \draw[msg] (\xb,-7.3) -- node[lbl,above] {\tb{ROLLBACK} (nada foi escrito)} (\xd,-7.3);
-  \node[font=\footnotesize,anchor=east] at (\xb-0.15,-8.0) {responde 409 (\tb{BNK003003})};
+  \node[font=\footnotesize,anchor=east] at (\xb-0.15,-8.0) {responde 409 (\tb{PPP003003})};
 \end{tikzpicture}
 \end{center}
 
@@ -126,7 +126,7 @@ passo 5 ele encontra a \tb{transaction} já gravada:
 \begin{itemize}
   \item com o mesmo \tb{request_hash}, devolve 200 com o corpo original e não executa os passos 6
         a 10, então nada é debitado de novo;
-  \item com um hash diferente (mesma chave, corpo diferente), devolve 409 (\tb{BNK000004}).
+  \item com um hash diferente (mesma chave, corpo diferente), devolve 409 (\tb{PPP000004}).
 \end{itemize}
 A checagem de idempotência fica \emph{depois} da trava de propósito. Se viesse antes, um reenvio
 simultâneo passaria pela checagem (o original ainda não gravou), esperaria a trava e, ao ver o saldo
@@ -142,7 +142,7 @@ disputam a mesma primeira trava: um passa e o outro espera.
 \subsubsection*{Aplicação --- caminho feliz}
 \begin{enumerate}
   \item O schema exige \tb{product_key}, \tb{side = APPLY}, \tb{amount} e \tb{Idempotency-Key}.
-  \item Busca o cliente e a sua conta não encerrada. Se não tiver, 409 (\tb{BNK007006}).
+  \item Busca o cliente e a sua conta não encerrada. Se não tiver, 409 (\tb{PPP007006}).
   \item Busca \tb{product}. Confere \tb{is_active} e, se ele tem vencimento fixo, que
         \tb{maturity_date} $>$ data de movimento (RN-PRO-03). Produto com prazo (LCI) não vence
         como um todo: o vencimento é calculado no passo 11.
@@ -172,8 +172,8 @@ aberta, a trava da conta enfileira todas as ordens daquele cliente. Por isso a p
 criada no passo 6 sem risco de duas ordens simultâneas tentarem criá-la.
 
 \textbf{Aplicação --- falha: produto acima do perfil (a mais provável).} O passo 4 recusa antes de
-qualquer trava ou escrita. O cliente recebe 422 (\tb{BNK007003}). Perfil vencido ou inexistente
-recusa no mesmo passo, com 409 (\tb{BNK004004} / \tb{BNK004005}).
+qualquer trava ou escrita. O cliente recebe 422 (\tb{PPP007003}). Perfil vencido ou inexistente
+recusa no mesmo passo, com 409 (\tb{PPP004004} / \tb{PPP004005}).
 
 \textbf{Aplicação --- falha: exceção entre os passos 10 e 12 (a mais cara).} O débito já está na
 sessão, mas a ordem ou a posição não foram gravadas. O \tb{rollback} desfaz débito, lançamento e
@@ -185,7 +185,7 @@ nunca sai da conta sem virar posição}.
 \begin{itemize}
   \item \textbf{Sem checagem de perfil no passo 4.} O cliente sempre pode tirar o dinheiro, mesmo
         com perfil vencido. No lugar dela: produto com \tb{liquidity = AT_MATURITY} e data de movimento $<$
-        \tb{maturity_date} dá 422 (\tb{BNK007005}). Na LCI, o vencimento é o de cada aplicação
+        \tb{maturity_date} dá 422 (\tb{PPP007005}). Na LCI, o vencimento é o de cada aplicação
         (RN-ORD-17), e quem devolve o dinheiro no vencimento é o fechamento do dia (RN-FEC-09).
   \item \textbf{No passo 8,} com a posição travada, confere
         \tb{position.quantity} $\geq$ quantidade a resgatar, sendo essa quantidade
@@ -200,7 +200,7 @@ nunca sai da conta sem virar posição}.
 \end{itemize}
 
 \textbf{Resgate --- falha: valor maior que a posição.} O passo 8 recusa com a posição travada, e
-nada foi escrito. O cliente recebe 409 (\tb{BNK007004}).
+nada foi escrito. O cliente recebe 409 (\tb{PPP007004}).
 
 % ---------------------------------------------------------------------
 \subsubsection*{Suitability --- caminho feliz}
@@ -220,7 +220,7 @@ A avaliação anterior não é alterada. Ela vira histórico porque o perfil vig
 avaliação mais recente.
 
 \textbf{Suitability --- falha: resposta faltando ou repetida.} O passo 2 recusa antes de qualquer
-escrita. O cliente recebe 422 (\tb{BNK004002}).
+escrita. O cliente recebe 422 (\tb{PPP004002}).
 
 % ---------------------------------------------------------------------
 \subsubsection*{Fechamento do dia --- caminho feliz}
@@ -246,16 +246,16 @@ A trava da data faz dois fechamentos simultâneos virarem uma fila: o segundo en
 avançada no passo 3 e recebe 409. Os passos 5 a 7 só leem; toda escrita fica no passo 8.
 
 \textbf{Fechamento --- falha: serviço externo fora do ar (a mais provável).} O passo 5 recebe
-erro, timeout ou conexão derrubada. O banco devolve 502 (\tb{BNK005006}). Nada foi escrito: a data
+erro, timeout ou conexão derrubada. O banco devolve 502 (\tb{PPP005006}). Nada foi escrito: a data
 de movimento continua a mesma e o preço do dia continua o último publicado (RN-PRO-04). Basta
 chamar de novo quando o serviço voltar.
 
 \textbf{Fechamento --- falha: resposta sem sentido.} O passo 6 recusa (por exemplo, cota $= 0$ ou
-título faltando) com 502 (\tb{BNK005007}), também sem escrever nada. Gravar um preço errado seria
+título faltando) com 502 (\tb{PPP005007}), também sem escrever nada. Gravar um preço errado seria
 pior do que não ter preço novo: preço publicado não se reescreve (R4).
 
 \textbf{Fechamento --- falha: clique duplo.} O segundo pedido com o mesmo \tb{close_date} espera a
-trava do primeiro, encontra a data já avançada e recebe 409 (\tb{BNK000006}). Fecha-se um dia só.
+trava do primeiro, encontra a data já avançada e recebe 409 (\tb{PPP000006}). Fecha-se um dia só.
 
 % ---------------------------------------------------------------------
 \bigskip

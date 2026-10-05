@@ -273,8 +273,8 @@ SELECT gen_random_uuid()::text, v.name, t.id, v.issuer, v.indexer, v.rate_descri
        v.admin_fee_bps, v.external_code
 FROM (VALUES
     ('Tesouro Selic 2031',      'PUBLIC_BOND',  'Tesouro Nacional',  'SELIC',    '100% da Selic',           1, 'DAILY',       '2031-03-01', NULL, false, 5000,  false, NULL, NULL, 'TESOURO SELIC 2031'),
-    ('CDB Quant Bank Liquidez', 'PRIVATE_BOND', 'Quant Bank',        'CDI',      '95% do CDI',              2, 'DAILY',       NULL,         NULL, false, 5000,  true,  9500, NULL, NULL),
-    ('LCI Quant Bank 12 meses', 'PRIVATE_BOND', 'Quant Bank',        'CDI',      '93% do CDI, isento de IR',2, 'AT_MATURITY', NULL,         12,   true,  10000, true,  9300, NULL, NULL),
+    ('CDB Triple P Bank Liquidez', 'PRIVATE_BOND', 'Triple P Bank',        'CDI',      '95% do CDI',              2, 'DAILY',       NULL,         NULL, false, 5000,  true,  9500, NULL, NULL),
+    ('LCI Triple P Bank 12 meses', 'PRIVATE_BOND', 'Triple P Bank',        'CDI',      '93% do CDI, isento de IR',2, 'AT_MATURITY', NULL,         12,   true,  10000, true,  9300, NULL, NULL),
     ('Tesouro Prefixado 2029',  'PUBLIC_BOND',  'Tesouro Nacional',  'PREFIXED', '13% a.a.',                2, 'DAILY',       '2029-01-01', NULL, false, 5000,  false, NULL, NULL, 'TESOURO PREFIXADO 2029'),
     ('Tesouro IPCA+ 2035',      'PUBLIC_BOND',  'Tesouro Nacional',  'IPCA',     'IPCA + 6% a.a.',          3, 'DAILY',       '2035-05-15', NULL, false, 5000,  false, NULL, NULL, 'TESOURO IPCA+ 2035'),
     ('FGV Quant Capital FIM',   'FUND',         'FGV Quant Capital', 'QUOTA',    'Varia com a cota',        3, 'DAILY',       NULL,         NULL, false, 10000, false, NULL, 100,  '12.345.678/0001-95')
@@ -343,10 +343,10 @@ INSERT INTO model_portfolio_item (model_portfolio_id, product_id, weight_bps)
 SELECT mp.id, p.id, v.weight_bps
 FROM (VALUES
     ('CONSERVATIVE', 'Tesouro Selic 2031',      5000),
-    ('CONSERVATIVE', 'CDB Quant Bank Liquidez', 3000),
-    ('CONSERVATIVE', 'LCI Quant Bank 12 meses', 2000),
+    ('CONSERVATIVE', 'CDB Triple P Bank Liquidez', 3000),
+    ('CONSERVATIVE', 'LCI Triple P Bank 12 meses', 2000),
     ('MODERATE',     'Tesouro Selic 2031',      2500),
-    ('MODERATE',     'CDB Quant Bank Liquidez', 2000),
+    ('MODERATE',     'CDB Triple P Bank Liquidez', 2000),
     ('MODERATE',     'Tesouro Prefixado 2029',  2000),
     ('MODERATE',     'Tesouro IPCA+ 2035',      2000),
     ('MODERATE',     'FGV Quant Capital FIM',   1500),

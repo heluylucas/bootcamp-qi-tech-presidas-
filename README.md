@@ -1,4 +1,4 @@
-# Quant Bank — Desafio Bootcamp QI Tech 2026
+# Triple P Bank — Desafio Bootcamp QI Tech 2026
 
 API de um banco digital com módulo de investimentos simulado: clientes,
 contas, movimentações e extrato, suitability, carteira sugerida,
@@ -48,7 +48,7 @@ Quando aparecer `Application startup complete`, a API está no ar. Abra
 http://localhost:3000 no navegador e ela responde quem é:
 
 ```json
-{"service":"quant-bank-api","id":"8"}
+{"service":"triple-p-bank-api","id":"8"}
 ```
 
 As rotas de negócio exigem o cabeçalho `INTERNAL-TOKEN` (seção 5) e por
@@ -211,7 +211,7 @@ As rotas de negócio pedem o cabeçalho:
 INTERNAL-TOKEN: default_token
 ```
 
-Sem ele, a API responde **403** (`BNK000002`). Ficam abertas só a rota
+Sem ele, a API responde **403** (`PPP000002`). Ficam abertas só a rota
 raiz e o `/health_check`, que o próprio Docker consulta.
 
 ---
@@ -225,21 +225,21 @@ Todo erro da API responde no mesmo formato:
   "title": "Insufficient Balance",
   "description": "The account does not have enough balance for amount plus fee.",
   "translation": "Saldo insuficiente para o valor mais a tarifa.",
-  "code": "BNK003003"
+  "code": "PPP003003"
 }
 ```
 
-O `code` é `BNK` + módulo (3 dígitos) + número (3 dígitos). Os genéricos,
+O `code` é `PPP` + módulo (3 dígitos) + número (3 dígitos). Os genéricos,
 que toda rota pode devolver, moram em `src/errors/base_error.py`:
 
 | Código      | HTTP | Quando acontece                                |
 |-------------|------|------------------------------------------------|
-| `BNK000001` | 400  | o JSON ou a query string estão fora do formato |
-| `BNK000002` | 403  | faltou o `INTERNAL-TOKEN`, ou ele está errado  |
-| `BNK000005` | 400  | parâmetro de endereço ou de query inválido     |
-| `BNK000404` | 404  | essa rota não existe                           |
-| `BNK000405` | 405  | a rota existe, mas não aceita esse método      |
-| `BNK000500` | 500  | erro inesperado                                |
+| `PPP000001` | 400  | o JSON ou a query string estão fora do formato |
+| `PPP000002` | 403  | faltou o `INTERNAL-TOKEN`, ou ele está errado  |
+| `PPP000005` | 400  | parâmetro de endereço ou de query inválido     |
+| `PPP000404` | 404  | essa rota não existe                           |
+| `PPP000405` | 405  | a rota existe, mas não aceita esse método      |
+| `PPP000500` | 500  | erro inesperado                                |
 
 Os de cada módulo moram em `src/errors/custom_errors.py`, e o catálogo
 completo está na seção "Catálogo de erros" de `docs/regras_de_negocio.tex`.

@@ -140,7 +140,7 @@ class BusinessDayController(BaseController):
 
 
 def answer_of(response: Optional[BaseConnectorResponse]):
-    """Sem resposta (None) ou status diferente de 200: a fonte está fora do ar (BNK005006)."""
+    """Sem resposta (None) ou status diferente de 200: a fonte está fora do ar (PPP005006)."""
     if response is None or response.status != 200:
         raise PriceSourceUnavailable()
     return response.json

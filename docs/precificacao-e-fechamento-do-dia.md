@@ -33,7 +33,7 @@ Para isso funcionar, precisamos responder três perguntas:
 | **Fonte externa** | Quem publica o preço na vida real: o Tesouro, a administradora do fundo, o Banco Central. | A administradora publica a cota do fundo todo fim de tarde. |
 | **MockServer** | Um programa que **finge ser** essas fontes externas. Ele sobe junto com o `docker compose` e responde o que a gente ensinar. | "Quando pedirem a cota de 06/10, responda 102,00." |
 | **Connector** | O código, em `src/connectors/`, que faz a chamada HTTP para a fonte externa. É o mesmo código que iria para produção, só muda o endereço. | `FundAdminConnector` pergunta a cota do fundo. |
-| **Emissão própria** | Papel que **o próprio banco** emitiu (CDB e LCI do Quant Bank). Ninguém de fora publica o preço dele: o banco calcula. | CDB rende 95% do CDI. |
+| **Emissão própria** | Papel que **o próprio banco** emitiu (CDB e LCI do Triple P Bank). Ninguém de fora publica o preço dele: o banco calcula. | CDB rende 95% do CDI. |
 | **CDI** | A taxa de juros de referência entre bancos. Vem do Banco Central, uma por dia útil. | 14,9% ao ano. |
 | **Cota** | A "fatia" de um fundo. Valor da posição = quantidade de cotas × valor da cota do dia. | 15 cotas × R$ 104,00 = R$ 1.560,00. |
 
@@ -74,7 +74,7 @@ produto, aplicar, ver a posição, resgatar) já usa o preço de 06/10.
 ```mermaid
 sequenceDiagram
     participant Op as Operador / teste
-    participant API as Quant Bank API
+    participant API as Triple P Bank API
     participant DB as PostgreSQL
     participant Mock as MockServer
     Op->>API: POST /internal/day_close {close_date}
@@ -101,8 +101,8 @@ MockServer **não tem memória**: ele só responde ao que perguntam.
 | Tesouro Prefixado 2029 | Mock (Tesouro) | `100 × 1,13^(d/252)` | Sobe um pouco todo dia |
 | Tesouro IPCA+ 2035 | Mock (Tesouro) | `100 × (1,045 × 1,06)^(d/252)` | Sobe um pouco todo dia |
 | CDI e Selic | Mock (Banco Central) | 14,9% e 15% ao ano | Uma taxa nova por dia útil |
-| CDB Quant Bank | **O banco** | preço de ontem × (1 + CDI do dia × 95%) | Rende pelo CDI que chegou |
-| LCI Quant Bank | **O banco** | preço de ontem × (1 + CDI do dia × 93%) | Rende pelo CDI que chegou |
+| CDB Triple P Bank | **O banco** | preço de ontem × (1 + CDI do dia × 95%) | Rende pelo CDI que chegou |
+| LCI Triple P Bank | **O banco** | preço de ontem × (1 + CDI do dia × 93%) | Rende pelo CDI que chegou |
 | FGV Quant Capital | Mock (administradora) | `100 × (1,10 × 0,99)^(d/252) × (1 + 3% × sen((d + 15)/7))` | **Sobe e desce** |
 
 O "CDI do dia" é a taxa anual convertida para um dia útil:
@@ -169,9 +169,9 @@ O fechamento é **tudo ou nada**: ou grava tudo, ou não grava nada.
 
 | O que aconteceu | Resposta | O que muda no banco |
 |---|---|---|
-| O `close_date` não é a data atual (por exemplo, clique duplo) | 409 `BNK000006` | Nada |
-| Fonte externa fora do ar, demorou mais de 5 s ou respondeu erro | 502 `BNK005006` | Nada |
-| Fonte respondeu algo sem sentido (cota zero, data errada, título faltando) | 502 `BNK005007` | Nada |
+| O `close_date` não é a data atual (por exemplo, clique duplo) | 409 `PPP000006` | Nada |
+| Fonte externa fora do ar, demorou mais de 5 s ou respondeu erro | 502 `PPP005006` | Nada |
+| Fonte respondeu algo sem sentido (cota zero, data errada, título faltando) | 502 `PPP005007` | Nada |
 
 Se o fechamento falhar, a data de movimento não anda, e o sistema continua
 usando o último preço publicado. É só chamar de novo quando a fonte voltar.
@@ -287,7 +287,7 @@ concordar com o desenho.
 - **Modelo de dados**: tabela `business_day`, `reference_rate` com
   `reference_date`, `product.external_code`.
 - **Rotas**: `GET /internal/business_date` e `POST /internal/day_close`.
-- **Erros**: `BNK000006`, `BNK005006`, `BNK005007`.
+- **Erros**: `PPP000006`, `PPP005006`, `PPP005007`.
 - **Testes previstos**: nova linha "Fechamento do dia".
 - **Decisões**: 9 alternativas novas ou reescritas (seção 8 deste texto).
 - **Incrementos**: saiu "connector + MockServer" (agora faz parte do MVP);
@@ -362,10 +362,10 @@ o seed nas fórmulas que o mock vai usar.
 | `GET /product/{key}/prices?from=&to=` | Histórico de preços, do mais antigo ao mais novo. |
 
 O `unit_price` sai **como texto** (`"102.50000000"`), para ninguém ler como
-`float`. Erro novo: `BNK005001` (produto não existe).
+`float`. Erro novo: `PPP005001` (produto não existe).
 
 > Esta fase também criou `POST /product/{key}/price` (publicação manual de
-> preço, `BNK005004` e `BNK005005`). Ela foi **removida** em 04/10: não havia
+> preço, `PPP005004` e `PPP005005`). Ela foi **removida** em 04/10: não havia
 > dia que ela pudesse corrigir (ver seção 8).
 
 **Testes:** `tests/integration/test_product.py`, com 27 casos. Primeiro
@@ -381,7 +381,7 @@ Corrigido em `tests/utils/db_utils.py`.
 
 - model e repository de `reference_rate`: entram na Fase 4, quando o
   fechamento gravar taxas;
-- `BNK005002` e `BNK005003` (produto indisponível, sem preço): entram com as
+- `PPP005002` e `PPP005003` (produto indisponível, sem preço): entram com as
   ordens, que é quem os usa.
 
 ### Fase 3: infraestrutura do mock ✅
@@ -458,7 +458,7 @@ do mock (vai virar 502). `docker compose down -v` e `up` recomeçam tudo.
   4. grava tudo e dá `commit` uma vez só.
 - Models e repositories novos: `ReferenceRate` / `ReferenceRateRepository`;
   `BusinessDayRepository` ganhou `get_current_for_update` e `create`.
-- Erros: `BNK000006` (409), `BNK005006` e `BNK005007` (502).
+- Erros: `PPP000006` (409), `PPP005006` e `PPP005007` (502).
 - O `parse_date` saiu do controller de produto para `src/utils/dates.py`,
   junto com o `next_business_day`.
 
@@ -468,7 +468,7 @@ o segundo esperava a trava e depois conferia a data com a linha **antiga**
 depois da trava. Conferido com três pedidos simultâneos: um 201 e dois 409,
 um dia só gravado. RFC e fluxos atualizados.
 
-**Como o fechamento recusa uma resposta "sem sentido" (502 `BNK005007`):**
+**Como o fechamento recusa uma resposta "sem sentido" (502 `PPP005007`):**
 
 - data diferente da pedida, ou CNPJ diferente do produto;
 - título faltando;
@@ -522,9 +522,10 @@ que está testada.
 | 04/10/2026 | 2 | Onda do fundo deslocada para `sen((d + 15)/7)` (outubro sobe). Seed novo, `reference_rate` com histórico, `external_code` e as 4 rotas de produto. Corrigido o `DbUtils.rollback()` com `%` no SQL. |
 | 04/10/2026 | 3 | MockServer e `mock-init` no compose (60 dias úteis ensinados pelas fórmulas, iguais ao seed até a 8ª casa). `PriceSourceMock` para os testes. CNPJ só com dígitos no caminho e preços como texto (RFC). |
 | 04/10/2026 | 4 | Connectors e `POST /internal/day_close` prontos. Corrigido o fluxo de clique duplo (reler a data depois da trava). `teach_day` passa a limpar o dia no mock antes de ensinar. |
-| 04/10/2026 | 2 | Removida a rota `POST /product/{key}/price` (RN-PRO-05, `BNK005004`, `BNK005005`) e os testes dela. Com isso nenhum teste chama mais o `DbUtils.rollback()`, e os dados criados pela suíte ficam no banco. |
+| 04/10/2026 | 2 | Removida a rota `POST /product/{key}/price` (RN-PRO-05, `PPP005004`, `PPP005005`) e os testes dela. Com isso nenhum teste chama mais o `DbUtils.rollback()`, e os dados criados pela suíte ficam no banco. |
 | 05/10/2026 | 2 | Seed de preços e taxas reduzido ao dia em que o banco nasce (eram 30 dias). RFC ajustada. |
-| 05/10/2026 | 2 | LCI virou "LCI Quant Bank 12 meses": `term_months` e `tax_exempt` em `product`, `CHECK` do prazo mínimo de 9 meses (Res. CMN 5.119 e 5.168/2024). RFC: RN-PRO-09, RN-ORD-17, RN-FEC-09 (rascunho, liquidação no vencimento) e "Do MVP à produção". O fechamento continua calculando a LCI igual. |
+| 05/10/2026 | 2 | LCI virou "LCI Triple P Bank 12 meses": `term_months` e `tax_exempt` em `product`, `CHECK` do prazo mínimo de 9 meses (Res. CMN 5.119 e 5.168/2024). RFC: RN-PRO-09, RN-ORD-17, RN-FEC-09 (rascunho, liquidação no vencimento) e "Do MVP à produção". O fechamento continua calculando a LCI igual. |
+| 05/10/2026 | — | Banco renomeado de Quant Bank para **Triple P Bank**; códigos de erro de `BNK` para `PPP` (mesmo formato); serviço `triple-p-bank-api`. O fundo continua FGV Quant Capital. |
 
 ---
 

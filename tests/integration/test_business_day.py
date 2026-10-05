@@ -18,4 +18,4 @@ class TestBusinessDate:
         response = ClientRequisition.send("GET", "/internal/business_date")
 
         assert response.response_status == 403
-        assert response.response_json["code"] == "BNK000002"
+        assert response.response_json["code"] == "PPP000002"

@@ -38,7 +38,7 @@
 % ---------------------------------------------------------------------
 % Macros do documento
 % ---------------------------------------------------------------------
-\newcommand{\banco}{Quant Bank}            % nome provisorio do banco -- troquem aqui
+\newcommand{\banco}{Triple P Bank}            % nome provisorio do banco -- troquem aqui
 \newcommand{\fundo}{FGV Quant Capital}     % fundo ficticio da entidade
 \newcommand{\obr}{\textbf{[OBR]}}          % obrigatorio pelo desafio
 \newcommand{\dec}{\textbf{[DEC]}}          % decisao nossa (pode mudar)
@@ -446,10 +446,10 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   \tb{Idempotency-Key} (um UUID criado pelo cliente da API):
   \begin{itemize}
     \item mesma chave + mesmo corpo $\to$ devolve a resposta original, \textbf{sem} movimentar de novo;
-    \item mesma chave + corpo diferente $\to$ 409 (\tb{BNK000004});
+    \item mesma chave + corpo diferente $\to$ 409 (\tb{PPP000004});
     \item a checagem acontece \emph{depois} de travar as linhas envolvidas (RN-GER-12), para que
           um reenvio simultâneo receba a resposta original, e não um falso ``saldo insuficiente'';
-    \item sem o cabeçalho $\to$ 400 (\tb{BNK000003}).
+    \item sem o cabeçalho $\to$ 400 (\tb{PPP000003}).
   \end{itemize}
   \item[RN-GER-09 \dec] \textbf{Nomes de rota.} Em inglês, substantivos, identificados pela
   \tb{key}; singular para o item (\tb{/account/\{key\}}) e plural para listas
@@ -507,18 +507,18 @@ tem estado é a conta.
   \item[RN-CLI-01 \obr] Os campos \tb{name}, \tb{document_number} e \tb{birth_date} são
   obrigatórios (400 se faltar ou vier com tipo errado).
   \item[RN-CLI-02 \obr] O CPF precisa ser válido (dígitos verificadores). Usar o validador que já
-  existe em \tb{src/utils/document_number.py}. Inválido $\to$ 422 (\tb{BNK001003}).
+  existe em \tb{src/utils/document_number.py}. Inválido $\to$ 422 (\tb{PPP001003}).
   \item[RN-CLI-03 \obr] Não pode existir dois clientes com o mesmo CPF. Repetido $\to$ 409
-  (\tb{BNK001002}). Garantido também no banco com \tb{UNIQUE(document_number)}.
+  (\tb{PPP001002}). Garantido também no banco com \tb{UNIQUE(document_number)}.
   \item[RN-CLI-04 \dec] O CPF entra em \textbf{dois formatos}: \tb{000.000.000-00} ou 11 dígitos
   seguidos (\tb{00000000000}). Qualquer outro é recusado pelo schema com 400 (padrão
   \tb{pattern}). O controller normaliza para \tb{000.000.000-00} antes de qualquer regra, e é
   assim que ele é gravado, em \tb{CHAR(14)}. Por isso o mesmo CPF com pontuação diferente é
-  repetido (409, \tb{BNK001002}). Ver Seção~\ref{sec:decisoes}.
+  repetido (409, \tb{PPP001002}). Ver Seção~\ref{sec:decisoes}.
   \item[RN-CLI-04b \dec] Os schemas usam \tb{"additionalProperties": false}: campo que não está no
   contrato é recusado com 400.
   \item[RN-CLI-05 \dec] Idade mínima de 18 anos na data real (não na data de movimento, ver
-  RN-GER-13). Menor $\to$ 422 (\tb{BNK001004}). Data de nascimento no futuro também $\to$ 422.
+  RN-GER-13). Menor $\to$ 422 (\tb{PPP001004}). Data de nascimento no futuro também $\to$ 422.
   \item[RN-CLI-06 \dec] Nome com 3 a 120 caracteres, sem espaços sobrando nas pontas.
   \item[RN-CLI-07 \obr] A resposta de criação é 201 com \tb{customer_key}; nunca o \tb{id}.
   \item[RN-CLI-08 \dec] O CPF volta mascarado (RN-GER-10).
@@ -546,9 +546,9 @@ tem estado é a conta.
 
 \begin{regras}
   \item[RN-CON-01 \obr] A conta pertence a um cliente que precisa existir. \tb{customer_key}
-  inexistente $\to$ 404 (\tb{BNK001001}). Como a \tb{key} está no caminho, é 404 e não 422.
+  inexistente $\to$ 404 (\tb{PPP001001}). Como a \tb{key} está no caminho, é 404 e não 422.
   \item[RN-CON-02 \dec] \textbf{Limite de contas:} cada cliente pode ter no máximo
-  \textbf{uma} conta não encerrada. Tentar abrir outra $\to$ 409 (\tb{BNK002002}). (Esta é a
+  \textbf{uma} conta não encerrada. Tentar abrir outra $\to$ 409 (\tb{PPP002002}). (Esta é a
   ``regra que mais some'' segundo a Aula 2.) A linha do cliente é travada (\tb{FOR UPDATE})
   antes de contar, para que dois pedidos simultâneos não abram duas contas.
   \item[RN-CON-03 \dec] A conta nasce \tb{ACTIVE} com saldo 0, e o nascimento já gera um evento
@@ -558,14 +558,14 @@ tem estado é a conta.
   \item[RN-CON-05 \obr] Toda mudança de status gera uma linha em \tb{account_status_event} com
   status de origem, de destino, motivo e data.
   \item[RN-CON-06 \dec] Bloquear e encerrar exigem um motivo (\tb{reason}); sem motivo $\to$ 422
-  (\tb{BNK002006}).
-  \item[RN-CON-07 \obr] Transições fora da tabela acima $\to$ 409 (\tb{BNK002003}). \tb{CLOSED} é
+  (\tb{PPP002006}).
+  \item[RN-CON-07 \obr] Transições fora da tabela acima $\to$ 409 (\tb{PPP002003}). \tb{CLOSED} é
   final.
   \item[RN-CON-08 \dec] Só se encerra conta \textbf{vazia}: saldo zero e nenhuma posição de
-  investimento com quantidade maior que zero. Caso contrário $\to$ 409 (\tb{BNK002004}).
+  investimento com quantidade maior que zero. Caso contrário $\to$ 409 (\tb{PPP002004}).
   \item[RN-CON-09 \dec] Conta \tb{BLOCKED} ou \tb{CLOSED} não movimenta nada: não
   recebe depósito nem transferência, não faz saque, não aplica, não resgata $\to$ 409
-  (\tb{BNK002005}). Consultas (saldo, extrato) continuam funcionando.
+  (\tb{PPP002005}). Consultas (saldo, extrato) continuam funcionando.
   \item[RN-CON-10 \obr] Consultar uma conta de outro cliente $\to$ 404 (R8).
 \end{regras}
 
@@ -623,17 +623,17 @@ E o \tb{balance_after} do último lançamento é igual ao saldo atual. Ou seja: 
 
 \begin{regras}
   \item[RN-MOV-01 \obr] Valor (\tb{amount}) inteiro e maior que zero. Zero ou negativo $\to$ 422
-  (\tb{BNK003004}).
+  (\tb{PPP003004}).
   \item[RN-MOV-02 \dec] Limites por operação: depósito até \rs 1.000.000,00; saque até
-  \rs 5.000,00; transferência até \rs 50.000,00. Acima $\to$ 422 (\tb{BNK003005}).
+  \rs 5.000,00; transferência até \rs 50.000,00. Acima $\to$ 422 (\tb{PPP003005}).
   \item[RN-MOV-03 \obr] A conta do caminho precisa ser do cliente do caminho (senão 404) e estar
   \tb{ACTIVE} (senão 409).
   \item[RN-MOV-04 \obr] Saque e transferência exigem saldo suficiente \textbf{para o valor mais a
-  tarifa}. Faltou $\to$ 409 (\tb{BNK003003}), e nada é gravado.
+  tarifa}. Faltou $\to$ 409 (\tb{PPP003003}), e nada é gravado.
   \item[RN-MOV-05 \obr] Na transferência, a conta de destino (\tb{destination_account_key}) precisa
-  existir (404, \tb{BNK003002}) e estar \tb{ACTIVE} (409, \tb{BNK003007}). O destino pode ser de
+  existir (404, \tb{PPP003002}) e estar \tb{ACTIVE} (409, \tb{PPP003007}). O destino pode ser de
   outro cliente --- é assim que se paga alguém.
-  \item[RN-MOV-06 \obr] Origem igual a destino $\to$ 422 (\tb{BNK003006}).
+  \item[RN-MOV-06 \obr] Origem igual a destino $\to$ 422 (\tb{PPP003006}).
   \item[RN-MOV-07 \obr] \textbf{Atomicidade:} débito, crédito, tarifa, atualização dos dois saldos
   e a linha de \tb{transaction} acontecem na mesma transação de banco. O \tb{commit} é a última
   linha antes do \tb{return}; qualquer erro no meio desfaz tudo.
@@ -709,8 +709,8 @@ Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1
 \begin{regras}
   \item[RN-SUI-01 \obr] Só um cliente existente responde o questionário (404 se não existir).
   \item[RN-SUI-02 \obr] Todas as sete perguntas precisam de exatamente uma resposta. Falta pergunta,
-  pergunta repetida ou pergunta que não existe $\to$ 422 (\tb{BNK004002}). Opção que não pertence
-  à pergunta $\to$ 422 (\tb{BNK004003}).
+  pergunta repetida ou pergunta que não existe $\to$ 422 (\tb{PPP004002}). Opção que não pertence
+  à pergunta $\to$ 422 (\tb{PPP004003}).
   \item[RN-SUI-03 \dec] Perfil = faixa da soma dos pontos (tabela acima).
   \item[RN-SUI-04 \dec] \textbf{Trava de segurança:} quem responde (1) na Q3 (``resgataria tudo'')
   ou (1) na Q5 (``preciso a qualquer momento'') é \textbf{Conservador}, qualquer que seja a soma. A
@@ -718,12 +718,12 @@ Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1
   pontos seria Moderado ou Arrojado). Se os pontos já davam Conservador, \tb{forced_by_rule = false}.
   \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until} \tb{TIMESTAMPTZ} = hora real
   da resposta + 24 meses, não a data de movimento, ver RN-GER-13). Vencido (hora real depois de
-  \tb{valid_until}), o cliente não faz novas aplicações nem pede sugestão até refazer (409, \tb{BNK004004}).
+  \tb{valid_until}), o cliente não faz novas aplicações nem pede sugestão até refazer (409, \tb{PPP004004}).
   \item[RN-SUI-06 \obr] Refazer o questionário cria uma avaliação \textbf{nova}; as antigas continuam
   guardadas (R4). O perfil atual é sempre a avaliação mais recente.
   \item[RN-SUI-07 \dec] Cada avaliação guarda as respostas escolhidas (\tb{suitability_answer}),
   para que dê para explicar depois por que o cliente recebeu aquele perfil.
-  \item[RN-SUI-08 \dec] Consultar o perfil de quem nunca respondeu $\to$ 404 (\tb{BNK004001}).
+  \item[RN-SUI-08 \dec] Consultar o perfil de quem nunca respondeu $\to$ 404 (\tb{PPP004001}).
 \end{regras}
 
 % =====================================================================
@@ -765,17 +765,17 @@ D+0. Liquidez com prazo real fica como \ext.}
   criar produto no MVP (\ext: rota interna de cadastro).
   \item[RN-PRO-02 \obr] Todo produto tem \tb{product_key} (UUID) e só ela sai na API.
   \item[RN-PRO-03 \dec] Produto inativo (\tb{is_active = false}) ou vencido não aceita aplicação
-  $\to$ 409 (\tb{BNK005002}). Vencido $=$ \tb{maturity_date} $\le$ data de movimento: no dia do
+  $\to$ 409 (\tb{PPP005002}). Vencido $=$ \tb{maturity_date} $\le$ data de movimento: no dia do
   vencimento o título já é liquidado (RN-FEC-09), então não aceita aplicação nova. Vale só para
   quem tem vencimento fixo; produto com prazo (RN-PRO-09) nunca vence como um todo.
   \item[RN-PRO-04 \dec] O preço do dia é o registro de \tb{product_price} com a maior
   \tb{reference_date} menor ou igual à \textbf{data de movimento} (RN-GER-13). Se não existir
-  nenhum $\to$ 409 (\tb{BNK005003}) e a operação não acontece. Num dia sem preço novo (fim de
+  nenhum $\to$ 409 (\tb{PPP005003}) e a operação não acontece. Num dia sem preço novo (fim de
   semana, fechamento que falhou), vale o último publicado.
   \item[RN-PRO-05 \dec] \textbf{Removida.} Era a rota de publicação manual de preço
   (\tb{POST /product/\{key\}/price}). Preço novo só entra pelo fechamento do dia
   (Seção~\ref{sec:fechamento}); o motivo está nas alternativas descartadas. O número da regra e os
-  códigos \tb{BNK005004} e \tb{BNK005005} não são reaproveitados.
+  códigos \tb{PPP005004} e \tb{PPP005005} não são reaproveitados.
   \item[RN-PRO-06 \dec] \textbf{Preço simulado depende só da data.} O seed e o cenário do mock usam
   as mesmas fórmulas (tabela abaixo), em que $d$ é o número de dias úteis (segunda a sexta) depois
   da \textbf{data âncora fixa 01/01/2026}. Como a fórmula só usa a data, qualquer dia pode ser
@@ -854,7 +854,7 @@ produção, mudando só o endereço.
   abre o próximo dia útil. As duas são internas (só \tb{INTERNAL-TOKEN}).
   \item[RN-FEC-02 \dec] \textbf{Contra clique duplo.} O \tb{close_date} precisa ser a data de
   movimento atual: trava a linha de \tb{business_day} (\tb{FOR UPDATE}) e \textbf{relê} a data
-  atual depois da trava. Diferente $\to$ 409 (\tb{BNK000006}) e nada muda. Assim, dois pedidos
+  atual depois da trava. Diferente $\to$ 409 (\tb{PPP000006}) e nada muda. Assim, dois pedidos
   iguais fecham um dia só; o \tb{UNIQUE} de \tb{business_day}, \tb{product_price} e
   \tb{reference_rate} é a rede de segurança.
   \item[RN-FEC-03 \dec] \textbf{Próximo dia útil.} Sexta fecha para segunda; sábado e domingo nunca
@@ -866,8 +866,8 @@ produção, mudando só o endereço.
   $(1 + c \times$ \tb{cdi_percentage_bps}$/10000)$, com $c = (1 + \text{CDI do novo dia})^{1/252}
   - 1$, em \tb{Decimal} e arredondado em 8 casas.
   \item[RN-FEC-06 \obr] \textbf{Tudo ou nada.} Serviço fora do ar, demorando mais que o timeout (5 s)
-  ou respondendo erro $\to$ 502 (\tb{BNK005006}). Resposta sem sentido (preço $\le 0$, data
-  diferente da pedida, título ou fundo faltando, taxa ausente) $\to$ 502 (\tb{BNK005007}). Nos dois
+  ou respondendo erro $\to$ 502 (\tb{PPP005006}). Resposta sem sentido (preço $\le 0$, data
+  diferente da pedida, título ou fundo faltando, taxa ausente) $\to$ 502 (\tb{PPP005007}). Nos dois
   casos nada é gravado e a data de movimento não muda.
   \item[RN-FEC-07 \dec] \textbf{O que é gravado}, num \tb{commit} só: um preço por produto em
   \tb{product_price}, o CDI e a Selic em \tb{reference_rate} e a nova linha de \tb{business_day}.
@@ -950,9 +950,9 @@ Conferência: todo produto de cada carteira tem risco menor ou igual ao máximo 
 
 \begin{regras}
   \item[RN-CAR-01 \obr] Só sugere carteira para cliente com perfil válido. Sem perfil $\to$ 409
-  (\tb{BNK004005}); perfil vencido $\to$ 409 (\tb{BNK004004}).
+  (\tb{PPP004005}); perfil vencido $\to$ 409 (\tb{PPP004004}).
   \item[RN-CAR-02 \dec] Valor mínimo para sugestão: \rs 1.000,00 (garante que cada fatia respeite a
-  aplicação mínima do produto). Abaixo $\to$ 422 (\tb{BNK006001}).
+  aplicação mínima do produto). Abaixo $\to$ 422 (\tb{PPP006001}).
   \item[RN-CAR-03 \dec] \textbf{Cálculo:} para cada item, \tb{valor = floor(total} $\times$
   \tb{peso / 10000)}. Os centavos que sobram do arredondamento vão para o item de maior peso.
   Assim a soma dos itens é \emph{exatamente} o valor pedido.
@@ -989,16 +989,16 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
 
 \begin{regras}
   \item[RN-ORD-01 \obr] O cliente precisa existir (404) e ter uma conta \tb{ACTIVE} (409,
-  \tb{BNK007006} se não tiver conta; \tb{BNK002005} se ela estiver bloqueada).
-  \item[RN-ORD-02 \obr] Precisa ter perfil de suitability válido (409, \tb{BNK004005} ou
-  \tb{BNK004004}).
-  \item[RN-ORD-03 \obr] O produto precisa existir (404, \tb{BNK005001}), estar disponível (409,
-  \tb{BNK005002}) e ter preço do dia (409, \tb{BNK005003}).
+  \tb{PPP007006} se não tiver conta; \tb{PPP002005} se ela estiver bloqueada).
+  \item[RN-ORD-02 \obr] Precisa ter perfil de suitability válido (409, \tb{PPP004005} ou
+  \tb{PPP004004}).
+  \item[RN-ORD-03 \obr] O produto precisa existir (404, \tb{PPP005001}), estar disponível (409,
+  \tb{PPP005002}) e ter preço do dia (409, \tb{PPP005003}).
   \item[RN-ORD-04 \obr] \textbf{Adequação ao perfil:} risco do produto $\le$ risco máximo do perfil.
-  Senão $\to$ 422 (\tb{BNK007003}). \dec{} No MVP a regra \textbf{bloqueia}; aceitar com ``termo
+  Senão $\to$ 422 (\tb{PPP007003}). \dec{} No MVP a regra \textbf{bloqueia}; aceitar com ``termo
   de ciência'' fica como \ext.
-  \item[RN-ORD-05 \obr] Valor $\ge$ aplicação mínima do produto (422, \tb{BNK007002}) e saldo da
-  conta $\ge$ valor (409, \tb{BNK003003}).
+  \item[RN-ORD-05 \obr] Valor $\ge$ aplicação mínima do produto (422, \tb{PPP007002}) e saldo da
+  conta $\ge$ valor (409, \tb{PPP003003}).
   \item[RN-ORD-06 \dec] \textbf{Quantidade:} \tb{quantidade = valor / preço unitário}, truncada
   em 8 casas decimais. O valor debitado da conta é exatamente o valor pedido.
   \item[RN-ORD-07 \obr] \textbf{Atomicidade (4 escritas, 1 commit):} (a) trava a conta; (b) trava
@@ -1018,10 +1018,10 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   \item[RN-ORD-09 \dec] \textbf{Resgate não depende do perfil.} Mesmo com perfil vencido, o cliente
   sempre pode tirar o dinheiro (princípio de proteção ao cliente).
   \item[RN-ORD-10 \obr] Precisa existir posição com quantidade suficiente; senão $\to$ 409
-  (\tb{BNK007004}).
+  (\tb{PPP007004}).
   \item[RN-ORD-11 \dec] Produto com liquidez \tb{AT_MATURITY} só pode ser resgatado quando a data
   de movimento chega ao vencimento (o do produto ou, se ele tem prazo, o da aplicação,
-  RN-ORD-17). Antes $\to$ 422 (\tb{BNK007005}).
+  RN-ORD-17). Antes $\to$ 422 (\tb{PPP007005}).
   \item[RN-ORD-12 \dec] O resgate pode ser por valor (\tb{amount}) ou total
   (\tb{redeem_all: true}). Por valor: \tb{quantidade = valor / preço}, truncada em 8 casas. Total:
   quantidade = toda a posição e valor = \tb{floor(quantidade} $\times$ \tb{preço)} em centavos.
@@ -1133,7 +1133,7 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   \item[RN-REC-09 \dec] \textbf{Relatório.} \tb{GET /internal/revenue?from=\&to=} devolve as
   duas partes, em centavos. O período filtra pelo \tb{created_at} (hora real) dos lançamentos.
   Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
-  intervalo maior que 366 dias $\to$ 400 (\tb{BNK000005}). A rota é interna (não pertence a
+  intervalo maior que 366 dias $\to$ 400 (\tb{PPP000005}). A rota é interna (não pertence a
   nenhum cliente) e fica protegida pelo \tb{INTERNAL-TOKEN}; num banco real ela exigiria perfil de
   administrador, o que está fora do escopo.
   \item[RN-REC-10 \dec] Tesouro Direto não tem taxa para o cliente.
@@ -1316,8 +1316,8 @@ coisa, e responde 404 se não for.
 % =====================================================================
 
 Formato do corpo (RN-GER-05). \tb{title} e \tb{description} em inglês, \tb{translation} em
-português, \tb{code} = \tb{BNK} + módulo (3 dígitos) + número (3 dígitos). Troquem o prefixo
-\tb{BNK} pelo nome final do banco.
+português, \tb{code} = \tb{PPP} + módulo (3 dígitos) + número (3 dígitos). Troquem o prefixo
+\tb{PPP} pelo nome final do banco.
 
 \begin{lstlisting}
 HTTP/1.1 409 Conflict
@@ -1325,7 +1325,7 @@ HTTP/1.1 409 Conflict
   "title": "Insufficient Balance",
   "description": "The account does not have enough balance for amount plus fee.",
   "translation": "Saldo insuficiente para o valor mais a tarifa.",
-  "code": "BNK003003"
+  "code": "PPP003003"
 }
 \end{lstlisting}
 
@@ -1335,53 +1335,53 @@ HTTP/1.1 409 Conflict
 \textbf{Código} & \textbf{HTTP} & \textbf{Title} & \textbf{Quando} \\
 \midrule
 \endhead
-BNK000001 & 400 & Invalid Payload & Corpo fora do schema (campo faltando, tipo errado, enum inválido). \\
-BNK000002 & 403 & Forbidden & Sem \tb{INTERNAL-TOKEN} (repositório-base). \\
-BNK000003 & 400 & Missing Idempotency Key & Rota de dinheiro sem \tb{Idempotency-Key}. \\
-BNK000004 & 409 & Idempotency Key Reused & Mesma chave com corpo diferente. \\
-BNK000005 & 400 & Invalid Query Parameter & Paginação ou filtro inválido. \\
-BNK000006 & 409 & Business Date Mismatch & \tb{close_date} do fechamento não é a data de movimento atual. \\
+PPP000001 & 400 & Invalid Payload & Corpo fora do schema (campo faltando, tipo errado, enum inválido). \\
+PPP000002 & 403 & Forbidden & Sem \tb{INTERNAL-TOKEN} (repositório-base). \\
+PPP000003 & 400 & Missing Idempotency Key & Rota de dinheiro sem \tb{Idempotency-Key}. \\
+PPP000004 & 409 & Idempotency Key Reused & Mesma chave com corpo diferente. \\
+PPP000005 & 400 & Invalid Query Parameter & Paginação ou filtro inválido. \\
+PPP000006 & 409 & Business Date Mismatch & \tb{close_date} do fechamento não é a data de movimento atual. \\
 \midrule
-BNK001001 & 404 & Customer Not Found & \tb{customer_key} não existe. \\
-BNK001002 & 409 & Document Already Registered & CPF já cadastrado. \\
-BNK001003 & 422 & Invalid Document Number & CPF com dígitos verificadores errados. \\
-BNK001004 & 422 & Underage Customer & Menor de 18 anos ou nascimento no futuro. \\
+PPP001001 & 404 & Customer Not Found & \tb{customer_key} não existe. \\
+PPP001002 & 409 & Document Already Registered & CPF já cadastrado. \\
+PPP001003 & 422 & Invalid Document Number & CPF com dígitos verificadores errados. \\
+PPP001004 & 422 & Underage Customer & Menor de 18 anos ou nascimento no futuro. \\
 \midrule
-BNK002001 & 404 & Account Not Found & Conta inexistente ou de outro cliente. \\
-BNK002002 & 409 & Account Already Exists & Cliente já tem conta não encerrada. \\
-BNK002003 & 409 & Invalid Status Transition & Transição proibida (ex.: sair de CLOSED). \\
-BNK002004 & 409 & Account Not Empty & Encerrar com saldo ou posição. \\
-BNK002005 & 409 & Account Not Active & Movimentar conta bloqueada ou encerrada. \\
-BNK002006 & 422 & Status Reason Required & Bloquear/encerrar sem motivo. \\
+PPP002001 & 404 & Account Not Found & Conta inexistente ou de outro cliente. \\
+PPP002002 & 409 & Account Already Exists & Cliente já tem conta não encerrada. \\
+PPP002003 & 409 & Invalid Status Transition & Transição proibida (ex.: sair de CLOSED). \\
+PPP002004 & 409 & Account Not Empty & Encerrar com saldo ou posição. \\
+PPP002005 & 409 & Account Not Active & Movimentar conta bloqueada ou encerrada. \\
+PPP002006 & 422 & Status Reason Required & Bloquear/encerrar sem motivo. \\
 \midrule
-BNK003001 & 404 & Transaction Not Found & Inexistente ou não envolve a conta. \\
-BNK003002 & 404 & Destination Account Not Found & Conta de destino não existe. \\
-BNK003003 & 409 & Insufficient Balance & Saldo menor que valor + tarifa (ou que a aplicação). \\
-BNK003004 & 422 & Invalid Amount & Valor zero ou negativo. \\
-BNK003005 & 422 & Amount Above Limit & Acima do limite por operação. \\
-BNK003006 & 422 & Same Account Transfer & Origem igual ao destino. \\
-BNK003007 & 409 & Destination Account Not Active & Destino bloqueado ou encerrado. \\
+PPP003001 & 404 & Transaction Not Found & Inexistente ou não envolve a conta. \\
+PPP003002 & 404 & Destination Account Not Found & Conta de destino não existe. \\
+PPP003003 & 409 & Insufficient Balance & Saldo menor que valor + tarifa (ou que a aplicação). \\
+PPP003004 & 422 & Invalid Amount & Valor zero ou negativo. \\
+PPP003005 & 422 & Amount Above Limit & Acima do limite por operação. \\
+PPP003006 & 422 & Same Account Transfer & Origem igual ao destino. \\
+PPP003007 & 409 & Destination Account Not Active & Destino bloqueado ou encerrado. \\
 \midrule
-BNK004001 & 404 & Suitability Not Found & Cliente nunca respondeu o questionário. \\
-BNK004002 & 422 & Incomplete Answers & Falta pergunta ou pergunta repetida. \\
-BNK004003 & 422 & Invalid Option & Opção não pertence à pergunta. \\
-BNK004004 & 409 & Suitability Expired & Perfil com mais de 24 meses. \\
-BNK004005 & 409 & Suitability Required & Aplicar ou pedir sugestão sem perfil. \\
+PPP004001 & 404 & Suitability Not Found & Cliente nunca respondeu o questionário. \\
+PPP004002 & 422 & Incomplete Answers & Falta pergunta ou pergunta repetida. \\
+PPP004003 & 422 & Invalid Option & Opção não pertence à pergunta. \\
+PPP004004 & 409 & Suitability Expired & Perfil com mais de 24 meses. \\
+PPP004005 & 409 & Suitability Required & Aplicar ou pedir sugestão sem perfil. \\
 \midrule
-BNK005001 & 404 & Product Not Found & \tb{product_key} não existe. \\
-BNK005002 & 409 & Product Not Available & Produto inativo ou vencido. \\
-BNK005003 & 409 & Price Unavailable & Nenhum preço até a data de movimento. \\
-BNK005006 & 502 & Price Source Unavailable & Fonte externa de preço ou taxa fora do ar, com timeout ou respondendo erro. \\
-BNK005007 & 502 & Invalid Price Source Response & Fonte externa respondeu algo sem sentido (preço $\le 0$, data errada, produto ou taxa faltando). \\
+PPP005001 & 404 & Product Not Found & \tb{product_key} não existe. \\
+PPP005002 & 409 & Product Not Available & Produto inativo ou vencido. \\
+PPP005003 & 409 & Price Unavailable & Nenhum preço até a data de movimento. \\
+PPP005006 & 502 & Price Source Unavailable & Fonte externa de preço ou taxa fora do ar, com timeout ou respondendo erro. \\
+PPP005007 & 502 & Invalid Price Source Response & Fonte externa respondeu algo sem sentido (preço $\le 0$, data errada, produto ou taxa faltando). \\
 \midrule
-BNK006001 & 422 & Suggestion Amount Too Low & Sugestão abaixo de \rs 1.000,00. \\
+PPP006001 & 422 & Suggestion Amount Too Low & Sugestão abaixo de \rs 1.000,00. \\
 \midrule
-BNK007001 & 404 & Order Not Found & Ordem inexistente ou de outro cliente. \\
-BNK007002 & 422 & Below Minimum Application & Valor menor que o mínimo do produto. \\
-BNK007003 & 422 & Product Not Suitable & Risco do produto acima do perfil. \\
-BNK007004 & 409 & Insufficient Position & Resgate maior que a posição. \\
-BNK007005 & 422 & Redemption Not Allowed & Resgate antes do vencimento (liquidez no vencimento). \\
-BNK007006 & 409 & No Active Account & Cliente sem conta ativa para liquidar a ordem. \\
+PPP007001 & 404 & Order Not Found & Ordem inexistente ou de outro cliente. \\
+PPP007002 & 422 & Below Minimum Application & Valor menor que o mínimo do produto. \\
+PPP007003 & 422 & Product Not Suitable & Risco do produto acima do perfil. \\
+PPP007004 & 409 & Insufficient Position & Resgate maior que a posição. \\
+PPP007005 & 422 & Redemption Not Allowed & Resgate antes do vencimento (liquidez no vencimento). \\
+PPP007006 & 409 & No Active Account & Cliente sem conta ativa para liquidar a ordem. \\
 \bottomrule
 \end{longtable}
 \endgroup
@@ -1397,15 +1397,15 @@ seção ``Fluxos'' da RFC.
 \textbf{Feliz:} (1) schema valida o corpo; (2) normaliza o CPF para \tb{000.000.000-00}; (3) valida dígitos;
 (4) confere idade $\ge$ 18; (5) busca CPF no banco --- não existe; (6) cria com \tb{customer_key}
 nova; (7) \tb{commit}; (8) 201.\\
-\textbf{Falhas:} passo 3 $\to$ 422 \tb{BNK001003}; passo 4 $\to$ 422 \tb{BNK001004}; passo 5 $\to$
-409 \tb{BNK001002}. Corrida (dois cadastros iguais ao mesmo tempo): o \tb{UNIQUE} do banco recusa
+\textbf{Falhas:} passo 3 $\to$ 422 \tb{PPP001003}; passo 4 $\to$ 422 \tb{PPP001004}; passo 5 $\to$
+409 \tb{PPP001002}. Corrida (dois cadastros iguais ao mesmo tempo): o \tb{UNIQUE} do banco recusa
 o segundo; o controller transforma o erro de integridade em 409.
 
 \subsection{Abrir conta}
 \textbf{Feliz:} (1) busca cliente pela \tb{key}; (2) trava a linha do cliente (\tb{FOR UPDATE});
 (3) conta contas não encerradas = 0; (4) cria conta \tb{ACTIVE}, saldo 0; (5) grava evento
 \tb{null} $\to$ \tb{ACTIVE}; (6) \tb{commit}; (7) 201.\\
-\textbf{Falhas:} passo 1 $\to$ 404; passo 3 $\to$ 409 \tb{BNK002002}. Dois pedidos simultâneos: o
+\textbf{Falhas:} passo 1 $\to$ 404; passo 3 $\to$ 409 \tb{PPP002002}. Dois pedidos simultâneos: o
 segundo espera a trava do passo 2, conta uma conta e recebe 409.
 
 \subsection{Transferência (o coração do sistema)}
@@ -1425,7 +1425,7 @@ segundo espera a trava do passo 2, conta uma conta e recebe 409.
 \end{enumerate}
 \textbf{Falhas:}
 \begin{itemize}
-  \item Saldo insuficiente no passo 6 $\to$ nada foi escrito, \tb{rollback}, 409 \tb{BNK003003}.
+  \item Saldo insuficiente no passo 6 $\to$ nada foi escrito, \tb{rollback}, 409 \tb{PPP003003}.
   \item Duas transferências simultâneas de uma conta com \rs 100 (cada uma de \rs 80): a segunda
         espera a trava da primeira no passo 4; quando lê o saldo já vê \rs 18 e recebe 409. Sem a
         trava, as duas leriam \rs 100 e o saldo ficaria negativo (o \tb{CHECK} do banco
@@ -1442,7 +1442,7 @@ segundo espera a trava do passo 2, conta uma conta e recebe 409.
 \textbf{Feliz:} (1) busca cliente; (2) confere 7 respostas, uma por pergunta, opções válidas; (3)
 soma pontos; (4) aplica a trava da Q3/Q5; (5) escolhe o perfil pela faixa; (6) grava avaliação +
 7 respostas, \tb{valid_until} = hora real + 24 meses; (7) \tb{commit}; (8) 201.\\
-\textbf{Falhas:} passo 1 $\to$ 404; passo 2 $\to$ 422 \tb{BNK004002}/\tb{BNK004003}.
+\textbf{Falhas:} passo 1 $\to$ 404; passo 2 $\to$ 422 \tb{PPP004002}/\tb{PPP004003}.
 
 \subsection{Aplicação}
 \textbf{Feliz:} (1) schema e \tb{Idempotency-Key}; (2) busca cliente, conta ativa, perfil
@@ -1452,11 +1452,11 @@ checa a idempotência, já com as travas; confere saldo $\ge$ valor; (7) calcula
 lançamento de débito, atualiza saldo; (9) grava ordem; (10) soma quantidade e custo na posição;
 (11) \tb{commit}; (12) 201.\\
 \textbf{Falhas:} perfil vencido $\to$ 409; produto de risco 3 para Conservador $\to$ 422
-\tb{BNK007003}; sem preço $\to$ 409 \tb{BNK005003}; saldo insuficiente $\to$ 409 (nada gravado).
+\tb{PPP007003}; sem preço $\to$ 409 \tb{PPP005003}; saldo insuficiente $\to$ 409 (nada gravado).
 
 \subsection{Resgate}
-Igual à aplicação, sem a checagem de perfil, com: posição suficiente (409 \tb{BNK007004}),
-liquidez (422 \tb{BNK007005} antes do vencimento), crédito na conta e redução proporcional do
+Igual à aplicação, sem a checagem de perfil, com: posição suficiente (409 \tb{PPP007004}),
+liquidez (422 \tb{PPP007005} antes do vencimento), crédito na conta e redução proporcional do
 custo; a ordem guarda o custo que saiu e a resposta traz resultado e rentabilidade (RN-ORD-16).
 
 \subsection*{Principal desafio (candidato para a RFC)}
@@ -1630,9 +1630,9 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   pedido antes de olhar a conta) --- descartada porque, para uma conta \tb{CLOSED}, dizer ``falta
   o motivo'' induz o cliente a reenviar com motivo e receber outro erro; o estado da conta é a
   recusa mais definitiva. Ganharia se quiséssemos recusar sem consultar o banco. \emph{Escolhido:}
-  com a conta travada, transição proibida (409 \tb{BNK002003}) $\to$ falta de motivo (422
-  \tb{BNK002006}; motivo vazio ou só com espaços conta como ausente) $\to$ conta não vazia (409
-  \tb{BNK002004}).
+  com a conta travada, transição proibida (409 \tb{PPP002003}) $\to$ falta de motivo (422
+  \tb{PPP002006}; motivo vazio ou só com espaços conta como ausente) $\to$ conta não vazia (409
+  \tb{PPP002004}).
   \item \textbf{Paginar o histórico de status} (\tb{GET .../status_events} com \tb{page} e
   \tb{limit}, como o extrato) --- descartada porque uma conta tem poucos eventos (abertura,
   bloqueios, encerramento) e a paginação traria schema de query e mais um 400 sem ganho. Ganharia
@@ -1654,10 +1654,10 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   $\approx$ \rs 1,00) --- descartada porque dificulta conferir as contas na mão. Ganharia se o
   objetivo fosse realismo visual. \emph{Escolhido:} todos valem \rs 100,00 na data âncora.
   \item \textbf{Códigos de erro com numeração livre} (o número do meio sem ligação com o módulo,
-  como era antes: os erros de ordens, Módulo 7, usavam \tb{BNK006}) --- descartada porque quem lê
-  \tb{BNK006xxx} espera um erro do Módulo 6, e a carteira (Módulo 6) ficava misturada com as
+  como era antes: os erros de ordens, Módulo 7, usavam \tb{PPP006}) --- descartada porque quem lê
+  \tb{PPP006xxx} espera um erro do Módulo 6, e a carteira (Módulo 6) ficava misturada com as
   ordens. Ganharia se os módulos mudassem de número com frequência. \emph{Escolhido:} o número do
-  meio é o número do módulo (carteira \tb{BNK006}, ordens \tb{BNK007}).
+  meio é o número do módulo (carteira \tb{PPP006}, ordens \tb{PPP007}).
   \item \textbf{\tb{forced_by_rule = true} sempre que Q3 ou Q5 for (1)} --- descartada porque quem
   responde tudo (1) soma 7 pontos e já é Conservador pelos pontos; dizer que foi a trava seria
   explicar o perfil com um motivo falso. Ganharia se o campo quisesse dizer ``marcou uma resposta de
@@ -1667,7 +1667,7 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   --- descartada porque as perguntas moram no banco (decisão 6) e o schema não consulta o banco:
   toda pergunta nova no seed exigiria mudar o schema junto. Ganharia se o questionário nunca
   mudasse. \emph{Escolhido:} o schema confere só o formato (texto e número inteiro); pergunta
-  inexistente é conteúdo e dá 422 \tb{BNK004002}, como falta ou repetição (RN-SUI-02).
+  inexistente é conteúdo e dá 422 \tb{PPP004002}, como falta ou repetição (RN-SUI-02).
   \item \textbf{Paginar o histórico de suitability} (\tb{GET /customer/\{ck\}/suitabilities} com
   \tb{page} e \tb{limit}) --- descartada pelo mesmo motivo do histórico de status: um cliente
   responde o questionário poucas vezes (o perfil vale 24 meses), e a paginação traria schema de
@@ -1681,7 +1681,7 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   existisse um produto sem fonte externa nem fórmula, cujo preço alguém precisasse digitar.
   \emph{Escolhido:} preço novo só entra pelo fechamento do dia.
   \item \textbf{LCI com vencimento fixo e prazo mínimo checado na aplicação} (coluna
-  \tb{min_remaining_months}, erro \tb{BNK005008} ``Minimum Term Not Met'', LCI movida para 2028 e
+  \tb{min_remaining_months}, erro \tb{PPP005008} ``Minimum Term Not Met'', LCI movida para 2028 e
   uma LCA 2027 que já nasceria bloqueada) --- descartada porque trata uma emissão própria como se
   fosse um título do Tesouro: com vencimento fixo, a LCI fica bloqueada nos últimos 9 meses e
   ``some'' da carteira Conservadora, e o mercado não funciona assim. Ganharia se o banco

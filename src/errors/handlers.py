@@ -82,13 +82,13 @@ def register_error_handlers(application: FastAPI) -> None:
         #
         # Quem julga a query string aqui e o JSON Schema, antes do
         # FastAPI (veja utils/schema_handler.py). Um ?page=-3 morre la,
-        # com 400 BNK000001 — nunca chega a virar RequestValidationError.
+        # com 400 PPP000001 — nunca chega a virar RequestValidationError.
         # E os parametros de endereco sao todos `str`, que nao tem como
         # falhar validacao.
         #
         # O ramo fica de pe para o dia em que alguma rota declarar um
         # parametro tipado (page: int) e passar a depender do FastAPI
-        # para isso. Hoje nenhuma rota responde BNK000005:
+        # para isso. Hoje nenhuma rota responde PPP000005:
         # o erro continua em base_error.py, pronto para um controller
         # que precise recusar parametros que se contradizem.
         if origin in ("query", "path"):

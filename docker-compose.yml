@@ -31,7 +31,7 @@ services:
       # endereco do banco e sempre este.
       DATABASE_URL: postgresql+psycopg2://bootcamp:bootcamp@db:5432/bootcamp
       APP_ENV: ${APP_ENV:-local}
-      SERVICE_NAME: ${SERVICE_NAME:-quant-bank-api}
+      SERVICE_NAME: ${SERVICE_NAME:-triple-p-bank-api}
       # Com "true", todo SQL emitido aparece no log da API. Desligado
       # por padrao: ligado, e uma linha de log por comando.
       DATABASE_ECHO: ${DATABASE_ECHO:-false}
