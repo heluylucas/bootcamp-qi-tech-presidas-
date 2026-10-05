@@ -4,4 +4,5 @@ from resources.customer import CustomerResource
 from resources.account import AccountResource
 from resources.suitability import SuitabilityResource
 from resources.product import ProductResource
+from resources.portfolio import PortfolioResource
 from resources.transaction import TransactionResource

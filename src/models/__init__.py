@@ -10,4 +10,5 @@ from models.suitability import (
     SuitabilityAnswer,
 )
 from models.product import ProductType, Product, ProductPrice
+from models.model_portfolio import ModelPortfolioItem, ModelPortfolio
 from models.reference_rate import ReferenceRate
