@@ -245,14 +245,14 @@ Todo erro da API responde no mesmo formato:
 O `code` é `PPP` + módulo (3 dígitos) + número (3 dígitos). Os genéricos,
 que toda rota pode devolver, moram em `src/errors/base_error.py`:
 
-| Código      | HTTP | Quando acontece                                |
-|-------------|------|------------------------------------------------|
-| `PPP000001` | 400  | o JSON ou a query string estão fora do formato |
-| `PPP000002` | 403  | faltou o `INTERNAL-TOKEN`, ou ele está errado  |
-| `PPP000005` | 400  | parâmetro de endereço ou de query inválido     |
-| `PPP000404` | 404  | essa rota não existe                           |
-| `PPP000405` | 405  | a rota existe, mas não aceita esse método      |
-| `PPP000500` | 500  | erro inesperado                                |
+| Código      | HTTP | Quando acontece                                                             |
+|-------------|------|-----------------------------------------------------------------------------|
+| `PPP000001` | 400  | o JSON ou a query string estão fora do formato (schema)                     |
+| `PPP000002` | 403  | faltou o `INTERNAL-TOKEN`, ou ele está errado                               |
+| `PPP000005` | 400  | parâmetros no formato certo que se contradizem (ex.: `from` depois de `to`) |
+| `PPP000404` | 404  | essa rota não existe                                                        |
+| `PPP000405` | 405  | a rota existe, mas não aceita esse método                                   |
+| `PPP000500` | 500  | erro inesperado                                                             |
 
 Os de cada módulo moram em `src/errors/custom_errors.py`, e o catálogo
 completo está na seção "Catálogo de erros" de `docs/regras_de_negocio.tex`.

@@ -1336,11 +1336,11 @@ HTTP/1.1 409 Conflict
 \textbf{Código} & \textbf{HTTP} & \textbf{Title} & \textbf{Quando} \\
 \midrule
 \endhead
-PPP000001 & 400 & Invalid Payload & Corpo fora do schema (campo faltando, tipo errado, enum inválido). \\
+PPP000001 & 400 & Invalid Payload & Corpo ou query string fora do schema (campo faltando, tipo ou formato errado, enum inválido, parâmetro desconhecido). \\
 PPP000002 & 403 & Forbidden & Sem \tb{INTERNAL-TOKEN} (repositório-base). \\
 PPP000003 & 400 & Missing Idempotency Key & Rota de dinheiro sem \tb{Idempotency-Key}. \\
 PPP000004 & 409 & Idempotency Key Reused & Mesma chave com corpo diferente. \\
-PPP000005 & 400 & Invalid Query Parameter & Paginação ou filtro inválido. \\
+PPP000005 & 400 & Invalid Query Parameter & Parâmetros com formato certo que se contradizem (ex.: \tb{from} depois de \tb{to}, período maior que 366 dias). \\
 PPP000006 & 409 & Business Date Mismatch & \tb{close_date} do fechamento não é a data de movimento atual. \\
 \midrule
 PPP001001 & 404 & Customer Not Found & \tb{customer_key} não existe. \\
