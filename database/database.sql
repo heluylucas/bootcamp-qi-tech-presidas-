@@ -222,8 +222,14 @@ CREATE TABLE product(
     rate_description                VARCHAR(100) NOT NULL,
     risk_level                      SMALLINT NOT NULL CHECK (risk_level BETWEEN 1 AND 5),
     liquidity                       VARCHAR(11) NOT NULL CHECK (liquidity IN ('DAILY', 'AT_MATURITY')),
+    -- Título com vencimento fixo (Tesouro) usa maturity_date. Emissão própria com prazo usa
+    -- term_months: cada aplicação vence em data da aplicação + prazo (RN-PRO-09).
     maturity_date                   DATE,
-    min_application                 BIGINT NOT NULL CHECK (min_application > 0),
+    term_months                     SMALLINT CHECK (term_months > 0),
+    -- Isento de IR (LCI, LCA). O CMN exige prazo mínimo de 9 meses para essas letras
+    -- (Resoluções CMN 5.119/2024 e 5.168/2024).
+    tax_exempt                      BOOLEAN NOT NULL DEFAULT false,
+    min_application                BIGINT NOT NULL CHECK (min_application > 0),
     is_active                       BOOLEAN NOT NULL DEFAULT true,
     own_issue                       BOOLEAN NOT NULL DEFAULT false,
     cdi_percentage_bps              SMALLINT CHECK (cdi_percentage_bps > 0),
@@ -231,7 +237,9 @@ CREATE TABLE product(
     -- Como a fonte externa chama o produto (RN-FEC-04). Nulo na emissão própria.
     external_code                   VARCHAR(50),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (maturity_date IS NULL OR term_months IS NULL),
+    CHECK (NOT tax_exempt OR term_months >= 9)
 );
 
 -- Histórico das taxas (RN-REC-08): uma linha por taxa e por data, nunca alterada.
@@ -258,18 +266,20 @@ INSERT INTO reference_rate (code, reference_date, annual_rate_bps) VALUES
 ('SELIC', CURRENT_DATE, 1500);
 
 INSERT INTO product (product_key, name, type_id, issuer, indexer, rate_description, risk_level, liquidity,
-                     maturity_date, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
+                     maturity_date, term_months, tax_exempt, min_application, own_issue, cdi_percentage_bps,
+                     admin_fee_bps, external_code)
 SELECT gen_random_uuid()::text, v.name, t.id, v.issuer, v.indexer, v.rate_description, v.risk_level, v.liquidity,
-       v.maturity_date::date, v.min_application, v.own_issue, v.cdi_percentage_bps, v.admin_fee_bps, v.external_code
+       v.maturity_date::date, v.term_months, v.tax_exempt, v.min_application, v.own_issue, v.cdi_percentage_bps,
+       v.admin_fee_bps, v.external_code
 FROM (VALUES
-    ('Tesouro Selic 2031',     'PUBLIC_BOND',  'Tesouro Nacional',  'SELIC',    '100% da Selic',           1, 'DAILY',       '2031-03-01', 5000,  false, NULL, NULL, 'TESOURO SELIC 2031'),
-    ('CDB Quant Bank Liquidez','PRIVATE_BOND', 'Quant Bank',        'CDI',      '95% do CDI',              2, 'DAILY',       NULL,         5000,  true,  9500, NULL, NULL),
-    ('LCI Quant Bank 2027',    'PRIVATE_BOND', 'Quant Bank',        'CDI',      '93% do CDI, isento de IR',2, 'AT_MATURITY', '2027-03-01', 10000, true,  9300, NULL, NULL),
-    ('Tesouro Prefixado 2029', 'PUBLIC_BOND',  'Tesouro Nacional',  'PREFIXED', '13% a.a.',                2, 'DAILY',       '2029-01-01', 5000,  false, NULL, NULL, 'TESOURO PREFIXADO 2029'),
-    ('Tesouro IPCA+ 2035',     'PUBLIC_BOND',  'Tesouro Nacional',  'IPCA',     'IPCA + 6% a.a.',          3, 'DAILY',       '2035-05-15', 5000,  false, NULL, NULL, 'TESOURO IPCA+ 2035'),
-    ('FGV Quant Capital FIM',  'FUND',         'FGV Quant Capital', 'QUOTA',    'Varia com a cota',        3, 'DAILY',       NULL,         10000, false, NULL, 100,  '12.345.678/0001-95')
+    ('Tesouro Selic 2031',      'PUBLIC_BOND',  'Tesouro Nacional',  'SELIC',    '100% da Selic',           1, 'DAILY',       '2031-03-01', NULL, false, 5000,  false, NULL, NULL, 'TESOURO SELIC 2031'),
+    ('CDB Quant Bank Liquidez', 'PRIVATE_BOND', 'Quant Bank',        'CDI',      '95% do CDI',              2, 'DAILY',       NULL,         NULL, false, 5000,  true,  9500, NULL, NULL),
+    ('LCI Quant Bank 12 meses', 'PRIVATE_BOND', 'Quant Bank',        'CDI',      '93% do CDI, isento de IR',2, 'AT_MATURITY', NULL,         12,   true,  10000, true,  9300, NULL, NULL),
+    ('Tesouro Prefixado 2029',  'PUBLIC_BOND',  'Tesouro Nacional',  'PREFIXED', '13% a.a.',                2, 'DAILY',       '2029-01-01', NULL, false, 5000,  false, NULL, NULL, 'TESOURO PREFIXADO 2029'),
+    ('Tesouro IPCA+ 2035',      'PUBLIC_BOND',  'Tesouro Nacional',  'IPCA',     'IPCA + 6% a.a.',          3, 'DAILY',       '2035-05-15', NULL, false, 5000,  false, NULL, NULL, 'TESOURO IPCA+ 2035'),
+    ('FGV Quant Capital FIM',   'FUND',         'FGV Quant Capital', 'QUOTA',    'Varia com a cota',        3, 'DAILY',       NULL,         NULL, false, 10000, false, NULL, 100,  '12.345.678/0001-95')
 ) AS v(name, type, issuer, indexer, rate_description, risk_level, liquidity,
-       maturity_date, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
+       maturity_date, term_months, tax_exempt, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
 JOIN product_type t ON t.enumerator = v.type;
 
 -- Preço do dia em que o banco nasce, pelas fórmulas da RN-PRO-06 (as mesmas do mock).
@@ -334,7 +344,7 @@ SELECT mp.id, p.id, v.weight_bps
 FROM (VALUES
     ('CONSERVATIVE', 'Tesouro Selic 2031',      5000),
     ('CONSERVATIVE', 'CDB Quant Bank Liquidez', 3000),
-    ('CONSERVATIVE', 'LCI Quant Bank 2027',     2000),
+    ('CONSERVATIVE', 'LCI Quant Bank 12 meses', 2000),
     ('MODERATE',     'Tesouro Selic 2031',      2500),
     ('MODERATE',     'CDB Quant Bank Liquidez', 2000),
     ('MODERATE',     'Tesouro Prefixado 2029',  2000),
