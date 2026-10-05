@@ -491,9 +491,14 @@ três rodadas seguidas.
 
 **Ajuste no `PriceSourceMock`:** a primeira rodada (antes da rota existir)
 deixou respostas ensinadas e não consumidas no mock, que atrapalhariam a
-rodada seguinte. Agora o `teach_day` apaga primeiro o que o mock sabia
-daquele dia (`Mock().clear_request`). O teste do cenário da demonstração
-passou a conferir um dia 30 dias úteis à frente, que a suíte não alcança.
+rodada seguinte. Primeiro o `teach_day` apagava o que o mock sabia daquele
+dia (`clear_request`), mas isso levava junto o cenário da demonstração: depois
+de umas 2 rodadas, o `test_price_source_mock.py` dava 404. Agora toda resposta
+de teste tem um id fixo por fonte e dia (`test-{fonte}-{dia}`), e o MockServer
+troca a resposta de mesmo id em vez de empilhar. A sobra some, e o cenário do
+`mock-init` (que tem outro id) fica intacto. Limite que sobra: o `mock-init`
+só ensina 60 dias úteis, então a demonstração manual sai da janela depois de
+muitas rodadas sem `docker compose down -v`.
 
 **Demonstração manual conferida:** com ambiente novo e sem ensinar nada,
 `POST /internal/day_close {"close_date": "2026-10-04"}` abriu 05/10 com os

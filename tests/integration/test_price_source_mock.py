@@ -25,9 +25,9 @@ def business_days_ahead(day: date, count: int) -> date:
 
 
 # O mock-init ensina 60 dias úteis a partir da data real em que o compose
-# subiu. Os testes do fechamento apagam e fecham os primeiros dias dessa
-# janela (PriceSourceMock.teach_day), então aqui se confere um dia lá na
-# frente, que a suíte não alcança: 30 dias úteis depois de hoje.
+# subiu. Os testes ensinam respostas próprias por cima (com id fixo, sem
+# apagar o cenário), então qualquer dia dessa janela serve: 30 dias úteis
+# depois de hoje.
 FAR_DAY = business_days_ahead(date.today(), 30)
 
 
