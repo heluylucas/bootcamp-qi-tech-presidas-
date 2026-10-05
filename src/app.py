@@ -169,7 +169,7 @@ def create_app() -> FastAPI:
         suitability_resource.on_get_history,
         methods=["GET"]
     )
-    
+
     product_resource = ProductResource()
     product_path = "/product/{product_key}"
 
