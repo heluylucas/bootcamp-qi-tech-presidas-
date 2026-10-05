@@ -251,6 +251,9 @@ class SuitabilityRequired(QIException):
         http_status = 409
         description = "The customer needs an investor profile before this operation."
         translation = "O cliente precisa responder o questionário de perfil de investidor antes desta operação."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
 class ProductNotFound(QIException):
     code = "PPP005001"
 
@@ -260,7 +263,6 @@ class ProductNotFound(QIException):
         description = "The product_key does not exist."
         translation = "Produto não encontrado."
         super().__init__(title, self.code, http_status, description, translation)
-
 
 
 class PriceSourceUnavailable(QIException):

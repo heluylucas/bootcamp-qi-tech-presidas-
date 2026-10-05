@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timezone
+from datetime import datetime, timezone
 
 from controllers.base_controller import BaseController
 from dtos.suitability_dto import assessment_to_dict, question_to_dict
@@ -63,9 +63,7 @@ class SuitabilityController(BaseController):
         if forced_by_rule:
             profile = SuitabilityRepository.get_profile(self.context, SAFE_PROFILE)
 
-        valid_until = datetime.combine(
-            add_months(self.business_date(), VALIDITY_MONTHS), time.min, tzinfo=timezone.utc
-        )
+        valid_until = add_months(self.now(), VALIDITY_MONTHS)
         assessment = SuitabilityRepository.create_assessment(
             self.context, customer.id, profile.id, score, forced_by_rule, valid_until
         )
@@ -101,16 +99,16 @@ class SuitabilityController(BaseController):
         if assessment is None:
             raise SuitabilityRequired()
 
-        if self.business_date() > assessment.valid_until.astimezone(timezone.utc).date():
+        if self.now() > assessment.valid_until:
             raise SuitabilityExpired()
 
         return assessment
 
-    def business_date(self) -> date:
-        # TODO(módulo 4): trocar por BusinessDayRepository.get_current(self.context)
-        # quando a data de movimento (Fase 1 do Lucas) entrar. Este é o único
-        # lugar do módulo que olha o relógio.
-        return datetime.now(timezone.utc).date()
+    def now(self) -> datetime:
+        # O relógio real, e não a data de movimento: a validade do perfil é um
+        # fato regulatório (RN-SUI-05, RN-GER-13), e a data de movimento pode
+        # estar à frente do calendário. Único lugar do módulo que olha o relógio.
+        return datetime.now(timezone.utc)
 
     def get_customer(self, customer_key: str) -> Customer:
         customer = CustomerRepository.get_by_key(self.context, customer_key)
