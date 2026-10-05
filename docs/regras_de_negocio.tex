@@ -952,7 +952,8 @@ Conferência: todo produto de cada carteira tem risco menor ou igual ao máximo 
   \item[RN-CAR-01 \obr] Só sugere carteira para cliente com perfil válido. Sem perfil $\to$ 409
   (\tb{PPP004005}); perfil vencido $\to$ 409 (\tb{PPP004004}).
   \item[RN-CAR-02 \dec] Valor mínimo para sugestão: \rs 1.000,00 (garante que cada fatia respeite a
-  aplicação mínima do produto). Abaixo $\to$ 422 (\tb{PPP006001}).
+  aplicação mínima do produto). Abaixo $\to$ 422 (\tb{PPP006001}). A falta de perfil (RN-CAR-01)
+  é conferida antes do valor: sem perfil e com valor baixo, a resposta é o 409.
   \item[RN-CAR-03 \dec] \textbf{Cálculo:} para cada item, \tb{valor = floor(total} $\times$
   \tb{peso / 10000)}. Os centavos que sobram do arredondamento vão para o item de maior peso.
   Assim a soma dos itens é \emph{exatamente} o valor pedido.
@@ -1289,7 +1290,7 @@ GET & \rota|/internal/business_date| & Data de movimento atual. & 200 \tb{\{busi
 POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, buscando preços e taxas lá fora. \tb{close_date}. & 201 nova data, preços e taxas; 400 schema; 409 \tb{close_date} não é a data atual; 502 fonte externa fora do ar ou com resposta inválida (nada gravado). \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Carteira sugerida}} \\
-GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
+GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 400 \tb{amount} ausente ou inválido; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Ordens e posição}} \\
 POST & \rota|/customer/{ck}/investment_order| & Aplica ou resgata. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço (no resgate, também custo, resultado e rentabilidade); 200 repetição idempotente; 400 schema/sem chave; 404 cliente ou produto; 409 sem conta ativa, sem perfil válido, saldo ou posição insuficiente, produto indisponível, sem preço, chave reutilizada; 422 abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
@@ -1690,6 +1691,17 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \item \textbf{Ligar e desligar produto por rota} --- descartada por agora: não há cenário do
   MVP que precise disso e traria rota, evento de estado e testes. Ganharia com cadastro de produto
   por rota (\ext). \emph{Escolhido:} \tb{is_active} só no seed.
+  \item \textbf{Tirar da sugestão o produto indisponível} (inativo ou vencido, redistribuindo o
+  peso entre os outros) --- descartada porque, com a LCI por prazo (RN-PRO-09) e sem rota para
+  desligar produto, nenhum item das carteiras-modelo fica indisponível no horizonte do projeto: o
+  título de vencimento fixo mais próximo é o Prefixado, em 2029. Seria código sem situação real e
+  sem teste pela API. Ganharia se houvesse produto desligável ou título vencendo em breve.
+  \emph{Escolhido:} a sugestão usa a carteira-modelo inteira (RN-CAR-03).
+  \item \textbf{Deixar o cliente pedir a carteira de um perfil mais conservador}
+  (\tb{?profile=CONSERVATIVE} para um Moderado) --- descartada porque ele já pode investir de forma
+  mais conservadora pelas ordens (RN-ORD-04 só limita para cima, como a CVM 30), e a rota ganharia
+  regra, erro e testes novos. Ganharia se quiséssemos oferecer uma ``carteira de reserva de
+  emergência'' a qualquer perfil. \emph{Escolhido:} a sugestão é sempre a do perfil atual.
 
 \end{enumerate}
 
