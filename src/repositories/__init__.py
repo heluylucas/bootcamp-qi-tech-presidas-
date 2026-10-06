@@ -6,3 +6,4 @@ from repositories.product_repository import ProductRepository
 from repositories.portfolio_repository import PortfolioRepository
 from repositories.reference_rate_repository import ReferenceRateRepository
 from repositories.transaction_repository import TransactionRepository
+from repositories.investment_order_repository import InvestmentOrderRepository, PositionRepository
