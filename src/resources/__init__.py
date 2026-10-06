@@ -6,3 +6,4 @@ from resources.suitability import SuitabilityResource
 from resources.product import ProductResource
 from resources.portfolio import PortfolioResource
 from resources.transaction import TransactionResource
+from resources.investment_order import InvestmentOrderResource
