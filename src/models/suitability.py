@@ -54,7 +54,6 @@ class SuitabilityAssessment(Base):
     score = Column(SmallInteger, nullable=False)
     # true quando a trava da Q3/Q5 forçou Conservador (RN-SUI-04).
     forced_by_rule = Column(Boolean, nullable=False, server_default="false")
-    # TODO(módulo 4): a RFC da data de movimento muda esta coluna para DATE.
     valid_until = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
