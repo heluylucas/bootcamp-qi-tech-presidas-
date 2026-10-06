@@ -9,7 +9,9 @@ from decimal import ROUND_HALF_UP, Decimal, getcontext
 getcontext().prec = 40
 
 MOCK_URL = os.environ.get("MOCK_URL", "http://mock:1080")
-BUSINESS_DAYS = 60
+# Pouco mais de um ano: a LCI de 12 meses vence ~262 dias úteis depois de aplicada.
+BUSINESS_DAYS = 300
+DAYS_PER_REQUEST = 25
 ANCHOR = date(2026, 1, 1)
 
 FUND_CNPJ = "12.345.678/0001-95"
@@ -92,20 +94,29 @@ def next_business_days(start: date, count: int) -> list:
     return days
 
 
-def put(path: str, payload) -> None:
+def put(path: str, payload, attempts: int = 5) -> None:
+    # Recém-ligado, o mock às vezes demora a responder os primeiros pedidos:
+    # tenta de novo em vez de deixar a demonstração sem preços.
     request = urllib.request.Request(
         f"{MOCK_URL}/mockserver/{path}",
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
         method="PUT",
     )
-    urllib.request.urlopen(request, timeout=10)
+    for attempt in range(1, attempts + 1):
+        try:
+            urllib.request.urlopen(request, timeout=30)
+            return
+        except OSError:
+            if attempt == attempts:
+                raise
+            time.sleep(2)
 
 
 def wait_for_mock() -> None:
     for _ in range(60):
         try:
-            put("status", {})
+            put("status", {}, attempts=1)
             return
         except OSError:
             time.sleep(1)
@@ -115,5 +126,12 @@ def wait_for_mock() -> None:
 if __name__ == "__main__":
     wait_for_mock()
     days = next_business_days(date.today(), BUSINESS_DAYS)
-    put("expectation", [expectation for day in days for expectation in expectations_for(day)])
+    # Em lotes: os 300 dias num pedido só passam do timeout do mock, e um pedido
+    # por dia deixa o mock-init ensinando por meio minuto depois de a API subir.
+    for start in range(0, len(days), DAYS_PER_REQUEST):
+        batch = days[start:start + DAYS_PER_REQUEST]
+        try:
+            put("expectation", [expectation for day in batch for expectation in expectations_for(day)])
+        except OSError as error:
+            raise SystemExit(f"mock-init: o mock não aceitou os preços a partir de {batch[0]}: {error!r}")
     print(f"mock-init: {len(days)} dias úteis ensinados, de {days[0]} a {days[-1]}.")

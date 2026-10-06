@@ -64,6 +64,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # Só sobe depois que o mock aprendeu todos os dias: sem isso, um pytest
+      # rodado logo após o "up" pode pedir um dia que o mock ainda não conhece.
+      # Se o mock-init falhar, a API não sobe e o erro aparece na hora.
+      mock-init:
+        condition: service_completed_successfully
 
   mock:
     # Finge ser as fontes de preço de fora: a administradora do fundo, o
@@ -81,7 +86,7 @@ services:
       - "${MOCK_PORT:-1080}:1080"
 
   mock-init:
-    # Roda uma vez e termina: ensina ao mock os próximos 60 dias úteis
+    # Roda uma vez e termina: ensina ao mock os próximos 300 dias úteis
     # pelas fórmulas da RN-PRO-06, para a demonstração manual funcionar
     # sem preparar nada. Só biblioteca padrão do Python, nada a instalar.
     image: python:3.11-slim
