@@ -1,9 +1,10 @@
 import hashlib
 import json
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from controllers.base_controller import BaseController
-from dtos.transaction_dto import transaction_to_dict
+from dtos.transaction_dto import entry_to_dict, receipt_to_dict, transaction_to_dict
 from errors import (
     AccountNotActive,
     AccountNotFound,
@@ -14,11 +15,14 @@ from errors import (
     IdempotencyKeyReused,
     InsufficientBalance,
     InvalidAmount,
+    InvalidParameter,
     MissingIdempotencyKey,
     SameAccountTransfer,
+    TransactionNotFound,
 )
 from models import Account
 from repositories import AccountRepository, CustomerRepository, TransactionRepository
+from utils.dates import parse_date
 
 
 # Limite por operação, em centavos (RN-MOV-02).
@@ -34,6 +38,10 @@ TRANSFER_FEE = 200
 
 # Tamanho da coluna transaction.idempotency_key (CHAR(36), o tamanho de um UUID).
 IDEMPOTENCY_KEY_MAX_LENGTH = 36
+
+# Paginação do extrato (RN-GER-11). O máximo de 100 fica no schema.
+DEFAULT_PAGE = 1
+DEFAULT_LIMIT = 20
 
 
 class TransactionController(BaseController):
@@ -55,15 +63,7 @@ class TransactionController(BaseController):
         if amount > AMOUNT_LIMITS[transaction_type]:
             raise AmountAboveLimit()
 
-        customer = CustomerRepository.get_by_key(self.context, customer_key)
-
-        if customer is None:
-            raise CustomerNotFound()
-
-        origin = AccountRepository.get_by_key(self.context, customer.id, account_key)
-
-        if origin is None:
-            raise AccountNotFound()
+        origin = self.get_owned_account(customer_key, account_key)
 
         destination = None
         if transaction_type == "TRANSFER":
@@ -111,6 +111,52 @@ class TransactionController(BaseController):
 
         self.session.commit()
         return transaction_to_dict(transaction, balance), True
+
+    def list_statement(self, customer_key: str, account_key: str, query_params: dict) -> dict:
+        """Extrato (RN-MOV-12). Conta bloqueada ou encerrada continua consultando (RN-CON-09)."""
+        from_date = parse_date(query_params.get("from"), "from")
+        to_date = parse_date(query_params.get("to"), "to")
+
+        if from_date is not None and to_date is not None and from_date > to_date:
+            raise InvalidParameter("from must not be after to")
+
+        page = int(query_params.get("page", DEFAULT_PAGE))
+        limit = int(query_params.get("limit", DEFAULT_LIMIT))
+        account = self.get_owned_account(customer_key, account_key)
+
+        # Datas reais do lançamento, em UTC, com as duas pontas inclusas: o dia
+        # inteiro de `to` cabe porque o fim é o começo do dia seguinte.
+        start = start_of_day(from_date) if from_date else None
+        end = start_of_day(to_date + timedelta(days=1)) if to_date else None
+
+        entries, total = TransactionRepository.list_entries(
+            self.context, account.id, query_params.get("type"), start, end, (page - 1) * limit, limit
+        )
+        return {"items": [entry_to_dict(entry) for entry in entries], "page": page, "limit": limit, "total": total}
+
+    def get_receipt(self, customer_key: str, account_key: str, transaction_key: str) -> dict:
+        """Comprovante (RN-MOV-13): só para a origem ou o destino da transação."""
+        account = self.get_owned_account(customer_key, account_key)
+        transaction = TransactionRepository.get_by_key_for_account(self.context, transaction_key, account.id)
+
+        if transaction is None:
+            raise TransactionNotFound()
+
+        return receipt_to_dict(transaction)
+
+    def get_owned_account(self, customer_key: str, account_key: str) -> Account:
+        """Confere o dono antes de tudo (R8): conta de outro cliente dá o mesmo 404 da inexistente."""
+        customer = CustomerRepository.get_by_key(self.context, customer_key)
+
+        if customer is None:
+            raise CustomerNotFound()
+
+        account = AccountRepository.get_by_key(self.context, customer.id, account_key)
+
+        if account is None:
+            raise AccountNotFound()
+
+        return account
 
     def lock_accounts(self, origin: Account, destination: Optional[Account]) -> tuple:
         """Trava as contas sempre em ordem crescente de id.
@@ -188,6 +234,10 @@ class TransactionController(BaseController):
             self.context, transaction.id, account.id, direction, category, amount, balance_after
         )
         AccountRepository.update_balance(self.context, account, balance_after)
+
+
+def start_of_day(day: date) -> datetime:
+    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
 
 
 def hash_request(payload: dict) -> str:

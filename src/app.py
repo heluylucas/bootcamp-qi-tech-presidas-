@@ -180,6 +180,12 @@ def create_app() -> FastAPI:
     transaction_resource = TransactionResource()
 
     application.add_api_route(f"{account_path}/transaction", transaction_resource.on_post, methods=["POST"])
+    application.add_api_route(f"{account_path}/transactions", transaction_resource.on_get_list, methods=["GET"])
+    application.add_api_route(
+        f"{account_path}/transaction/{{transaction_key}}",
+        transaction_resource.on_get,
+        methods=["GET"]
+    )
 
     portfolio_resource = PortfolioResource()
 
