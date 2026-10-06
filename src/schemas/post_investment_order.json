@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["product_key", "side"],
+  "properties": {
+    "product_key": {
+      "type": "string",
+      "maxLength": 36
+    },
+    "side": {
+      "type": "string",
+      "enum": ["APPLY", "REDEEM"]
+    },
+    "amount": {
+      "type": "integer"
+    },
+    "redeem_all": {
+      "const": true
+    }
+  },
+  "if": {
+    "properties": {"side": {"const": "APPLY"}}
+  },
+  "then": {
+    "required": ["amount"],
+    "not": {"required": ["redeem_all"]}
+  },
+  "else": {
+    "oneOf": [
+      {"required": ["amount"]},
+      {"required": ["redeem_all"]}
+    ]
+  }
+}
