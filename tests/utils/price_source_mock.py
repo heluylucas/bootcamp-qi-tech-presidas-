@@ -104,7 +104,7 @@ def expectation_id_for(service: str, day: date) -> str:
 
 
 def request_of(service: str, day: date):
-    """Caminho e query que a API usa para perguntar a cada fonte (contratos na RFC)."""
+    """Caminho e query que a API usa para perguntar a cada fonte."""
     if service == "fund":
         return f"/fund-admin/funds/{FUND_CNPJ}/quotes", {"date": [day.isoformat()]}
     if service == "treasury":

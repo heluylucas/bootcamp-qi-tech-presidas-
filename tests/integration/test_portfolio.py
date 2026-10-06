@@ -56,7 +56,7 @@ class TestPortfolioSuggestion:
         assert sum(item["weight_bps"] for item in body["items"]) == 10000
         assert sum(item["amount"] for item in body["items"]) == amount
 
-    def test_rfc_example_1(self):
+    def test_moderate_round_amount_splits_exactly(self):
         """Moderado, R$ 10.000,00: a divisão sai redonda."""
         customer_key, _ = customer_with_profile(MODERATE)
 
@@ -70,7 +70,7 @@ class TestPortfolioSuggestion:
             FUND: 150000,
         }
 
-    def test_rfc_example_2_leftover_cent(self):
+    def test_moderate_leftover_cent_goes_to_largest_weight(self):
         """Moderado, R$ 1.000,01: sobra 1 centavo do arredondamento, que vai para o maior peso (Selic)."""
         customer_key, _ = customer_with_profile(MODERATE)
 
