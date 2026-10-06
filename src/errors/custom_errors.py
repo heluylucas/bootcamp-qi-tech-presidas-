@@ -296,3 +296,69 @@ class SuggestionAmountTooLow(QIException):
         description = "The amount for a portfolio suggestion must be at least 100000 cents (R$ 1,000.00)."
         translation = "O valor mínimo para pedir uma sugestão de carteira é R$ 1.000,00."
         super().__init__(title, self.code, http_status, description, translation)
+
+
+class OrderNotFound(QIException):
+    code = "PPP007001"
+
+    def __init__(self) -> None:
+        title = "Order Not Found"
+        http_status = 404
+        description = "The order_key does not exist for this customer."
+        translation = "Ordem não encontrada."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class BelowMinimumApplication(QIException):
+    code = "PPP007002"
+
+    def __init__(self) -> None:
+        title = "Below Minimum Application"
+        http_status = 422
+        description = "The amount is below the product's minimum application."
+        translation = "O valor está abaixo da aplicação mínima do produto."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class ProductNotSuitable(QIException):
+    code = "PPP007003"
+
+    def __init__(self) -> None:
+        title = "Product Not Suitable"
+        http_status = 422
+        description = "The product's risk level is above what the investor profile allows."
+        translation = "O risco do produto está acima do permitido para o seu perfil de investidor."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class InsufficientPosition(QIException):
+    code = "PPP007004"
+
+    def __init__(self) -> None:
+        title = "Insufficient Position"
+        http_status = 409
+        description = "The redemption is larger than the customer's position in this product."
+        translation = "O resgate é maior do que o que você tem aplicado neste produto."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class RedemptionNotAllowed(QIException):
+    code = "PPP007005"
+
+    def __init__(self) -> None:
+        title = "Redemption Not Allowed"
+        http_status = 422
+        description = "This product can only be redeemed at maturity."
+        translation = "Este produto só pode ser resgatado no vencimento."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
+class NoActiveAccount(QIException):
+    code = "PPP007006"
+
+    def __init__(self) -> None:
+        title = "No Active Account"
+        http_status = 409
+        description = "The customer has no open account to settle the order."
+        translation = "O cliente não tem uma conta aberta para movimentar a ordem."
+        super().__init__(title, self.code, http_status, description, translation)

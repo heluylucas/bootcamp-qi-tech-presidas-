@@ -36,6 +36,16 @@ class AccountRepository:
         )
 
     @staticmethod
+    def get_not_closed_by_customer(context: Context, customer_id: int) -> Optional[Account]:
+        # No máximo uma, pelo índice account_one_open_per_customer_idx.
+        return (
+            context.db_session.query(Account)
+            .join(AccountStatus, Account.status_id == AccountStatus.id)
+            .filter(Account.customer_id == customer_id, AccountStatus.enumerator != "CLOSED")
+            .first()
+        )
+
+    @staticmethod
     def count_not_closed(context: Context, customer_id: int) -> int:
         return (
             context.db_session.query(Account)

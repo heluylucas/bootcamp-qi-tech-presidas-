@@ -158,11 +158,17 @@ mão**.
 
 ### Demonstração manual do fechamento dando 404
 
-Cada `pytest` fecha uns 20 dias e avança a data de movimento. O `mock-init`
-só ensina ao mock 60 dias úteis a partir do dia em que o compose subiu.
-Depois de umas 3 rodadas sem recriar o banco, a data de movimento passa
-dessa janela, e um `POST /internal/day_close` feito na mão recebe 404 das
-fontes de preço. Recrie tudo:
+O `mock-init` ensina ao mock 300 dias úteis (pouco mais de um ano) a partir
+do dia em que o compose subiu, e a API só sobe depois que ele termina. O
+teste de vencimento (`test_maturity_settlement.py`) fecha uns 262 dias
+para a LCI vencer, mas recria o banco no começo e no fim: depois de uma
+suíte completa, a data de movimento volta para hoje.
+
+Se mesmo assim a data passar dessa janela (muitos fechamentos na mão, ou um
+teste interrompido no meio), um `POST /internal/day_close` recebe 404 das
+fontes de preço e responde 502. O mesmo acontece se o compose ficar no ar
+de um dia para o outro, porque a janela começa no dia em que ele subiu.
+Recrie tudo:
 
 ```bash
 docker compose down -v

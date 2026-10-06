@@ -29,7 +29,7 @@ class ModelPortfolio(Base):
     name = Column(String(100), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    # Do maior peso para o menor; no empate, na ordem do seed (é a ordem do exemplo da RFC).
+    # Do maior peso para o menor; no empate, na ordem do seed.
     items = relationship(
         ModelPortfolioItem,
         order_by=(ModelPortfolioItem.weight_bps.desc(), ModelPortfolioItem.id),

@@ -9,7 +9,7 @@ from constants import CENTRAL_BANK_API_URL, FUND_ADMIN_API_URL, PRICE_SOURCE_TIM
 
 
 class PriceSourceConnector(RestConnector):
-    """O que as três fontes de preço têm em comum (contratos na RFC, RN-FEC-04).
+    """O que as três fontes de preço têm em comum (RN-FEC-04).
 
     Devolve a resposta como veio, ou None quando não houve resposta
     nenhuma (fora do ar, timeout, conexão derrubada). Quem decide que
