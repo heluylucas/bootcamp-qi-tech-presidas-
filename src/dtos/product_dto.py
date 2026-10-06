@@ -17,7 +17,6 @@ def product_to_dict(product: Product) -> dict:
         "term_months": product.term_months,
         "tax_exempt": product.tax_exempt,
         "min_application": product.min_application,
-        "is_active": product.is_active,
     }
 
 

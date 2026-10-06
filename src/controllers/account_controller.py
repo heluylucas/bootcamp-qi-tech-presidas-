@@ -9,7 +9,7 @@ from errors import (
     StatusReasonRequired,
 )
 from models import Account
-from repositories import AccountRepository, CustomerRepository
+from repositories import AccountRepository, CustomerRepository, PositionRepository
 
 
 # A tabela de transições do Módulo 2: de cada status, para onde se pode ir.
@@ -63,9 +63,11 @@ class AccountController(BaseController):
         if target in REASON_REQUIRED and reason is None:
             raise StatusReasonRequired()
 
-        # TODO(módulo 7): a RN-CON-08 também exige posição de investimento
-        # zerada; conferir aqui quando a tabela position existir.
-        if target == "CLOSED" and account.balance > 0:
+        # RN-CON-08: só fecha vazia, sem saldo e sem investimento. A conta já está
+        # travada, e toda ordem trava a conta antes da posição: não há aplicação no meio.
+        if target == "CLOSED" and (
+            account.balance > 0 or PositionRepository.has_open_position(self.context, account.customer_id)
+        ):
             raise AccountNotEmpty()
 
         from_status_id = account.status_id

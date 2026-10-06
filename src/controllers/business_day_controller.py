@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from connectors.price_source_connector import CentralBankConnector, FundAdminConnector, TreasuryConnector
 from connectors.rest_connector import BaseConnectorResponse
 from controllers.base_controller import BaseController
+from controllers.investment_order_controller import InvestmentOrderController
 from errors import BusinessDateMismatch, InvalidPriceSourceResponse, PriceSourceUnavailable
 from models import Product
 from repositories import BusinessDayRepository, ProductRepository, ReferenceRateRepository
@@ -59,6 +60,8 @@ class BusinessDayController(BaseController):
                 ProductRepository.create_price(self.context, product.id, new_day, prices[product.id])
             ReferenceRateRepository.create(self.context, "CDI", new_day, cdi_bps)
             ReferenceRateRepository.create(self.context, "SELIC", new_day, selic_bps)
+            # RN-FEC-09: o dinheiro das aplicações que vencem no novo dia volta antes de ele abrir.
+            InvestmentOrderController().settle_maturities(new_day, prices)
             BusinessDayRepository.create(self.context, new_day)
         except IntegrityError:
             raise BusinessDateMismatch()
