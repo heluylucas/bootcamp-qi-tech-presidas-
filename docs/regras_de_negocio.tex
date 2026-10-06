@@ -764,14 +764,17 @@ D+0. Liquidez com prazo real fica como \ext.}
   \item[RN-PRO-01 \dec] Os produtos são criados pelo seed do \tb{database.sql}. Não há rota para
   criar produto no MVP (\ext: rota interna de cadastro).
   \item[RN-PRO-02 \obr] Todo produto tem \tb{product_key} (UUID) e só ela sai na API.
-  \item[RN-PRO-03 \dec] Produto inativo (\tb{is_active = false}) ou vencido não aceita aplicação
-  $\to$ 409 (\tb{PPP005002}). Vencido $=$ \tb{maturity_date} $\le$ data de movimento: no dia do
-  vencimento o título já é liquidado (RN-FEC-09), então não aceita aplicação nova. Vale só para
-  quem tem vencimento fixo; produto com prazo (RN-PRO-09) nunca vence como um todo.
+  \item[RN-PRO-03 \dec] \textbf{Removida.} Era a recusa de produto inativo (\tb{is_active}) ou
+  vencido (409, \tb{PPP005002}). O catálogo do MVP é fixo no seed: não há rota para desligar
+  produto, e nenhum produto vence no horizonte da simulação (o título de vencimento fixo mais
+  próximo é o Prefixado, em 2029; a LCI vence por aplicação, RN-PRO-09). Seria código sem
+  situação real e sem teste pela API; o motivo está nas alternativas descartadas. O número da
+  regra e o código não são reaproveitados.
   \item[RN-PRO-04 \dec] O preço do dia é o registro de \tb{product_price} com a maior
-  \tb{reference_date} menor ou igual à \textbf{data de movimento} (RN-GER-13). Se não existir
-  nenhum $\to$ 409 (\tb{PPP005003}) e a operação não acontece. Num dia sem preço novo (fim de
-  semana, fechamento que falhou), vale o último publicado.
+  \tb{reference_date} menor ou igual à \textbf{data de movimento} (RN-GER-13). Ele sempre existe:
+  o seed grava o preço do dia em que o banco nasce, e o fechamento só abre um dia novo depois de
+  gravar o preço de todos os produtos (RN-FEC-06). Por isso não há erro de ``sem preço'' (o antigo
+  \tb{PPP005003} foi removido). Num dia sem preço novo (fim de semana), vale o último publicado.
   \item[RN-PRO-05 \dec] \textbf{Removida.} Era a rota de publicação manual de preço
   (\tb{POST /product/\{key\}/price}). Preço novo só entra pelo fechamento do dia
   (Seção~\ref{sec:fechamento}); o motivo está nas alternativas descartadas. O número da regra e os
@@ -836,7 +839,7 @@ Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $
   \item LCI: \tb{term_months = 12}, \tb{tax_exempt = true}, \tb{maturity_date} nulo. CDB: sem
         prazo e sem vencimento (simplificação, ver ``Do MVP à produção'').
   \item CDB e LCI: \tb{own_issue = true}, \tb{cdi_percentage_bps} \tb{9500} e \tb{9300}. Fundo:
-        \tb{admin_fee_bps = 100}. Todos com \tb{is_active = true}.
+        \tb{admin_fee_bps = 100}.
 \end{itemize}
 
 \subsection{Fechamento do dia e fontes externas de preço}\label{sec:fechamento}
@@ -870,25 +873,39 @@ produção, mudando só o endereço.
   diferente da pedida, título ou fundo faltando, taxa ausente) $\to$ 502 (\tb{PPP005007}). Nos dois
   casos nada é gravado e a data de movimento não muda.
   \item[RN-FEC-07 \dec] \textbf{O que é gravado}, num \tb{commit} só: um preço por produto em
-  \tb{product_price}, o CDI e a Selic em \tb{reference_rate} e a nova linha de \tb{business_day}.
+  \tb{product_price}, o CDI e a Selic em \tb{reference_rate}, a liquidação do que venceu
+  (RN-FEC-09) e a nova linha de \tb{business_day}.
   Resposta 201: \tb{\{"business_date", "prices": [\{"product_key", "name", "unit_price"\}],
   "rates": [\{"code", "annual_rate_bps"\}]\}}.
   \item[RN-FEC-08 \dec] \textbf{Simplificações do MVP.} As chamadas externas acontecem com a trava
   da data segurada (no máximo 5 s por serviço), então fechamentos simultâneos ficam em fila. Ordens
   não travam a data de movimento: uma ordem que começou antes do fechamento usa o preço do dia em
   que começou.
-  \item[RN-FEC-09 \dec] \textbf{Liquidação no vencimento (rascunho, depende do Módulo 7).} No
-  fechamento, na mesma transação (tudo ou nada, RN-FEC-06), o banco devolve o dinheiro do que
-  venceu no novo dia: (a) cada aplicação de produto com prazo cujo \tb{maturity_date} (gravado na
-  ordem, RN-ORD-17) seja $\le$ novo dia e que ainda não tenha sido liquidada; (b) as posições de
-  produto com vencimento fixo $\le$ novo dia. Cada liquidação é uma ordem \tb{REDEEM} ao preço do
-  novo dia, com transação \tb{INVESTMENT_REDEEM} e crédito na conta, reaproveitando o cálculo do
-  resgate (RN-ORD-12, RN-ORD-13, RN-ORD-16). Como a LCI é \tb{AT_MATURITY} e a RN-ORD-11 proíbe
-  resgate antecipado, cada aplicação continua inteira até vencer: não é preciso escolher ``qual
-  lote'' resgatar. Conta \tb{BLOCKED} recebe mesmo assim (o bloqueio impede o cliente de
-  movimentar, não o banco de devolver). A posição zera sem ser apagada (RN-ORD-14). Os detalhes
-  (travas, chave de idempotência determinística, coluna que distingue a liquidação do resgate do
-  cliente, teste) são fechados junto com o Módulo 7.
+  \item[RN-FEC-09 \dec] \textbf{Liquidação no vencimento.} No fechamento, depois de gravar os
+  preços do novo dia e antes de abri-lo, na mesma transação (tudo ou nada, RN-FEC-06), o banco
+  devolve o dinheiro de cada aplicação de produto com prazo cujo \tb{maturity_date} (gravado na
+  ordem, RN-ORD-17) seja $\le$ novo dia e que ainda não tenha sido liquidada. Como funciona:
+  \begin{itemize}
+    \item \textbf{O resgate.} Cada aplicação vira uma ordem \tb{REDEEM} com
+    \tb{source = MATURITY}, a quantidade da aplicação inteira, ao preço do novo dia, com transação
+    \tb{INVESTMENT_REDEEM} e crédito na conta que pagou a aplicação. O cálculo é o mesmo do resgate
+    do cliente (RN-ORD-12, RN-ORD-13, RN-ORD-16). Como a LCI é \tb{AT_MATURITY} e a RN-ORD-11
+    proíbe resgate antecipado, cada aplicação continua inteira até vencer: não é preciso escolher
+    ``qual lote'' resgatar.
+    \item \textbf{Liquidada uma vez só.} A ordem de liquidação guarda em \tb{settled_order_id} a
+    aplicação que ela devolveu. ``Ainda não liquidada'' é ``nenhuma ordem aponta para ela'', e o
+    \tb{UNIQUE} da coluna impede liquidar a mesma aplicação duas vezes.
+    \item \textbf{Chave de idempotência determinística.} Não há cliente mandando chave; a
+    liquidação usa \tb{uuid5(NAMESPACE_URL, "maturity:\{order_key\}")}, uma por aplicação, e assim
+    cumpre os \tb{UNIQUE} de \tb{transaction} e \tb{investment_order}.
+    \item \textbf{Travas.} Em ordem crescente de \tb{account_id}, e em cada uma conta depois
+    posição: a mesma ordem das ordens do cliente (RN-GER-12), então liquidação e aplicação
+    simultâneas não fazem \emph{deadlock}.
+    \item \textbf{Conta bloqueada recebe mesmo assim}: o bloqueio impede o cliente de movimentar,
+    não o banco de devolver. A posição zera sem ser apagada (RN-ORD-14).
+  \end{itemize}
+  \textbf{Fora do MVP:} o vencimento de título com vencimento fixo (Tesouro). O primeiro vence em
+  2029, fora do horizonte da simulação; fica como \ext{} (Seção~\ref{sec:incrementos}).
 \end{regras}
 
 \begingroup\small
@@ -908,8 +925,12 @@ Nos três serviços, preços e taxas vão \textbf{como texto} (\tb{"103.99176299
 API do Banco Central: assim o connector lê \tb{Decimal}, nunca \tb{float} (R6).
 
 \textbf{Quem ensina o mock.} O MockServer sobe vazio. Um container que roda uma vez
-(\tb{mock-init}) ensina a ele os próximos 60 dias úteis, a partir da data real em que o compose
-sobe, pelas fórmulas da RN-PRO-06, para a demonstração manual. Os testes ensinam as próprias
+(\tb{mock-init}) ensina a ele os próximos 300 dias úteis (pouco mais de um ano, para a LCI de 12
+meses chegar ao vencimento), a partir da data real em que o compose sobe, pelas fórmulas da
+RN-PRO-06, para a demonstração manual. Ele manda os dias em lotes de 25, tenta de novo se o mock
+recém-ligado demorar a responder, e a API só sobe depois que ele termina com sucesso
+(\tb{depends_on} com \tb{service_completed_successfully}): quando o \tb{docker compose up} acaba, o
+ano inteiro já está ensinado, e se o mock-init falhar a API não sobe e o erro aparece na hora. Os testes ensinam as próprias
 respostas (números redondos, erros, queda de conexão) com \textbf{prioridade maior}, sem apagar o
 cenário da demonstração; cada resposta de teste vale para uma chamada só e depois o cenário volta.
 
@@ -993,8 +1014,8 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   \tb{PPP007006} se não tiver conta; \tb{PPP002005} se ela estiver bloqueada).
   \item[RN-ORD-02 \obr] Precisa ter perfil de suitability válido (409, \tb{PPP004005} ou
   \tb{PPP004004}).
-  \item[RN-ORD-03 \obr] O produto precisa existir (404, \tb{PPP005001}), estar disponível (409,
-  \tb{PPP005002}) e ter preço do dia (409, \tb{PPP005003}).
+  \item[RN-ORD-03 \obr] O produto precisa existir (404, \tb{PPP005001}). O preço do dia sempre
+  existe (RN-PRO-04), e o catálogo do MVP não tem produto inativo nem vencido (RN-PRO-03, removida).
   \item[RN-ORD-04 \obr] \textbf{Adequação ao perfil:} risco do produto $\le$ risco máximo do perfil.
   Senão $\to$ 422 (\tb{PPP007003}). \dec{} No MVP a regra \textbf{bloqueia}; aceitar com ``termo
   de ciência'' fica como \ext.
@@ -1052,6 +1073,15 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   \item[RN-POS-02 \dec] Rentabilidade é bruta (sem IR e IOF). Impostos ficam como \ext.
   \item[RN-POS-03 \dec] Posições com quantidade 0 não aparecem na lista, a menos que se peça
   \tb{?include_closed=true}.
+  \item[RN-POS-04 \dec] \textbf{Formato da resposta.} \tb{\{"items": [\{"product_key", "quantity",
+  "unit_price", "current_amount", "invested_amount", "result_amount", "return_bps"\}], "total":
+  \{"current_amount", "invested_amount", "result_amount", "return_bps"\}\}}. Quantidade e preço
+  como texto com 8 casas (R6); valores em centavos. O total soma valor atual e custo de todos os
+  itens listados e calcula resultado e rentabilidade sobre as somas (sem lista, tudo 0).
+  \item[RN-POS-05 \dec] \textbf{Histórico de ordens} (\tb{GET .../investment_orders}): a mais nova
+  primeiro, paginado (RN-GER-11), com filtro opcional por \tb{product_key}. Filtrar por um produto
+  que não existe devolve a lista vazia (200), não 404: o filtro só restringe a busca. Cada item tem o
+  mesmo formato da resposta da criação, e o \tb{GET} de uma ordem devolve exatamente esse corpo.
 \end{regras}
 
 \textbf{Exemplo.} O cliente aplica \rs 1.500,00 no \fundo{} com cota de \rs 1,23456789.
@@ -1203,13 +1233,13 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{profile_id} FK; \tb{score SMALLINT}; \tb{forced_by_rule BOOLEAN}; \tb{valid_until TIMESTAMPTZ} (hora real + 24 meses); \tb{created_at}. (Uma linha por vez que o cliente responde; nunca é editada.) \\
 \tb{suitability_answer} & \tb{assessment_id} FK; \tb{question_id} FK; \tb{option_id} FK. \tb{UNIQUE(assessment_id, question_id)}. \\
 \tb{product_type} & Enumerador: \tb{PUBLIC_BOND}, \tb{PRIVATE_BOND}, \tb{FUND}. \\
-\tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (vencimento fixo; nulo no fundo, no CDB e na LCI); \tb{term_months SMALLINT CHECK (> 0)} (prazo da oferta, RN-PRO-09); \tb{tax_exempt BOOLEAN NOT NULL DEFAULT false}; \tb{CHECK (maturity_date IS NULL OR term_months IS NULL)}; \tb{CHECK (NOT tax_exempt OR term_months >= 9)}; \tb{min_application BIGINT}; \tb{is_active BOOLEAN}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo); \tb{external_code VARCHAR(40)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo na emissão própria). \\
+\tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (vencimento fixo; nulo no fundo, no CDB e na LCI); \tb{term_months SMALLINT CHECK (> 0)} (prazo da oferta, RN-PRO-09); \tb{tax_exempt BOOLEAN NOT NULL DEFAULT false}; \tb{CHECK (maturity_date IS NULL OR term_months IS NULL)}; \tb{CHECK (NOT tax_exempt OR term_months >= 9)}; \tb{min_application BIGINT}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo); \tb{external_code VARCHAR(40)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo na emissão própria). \\
 \tb{business_day} & \tb{reference_date DATE NOT NULL UNIQUE}; \tb{created_at}. Uma linha por dia aberto, nunca alterada; a data de movimento é a maior \tb{reference_date} (RN-GER-13). \\
 \tb{reference_rate} & \tb{code} (\tb{CDI}, \tb{SELIC}); \tb{reference_date DATE NOT NULL}; \tb{annual_rate_bps INTEGER CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(code, reference_date)}. Histórico das taxas (RN-REC-08). \\
 \tb{product_price} & \tb{product_id} FK; \tb{reference_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, reference_date)}. \\
 \tb{model_portfolio} & \tb{profile_id} FK UNIQUE; \tb{name}. \\
 \tb{model_portfolio_item} & \tb{model_portfolio_id} FK; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(model_portfolio_id, product_id)}. A soma de 10.000 é conferida por um teste. \\
-\tb{investment_order} & \tb{order_key}; \tb{customer_id} FK; \tb{account_id} FK; \tb{product_id} FK; \tb{side} (\tb{APPLY}/\tb{REDEEM}); \tb{amount BIGINT CHECK (> 0)}; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{maturity_date DATE} (só na aplicação em produto com prazo, RN-ORD-17); \tb{transaction_id} FK $\to$ transaction (o movimento de dinheiro); \tb{status} (\tb{EXECUTED}); \tb{idempotency_key}; \tb{request_hash}; \tb{created_at}. \tb{UNIQUE(customer_id, idempotency_key)}. \\
+\tb{investment_order} & \tb{order_key}; \tb{customer_id} FK; \tb{account_id} FK; \tb{product_id} FK; \tb{side} (\tb{APPLY}/\tb{REDEEM}); \tb{amount BIGINT CHECK (> 0)}; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{maturity_date DATE} (só na aplicação em produto com prazo, RN-ORD-17); \tb{source} (\tb{CUSTOMER}/\tb{MATURITY}, padrão \tb{CUSTOMER}: quem pediu, o cliente ou a liquidação do fechamento, RN-FEC-09); \tb{settled_order_id INTEGER UNIQUE} FK $\to$ \tb{investment_order} (na liquidação, a aplicação devolvida; o \tb{UNIQUE} impede liquidar duas vezes); \tb{transaction_id} FK $\to$ transaction (o movimento de dinheiro); \tb{status} (\tb{EXECUTED}); \tb{idempotency_key}; \tb{request_hash}; \tb{created_at}. \tb{UNIQUE(customer_id, idempotency_key)}. \\
 \tb{position} & \tb{customer_id} FK; \tb{product_id} FK; \tb{quantity NUMERIC(24,8) NOT NULL CHECK (>= 0)}; \tb{invested_amount BIGINT NOT NULL CHECK (>= 0)}; \tb{updated_at}. \tb{UNIQUE(customer_id, product_id)}. \\
 \bottomrule
 \end{longtable}
@@ -1225,6 +1255,7 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
   \item \textbf{product 1:N product_price}.
   \item \textbf{customer N:N product} via \textbf{position} (com a quantidade na tabela do meio) e via \textbf{investment_order} (histórico).
   \item \textbf{investment_order 1:1 transaction} --- toda ordem aponta para o movimento de dinheiro que ela gerou.
+  \item \textbf{investment_order 1:0..1 investment_order} --- a liquidação no vencimento aponta para a aplicação que devolveu (\tb{settled_order_id}).
 \end{itemize}
 
 O diagrama no formato \emph{mermaid} (que o modelo de RFC usa) está no Apêndice~\ref{ap:mermaid}.
@@ -1293,10 +1324,10 @@ POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, bus
 GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 400 \tb{amount} ausente ou inválido; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Ordens e posição}} \\
-POST & \rota|/customer/{ck}/investment_order| & Aplica ou resgata. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço (no resgate, também custo, resultado e rentabilidade); 200 repetição idempotente; 400 schema/sem chave; 404 cliente ou produto; 409 sem conta ativa, sem perfil válido, saldo ou posição insuficiente, produto indisponível, sem preço, chave reutilizada; 422 abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
-GET & \rota|/customer/{ck}/investment_orders| & Histórico de ordens. Query: \tb{page}, \tb{limit}, \tb{product_key}. & 200; 404. \\
+POST & \rota|/customer/{ck}/investment_order| & Aplica ou resgata. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço (no resgate, também custo, resultado e rentabilidade); 200 repetição idempotente; 400 schema/sem chave; 404 cliente ou produto; 409 sem conta ativa, conta bloqueada, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; 422 valor $\le 0$, abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
+GET & \rota|/customer/{ck}/investment_orders| & Histórico de ordens, a mais nova primeiro (RN-POS-05). Query: \tb{page}, \tb{limit}, \tb{product_key}. & 200 \tb{\{items, page, limit, total\}} (produto inexistente: lista vazia); 400 query inválida; 404 cliente. \\
 GET & \rota|/customer/{ck}/investment_order/{order_key}| & Detalhe da ordem. & 200; 404 (inclusive de outro cliente). \\
-GET & \rota|/customer/{ck}/positions| & Posição consolidada e rentabilidade. & 200; 404. \\
+GET & \rota|/customer/{ck}/positions| & Posição consolidada e rentabilidade (RN-POS-04). Query: \tb{include_closed}. & 200; 400 query inválida; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Receita}} \\
 GET & \rota|/internal/revenue| & Receita realizada e estimada. Query: \tb{from}, \tb{to}. & 200; 400 período inválido. \\
@@ -1370,8 +1401,6 @@ PPP004004 & 409 & Suitability Expired & Perfil com mais de 24 meses. \\
 PPP004005 & 409 & Suitability Required & Aplicar ou pedir sugestão sem perfil. \\
 \midrule
 PPP005001 & 404 & Product Not Found & \tb{product_key} não existe. \\
-PPP005002 & 409 & Product Not Available & Produto inativo ou vencido. \\
-PPP005003 & 409 & Price Unavailable & Nenhum preço até a data de movimento. \\
 PPP005006 & 502 & Price Source Unavailable & Fonte externa de preço ou taxa fora do ar, com timeout ou respondendo erro. \\
 PPP005007 & 502 & Invalid Price Source Response & Fonte externa respondeu algo sem sentido (preço $\le 0$, data errada, produto ou taxa faltando). \\
 \midrule
@@ -1447,18 +1476,29 @@ soma pontos; (4) aplica a trava da Q3/Q5; (5) escolhe o perfil pela faixa; (6) g
 
 \subsection{Aplicação}
 \textbf{Feliz:} (1) schema e \tb{Idempotency-Key}; (2) busca cliente, conta ativa, perfil
-válido, produto disponível; (3) confere risco $\le$ perfil e valor $\ge$ mínimo; (4) busca preço
+válido, produto; (3) confere risco $\le$ perfil e valor $\ge$ mínimo; (4) busca preço
 do dia; (5) trava a conta e depois a posição (cria a posição com quantidade 0 se não existir); (6)
 checa a idempotência, já com as travas; confere saldo $\ge$ valor; (7) calcula quantidade; (8) grava transação \tb{INVESTMENT_APPLY} +
 lançamento de débito, atualiza saldo; (9) grava ordem; (10) soma quantidade e custo na posição;
 (11) \tb{commit}; (12) 201.\\
 \textbf{Falhas:} perfil vencido $\to$ 409; produto de risco 3 para Conservador $\to$ 422
-\tb{PPP007003}; sem preço $\to$ 409 \tb{PPP005003}; saldo insuficiente $\to$ 409 (nada gravado).
+\tb{PPP007003}; saldo insuficiente $\to$ 409 (nada gravado).
 
 \subsection{Resgate}
 Igual à aplicação, sem a checagem de perfil, com: posição suficiente (409 \tb{PPP007004}),
 liquidez (422 \tb{PPP007005} antes do vencimento), crédito na conta e redução proporcional do
 custo; a ordem guarda o custo que saiu e a resposta traz resultado e rentabilidade (RN-ORD-16).
+
+\subsection{Liquidação no vencimento (dentro do fechamento do dia)}
+Depois de gravar os preços do novo dia e antes de abri-lo: (1) busca as aplicações com
+\tb{maturity_date} $\le$ novo dia para as quais nenhuma ordem aponta em \tb{settled_order_id},
+em ordem crescente de conta; (2) para cada uma, trava a conta e depois a posição; (3) grava o
+resgate da quantidade inteira ao preço do novo dia, com \tb{source = MATURITY}, chave
+\tb{uuid5} da aplicação e crédito mesmo em conta bloqueada; (4) segue o fechamento, que grava o
+novo \tb{business_day} e faz o \tb{commit}.\\
+\textbf{Falhas:} qualquer erro desfaz o fechamento inteiro, e a data não anda (RN-FEC-06); um
+segundo fechamento não liquida de novo, porque a aplicação já tem quem aponte para ela (e o
+\tb{UNIQUE} de \tb{settled_order_id} barraria).
 
 \subsection*{Principal desafio (candidato para a RFC)}
 
@@ -1483,7 +1523,7 @@ Seguindo as camadas do repositório-base. Para cada módulo, criar:
 \midrule
 \endhead
 \tb{database/} & \tb{database.sql}: todas as tabelas, índices, \tb{CHECK}s e o seed. \\
-\tb{src/models/} & \tb{customer.py}, \tb{account.py} (+ status e evento), \tb{transaction.py} (+ tipo e \tb{ledger_entry}), \tb{suitability.py}, \tb{product.py} (+ tipo e preço), \tb{model_portfolio.py}, \tb{investment_order.py}, \tb{position.py}. Atenção à ordem no \tb{models/__init__.py}: enumerador antes da entidade que o usa. \\
+\tb{src/models/} & \tb{customer.py}, \tb{account.py} (+ status e evento), \tb{transaction.py} (+ tipo e \tb{ledger_entry}), \tb{suitability.py}, \tb{product.py} (+ tipo e preço), \tb{model_portfolio.py}, \tb{investment_order.py} (ordem e posição). Atenção à ordem no \tb{models/__init__.py}: enumerador antes da entidade que o usa. \\
 \tb{src/schemas/} & Um \tb{.json} por corpo de entrada: \tb{customer_create}, \tb{account_status_update}, \tb{transaction_create}, \tb{suitability_submit}, \tb{price_create}, \tb{investment_order_create}. \\
 \tb{src/repositories/} & Um por entidade. Gera a \tb{key} no \tb{create}; métodos \tb{get_by_key}, \tb{get_by_key_for_update}, listagens paginadas. Não decide nada. \\
 \tb{src/controllers/} & \tb{customer}, \tb{account}, \tb{transaction}, \tb{suitability}, \tb{product}, \tb{portfolio}, \tb{investment_order}. Aqui moram todos os \tb{if} de negócio e o \tb{commit}. \\
@@ -1511,13 +1551,13 @@ fazem a requisição e conferem \textbf{status e corpo}. Nomes sugeridos, lidos 
 \midrule
 \endhead
 Clientes & cria cliente e devolve key (não id); recusa CPF inválido com 422; recusa CPF repetido com 409; recusa CPF repetido com pontuação diferente; recusa menor de idade (idade calculada sobre a data real); devolve CPF mascarado; cliente inexistente dá 404. \\
-Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409; recusa conta para cliente inexistente com 404; conta de outro cliente dá 404; bloqueia e desbloqueia; não sai de CLOSED; não encerra com saldo; exige motivo; histórico registra todas as transições. \\
+Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409; recusa conta para cliente inexistente com 404; conta de outro cliente dá 404; bloqueia e desbloqueia; não sai de CLOSED; não encerra com saldo nem com investimento (posição $> 0$); encerra depois de resgatar e sacar tudo; exige motivo; histórico registra todas as transições. \\
 Movimentações & depósito aumenta saldo; saque diminui saldo; \textbf{transferência debita valor + tarifa na origem e credita só o valor no destino}; recusa saldo insuficiente sem alterar nenhum saldo; recusa transferência para si mesmo; recusa destino inexistente; recusa conta bloqueada (origem e destino); recusa valor zero e acima do limite; mesmo Idempotency-Key não debita duas vezes; mesma chave com corpo diferente dá 409; sem chave dá 400; extrato reconstrói o saldo; extrato pagina; comprovante de outra conta dá 404; tipo INVESTMENT_APPLY recusado na rota de transação. \\
 Suitability & calcula cada um dos três perfis; trava da Q3 força Conservador; recusa respostas incompletas; recusa opção de outra pergunta; refazer mantém histórico e muda o perfil atual; cliente sem perfil dá 404. \\
 Produtos & lista catálogo; filtra por risco e por tipo; detalhe traz o preço do dia; histórico de preços no período; produto inexistente dá 404. \\
-Fechamento do dia & devolve a data de movimento; fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova. \\
+Fechamento do dia & devolve a data de movimento; fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova; \textbf{liquidação no vencimento}: aplica na LCI, fecha um dia por vez até o vencimento (cerca de 262 fechamentos), o dinheiro volta com rendimento, existe a ordem \tb{MATURITY}, a posição zera sem sumir e um fechamento a mais não paga de novo. \\
 Carteira & soma dos pesos de cada carteira-modelo é 10.000; sugestão soma exatamente o valor pedido (inclusive com centavos quebrados); recusa sem perfil; recusa valor abaixo do mínimo. \\
-Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate devolve custo, resultado e rentabilidade (inclusive na repetição idempotente); resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate funciona mesmo sem perfil válido; mesmo Idempotency-Key não aplica duas vezes; ordem de outro cliente dá 404. \\
+Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate devolve custo, resultado e rentabilidade (inclusive na repetição idempotente); resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate sem perfil válido (não dá para vencer um perfil pela API: garantido porque o resgate não consulta o perfil); mesmo Idempotency-Key não aplica nem resgata duas vezes; ordem de outro cliente dá 404; \tb{GET} da ordem devolve o mesmo corpo da criação; histórico da mais nova para a mais antiga, paginado e filtrado por produto (produto inexistente: lista vazia); posição com valor atual, resultado, rentabilidade e total; posição zerada só com \tb{include_closed}; query inválida dá 400. \\
 Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. \\
 Concorrência \ext & dispara N transferências em paralelo (threads) de uma conta e confere que o saldo final nunca fica negativo e bate com o extrato. \\
 \bottomrule
@@ -1690,7 +1730,8 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   LCI como oferta com prazo, vencimento por aplicação e prazo mínimo num \tb{CHECK} (RN-PRO-09).
   \item \textbf{Ligar e desligar produto por rota} --- descartada por agora: não há cenário do
   MVP que precise disso e traria rota, evento de estado e testes. Ganharia com cadastro de produto
-  por rota (\ext). \emph{Escolhido:} \tb{is_active} só no seed.
+  por rota (\ext). \emph{Escolhido:} catálogo fixo no seed, sem coluna \tb{is_active} (ver o item
+  ``Coluna \tb{is_active} e recusa de produto vencido'' abaixo).
   \item \textbf{Tirar da sugestão o produto indisponível} (inativo ou vencido, redistribuindo o
   peso entre os outros) --- descartada porque, com a LCI por prazo (RN-PRO-09) e sem rota para
   desligar produto, nenhum item das carteiras-modelo fica indisponível no horizonte do projeto: o
@@ -1702,6 +1743,43 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   mais conservadora pelas ordens (RN-ORD-04 só limita para cima, como a CVM 30), e a rota ganharia
   regra, erro e testes novos. Ganharia se quiséssemos oferecer uma ``carteira de reserva de
   emergência'' a qualquer perfil. \emph{Escolhido:} a sugestão é sempre a do perfil atual.
+  \item \textbf{Coluna \tb{is_active} e recusa de produto vencido} (a antiga RN-PRO-03, com
+  \tb{PPP005002}, e o \tb{PPP005003} de ``sem preço'') --- descartada porque nenhum produto do MVP
+  fica inativo (não há rota para desligar) nem vence no horizonte da simulação (o primeiro título
+  público vence em 2029), e o preço do dia sempre existe (RN-PRO-04). Seriam dois erros sem
+  situação real e sem teste pela API. Ganharia com cadastro de produto por rota ou com um título
+  vencendo dentro da simulação. \emph{Escolhido:} catálogo fixo; tirar produto do ar e tratar o
+  vencimento de título público ficam como \ext.
+  \item \textbf{Liquidar o vencimento por posição} (zerar a posição inteira da LCI quando chega o
+  vencimento) --- descartada porque cada aplicação da LCI é uma emissão com o próprio vencimento
+  (RN-PRO-09): um cliente que aplicou em março e em junho tem duas datas, e zerar tudo em março
+  devolveria antes da hora o dinheiro de junho. Ganharia se o produto tivesse um vencimento só.
+  \emph{Escolhido:} liquidar por aplicação, com \tb{settled_order_id} ligando a liquidação à
+  aplicação (RN-FEC-09).
+  \item \textbf{Marcar a aplicação como liquidada} (uma coluna \tb{settled_at} ou um status
+  \tb{SETTLED} na própria ordem) --- descartada porque a ordem é histórico e não é editada (R4).
+  Ganharia se a ordem tivesse ciclo de estados (ver ``Cotização e liquidação com prazo'' nos
+  incrementos). \emph{Escolhido:} ``liquidada'' é ``existe uma ordem que aponta para ela''.
+  \item \textbf{Chave de idempotência aleatória na liquidação} (\tb{uuid4}, como as do cliente)
+  --- descartada porque, se a mesma aplicação fosse liquidada duas vezes por engano, as duas chaves
+  seriam diferentes e o banco aceitaria pagar em dobro. \emph{Escolhido:} \tb{uuid5} da
+  \tb{order_key} da aplicação, sempre a mesma; o \tb{UNIQUE} de \tb{settled_order_id} é a
+  segunda rede.
+  \item \textbf{Avançar um mês por fechamento} (para o teste chegar ao vencimento em 12 chamadas)
+  --- descartada porque deixaria buracos de preço e erraria o rendimento diário do CDB e da LCI,
+  que crescem pelo CDI de cada dia útil (RN-FEC-05). \emph{Também descartado:} um
+  \tb{until_date} no \tb{day_close} para fechar vários dias numa chamada, porque muda o contrato
+  da rota só para o teste. \emph{Escolhido:} o mock aprende 300 dias úteis e o teste fecha um dia
+  por vez (cerca de 262 chamadas, uns 25 s).
+  \item \textbf{Ensinar o mock num pedido só ou um pedido por dia} --- o pedido único com 300 dias
+  passou do timeout do mock recém-ligado; um pedido por dia funciona, mas deixava o mock-init
+  ensinando por meio minuto depois de a API subir, e um \tb{pytest} rodado logo em seguida podia
+  pedir um dia ainda não ensinado. \emph{Escolhido:} lotes de 25 dias com novas tentativas, e a
+  API esperando o mock-init terminar (\tb{service_completed_successfully}).
+  \item \textbf{404 ao filtrar o histórico de ordens por produto inexistente} --- descartada porque
+  o filtro só restringe a busca, e ``nenhuma ordem desse produto'' é uma resposta verdadeira.
+  Ganharia se quiséssemos avisar quem integra de que a chave está errada. \emph{Escolhido:} lista
+  vazia (RN-POS-05).
 
 \end{enumerate}
 
@@ -1721,7 +1799,8 @@ Prazo mínimo LCI/LCA & \tb{CHECK} no banco ($\ge 9$ meses). & Igual, e a rota d
 Vencimento da emissão própria & Prazo na oferta; vencimento gravado em cada aplicação (RN-ORD-17). & Igual. \\
 Prazos oferecidos & Um só (LCI 12 meses). & Vários (9, 12, 24 meses), cada um uma linha de produto com a sua taxa; sem mudar código. \\
 Preço de CDB/LCI & Uma série por produto; o rendimento é o mesmo por proporção. & PU por emissão, para registro na B3. \\
-Liquidação no vencimento & Rascunho (RN-FEC-09), entra com o Módulo 7 dentro do fechamento do dia. & Igual, com conciliação e aviso ao cliente. \\
+Liquidação no vencimento & Pelo fechamento do dia, por aplicação da LCI (RN-FEC-09). Vencimento de título público fora do horizonte. & Igual, com conciliação e aviso ao cliente; títulos públicos liquidados também no vencimento. \\
+Catálogo & Fixo no seed, sem produto inativo nem vencido. & Produto pode sair do ar (coluna de status e recusa na aplicação). \\
 CDB Liquidez & Sem prazo e sem vencimento. & Também teria prazo (ex.: 2 anos), com resgate diário. \\
 Data de movimento & Avança por rota (\tb{day_close}). & Agendador chamando a mesma rota. \\
 Feriados & Ignorados. & Calendário da ANBIMA. \\
@@ -1765,6 +1844,11 @@ Em ordem aproximada de custo-benefício (os primeiros são baratos e impressiona
   \item \textbf{Documentação automática}: reativar o \tb{/docs} do FastAPI (o repositório-base
   desliga com \tb{docs_url=None}) e deixar exemplos de cada rota.
   \item \textbf{Índice único parcial} no banco para uma conta não encerrada por cliente.
+  \item \textbf{Vencimento de título público}: no fechamento, zerar as posições de título com
+  vencimento fixo $\le$ novo dia, como a RN-FEC-09 faz com a LCI (chave \tb{uuid5} por posição e
+  data).
+  \item \textbf{Tirar produto do ar}: coluna de status em \tb{product}, rota interna e recusa da
+  aplicação (o antigo \tb{PPP005002}).
 \end{enumerate}
 
 % =====================================================================
@@ -1870,6 +1954,7 @@ erDiagram
   customer ||--o{ investment_order : "envia"
   product ||--o{ investment_order : "negociado"
   transaction ||--o| investment_order : "liquida"
+  investment_order |o--o| investment_order : "devolve no vencimento"
   customer ||--o{ position : "possui"
   product ||--o{ position : "em"
 
@@ -1951,6 +2036,8 @@ erDiagram
     numeric quantity
     bigint cost_amount
     date maturity_date "so aplicacao com prazo"
+    string source "CUSTOMER ou MATURITY"
+    int settled_order_id FK "UK, aplicacao devolvida"
   }
   position {
     int id PK
@@ -2045,10 +2132,13 @@ Idempotency-Key: 0f9e8d7c-...
 HTTP/1.1 201 Created
 {
   "order_key": "b3c4...",
+  "product_key": "55ee...",
   "side": "APPLY",
+  "source": "CUSTOMER",
   "amount": 150000,
   "unit_price": "1.23456789",
   "quantity": "1215.00001105",
+  "maturity_date": null,
   "status": "EXECUTED",
   "transaction_key": "f5d6..."
 }
@@ -2067,15 +2157,44 @@ Idempotency-Key: 7a6b5c4d-...
 HTTP/1.1 201 Created
 {
   "order_key": "c4d5...",
+  "product_key": "55ee...",
   "side": "REDEEM",
+  "source": "CUSTOMER",
   "amount": 50000,
   "unit_price": "1.24000000",
   "quantity": "403.22580645",
+  "maturity_date": null,
+  "status": "EXECUTED",
+  "transaction_key": "a1b2...",
   "cost_amount": 49780,
   "result_amount": 220,
-  "return_bps": 44,
-  "status": "EXECUTED",
-  "transaction_key": "a1b2..."
+  "return_bps": 44
+}
+\end{lstlisting}
+
+\subsection*{Posição (antes do resgate acima, com a cota a 1,24)}
+\begin{lstlisting}
+GET /customer/9c2f.../positions
+
+HTTP/1.1 200 OK
+{
+  "items": [
+    {
+      "product_key": "55ee...",
+      "quantity": "1215.00001105",
+      "unit_price": "1.24000000",
+      "current_amount": 150660,
+      "invested_amount": 150000,
+      "result_amount": 660,
+      "return_bps": 44
+    }
+  ],
+  "total": {
+    "current_amount": 150660,
+    "invested_amount": 150000,
+    "result_amount": 660,
+    "return_bps": 44
+  }
 }
 \end{lstlisting}
 

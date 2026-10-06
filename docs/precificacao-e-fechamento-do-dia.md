@@ -63,7 +63,12 @@ preço novo é o fechamento do dia:
         ↓
   6. calcula o CDB e a LCI com o CDI que chegou
         ↓
-  7. grava tudo de uma vez: 6 preços + 2 taxas + a nova data
+  7. grava os 6 preços e as 2 taxas
+        ↓
+  8. devolve o dinheiro das aplicações da LCI que vencem em 06/10
+     (resgate automático ao preço novo, crédito na conta)
+        ↓
+  9. grava a nova data e dá um commit só: tudo ou nada
         ↓
   201 {"business_date": "2026-10-06", "prices": [...], "rates": [...]}
 ```
@@ -82,7 +87,9 @@ sequenceDiagram
     API->>Mock: cota do fundo, preço dos títulos, CDI e Selic
     Mock-->>API: respostas do novo dia
     API->>API: valida e calcula CDB/LCI
-    API->>DB: grava preços, taxas e nova data (1 commit)
+    API->>DB: grava preços e taxas
+    API->>DB: resgata as aplicações vencidas (trava conta e posição)
+    API->>DB: grava a nova data (1 commit para tudo)
     API-->>Op: 201 nova data de movimento
 ```
 
@@ -161,6 +168,13 @@ rentabilidade mudar ao vivo.
 Lembre que o valor aplicado **sai do saldo** da conta e vai para a posição.
 Ele volta, com ganho ou perda, só no resgate.
 
+**E a LCI?** Ela só pode ser resgatada no vencimento, 12 meses depois de cada
+aplicação. O cliente não precisa pedir: o fechamento do dia que chega ao
+vencimento resgata a aplicação sozinho e o dinheiro volta para a conta, com o
+rendimento do ano. Na lista de ordens, esse resgate aparece com
+`"source": "MATURITY"`. Para ver isso acontecer são uns 262 fechamentos, e o
+teste `test_maturity_settlement.py` faz exatamente isso em uns 25 segundos.
+
 ---
 
 ## 6. Quando algo dá errado
@@ -208,16 +222,22 @@ Duas regras para quem escreve teste:
   apaga só o que o mock sabia **daquele dia** e ensina as quatro respostas
   do teste, com prioridade maior. Para simular uma falha, use
   `teach_day(dia, skip="fund")` e depois `PriceSourceMock.server_error("fund", dia)`.
-- Depois de rodar a suíte, a demonstração manual precisa de ambiente novo:
-  `docker compose down -v` e `docker compose up -d`. Os testes apagaram do
-  mock os primeiros dias do cenário.
+- O teste de vencimento recria o banco no começo e no fim
+  (`DbUtils.rollback()`): ele precisa da data de movimento em hoje para o ano
+  inteiro caber nos dias que o mock conhece, e não deixa o banco um ano à
+  frente para os outros testes. Depois de uma suíte completa, a data volta
+  para hoje.
 
 ### Na demonstração manual
 
 Um container chamado `mock-init` roda uma vez quando o compose sobe e ensina
-ao mock os próximos 60 dias úteis pelas fórmulas da seção 4. Então dá para
-chamar o fechamento direto, sem preparar nada (o roteiro com `curl` entra no
-README na Fase 6).
+ao mock os próximos **300 dias úteis** (pouco mais de um ano) pelas fórmulas
+da seção 4. Ele manda os dias em lotes de 25 e tenta de novo se o mock
+recém-ligado demorar. A API só sobe **depois** que ele termina com sucesso.
+Assim, quando o `docker compose up` acaba, o ano inteiro já está ensinado, e
+se o `mock-init` falhar a API nem sobe (o erro aparece na hora, e não só no
+primeiro fechamento). Então dá para chamar o fechamento direto, sem preparar
+nada (o roteiro com `curl` entra no README na Fase 6).
 
 ---
 
@@ -239,6 +259,10 @@ O registro completo, com o preço de cada alternativa, está na seção
 | Preço só pelo fechamento do dia                                  | Rota de publicação manual (`POST /product/{key}/price`)     | Preço não se reescreve, o fechamento não deixa buraco e fim de semana usa o último preço: a rota só conseguia gravar dias que ninguém lê. E o teste dela apagava o banco inteiro. |
 | LCI como oferta com prazo de 12 meses (vencimento por aplicação) | LCI com vencimento fixo e prazo mínimo checado na aplicação | Emissão própria é uma emissão nova a cada aplicação. Com vencimento fixo, a LCI ficaria bloqueada nos últimos 9 meses. O prazo mínimo do CMN virou `CHECK` no banco.              |
 | Seed só com o preço de hoje                                      | Seed com os últimos 30 dias                                 | Nenhuma regra lê preço de antes do banco nascer: aplicação, resgate e fechamento só usam o último preço até a data de movimento. O histórico era só decoração.                    |
+| Liquidar a LCI por aplicação, dentro do fechamento               | Zerar a posição inteira no vencimento                       | Cada aplicação da LCI vence numa data diferente. Zerar tudo devolveria antes da hora o dinheiro de quem aplicou depois.                                                           |
+| "Liquidada" = existe uma ordem apontando para ela                | Coluna ou status `SETTLED` na aplicação                     | A ordem é histórico e não se edita (R4). O `UNIQUE` de `settled_order_id` impede pagar duas vezes.                                                                                |
+| Mock com 300 dias úteis, um fechamento por vez no teste          | Pular um mês por fechamento / `until_date` no `day_close`   | Pular deixaria buracos de preço e erraria o rendimento diário do CDB e da LCI; o `until_date` mudaria o contrato da rota só para o teste.                                          |
+| Catálogo fixo, sem `is_active` nem erro de "sem preço"           | `PPP005002` (inativo/vencido) e `PPP005003` (sem preço)     | Nenhum produto sai do ar nem vence na simulação (o primeiro título vence em 2029), e o fechamento nunca deixa dia sem preço. Seriam erros que nunca acontecem.                     |
 
 **Fica para depois (incrementos):**
 
@@ -246,7 +270,8 @@ O registro completo, com o preço de cada alternativa, está na seção
 - marcação a mercado do Prefixado e do IPCA+ (no mercado real eles caem
   quando os juros sobem);
 - benchmark contra o CDI usando o histórico de taxas;
-- liquidação automática no vencimento (RN-FEC-09), junto com o módulo 7.
+- vencimento dos títulos do Tesouro no fechamento (o primeiro vence em 2029);
+- tirar produto do ar (status no produto e recusa da aplicação).
 
 ---
 
@@ -261,7 +286,7 @@ Legenda: ✅ pronto · 🔄 em andamento · ⬜ não começou
 | 2    | Módulo 5 (produtos e preços) já com data de movimento, histórico de taxas e seed novo | ✅     |
 | 3    | MockServer no compose, `mock-init` e utilitários de teste                             | ✅     |
 | 4    | Connectors e `POST /internal/day_close`                                               | ✅     |
-| 5    | Teste ponta a ponta: aplica → vira o dia → posição → resgate (com o módulo 7)         | ⬜     |
+| 5    | Teste ponta a ponta: aplica → vira o dia → posição → resgate (com o módulo 7)         | ✅     |
 | 6    | Roteiro de demonstração no README                                                     | ⬜     |
 
 ### Fase 0: RFC ✅
@@ -382,7 +407,8 @@ Corrigido em `tests/utils/db_utils.py`.
 - model e repository de `reference_rate`: entram na Fase 4, quando o
   fechamento gravar taxas;
 - `PPP005002` e `PPP005003` (produto indisponível, sem preço): entram com as
-  ordens, que é quem os usa.
+  ordens, que é quem os usa. **Atualização de 06/10:** os dois foram
+  removidos, junto com a coluna `is_active` (ver seção 8 e Diário).
 
 ### Fase 3: infraestrutura do mock ✅
 
@@ -433,6 +459,7 @@ fechamento que as usam.
 **Atenção:** o cenário cobre só 60 dias úteis a partir do dia em que o
 compose subiu. Se a data de movimento passar disso, o fechamento recebe 404
 do mock (vai virar 502). `docker compose down -v` e `up` recomeçam tudo.
+**Atualização de 06/10:** passaram a ser 300 dias úteis (ver Fase 5).
 
 ### Fase 4: connectors e fechamento do dia ✅
 
@@ -498,7 +525,7 @@ de teste tem um id fixo por fonte e dia (`test-{fonte}-{dia}`), e o MockServer
 troca a resposta de mesmo id em vez de empilhar. A sobra some, e o cenário do
 `mock-init` (que tem outro id) fica intacto. Limite que sobra: o `mock-init`
 só ensina 60 dias úteis, então a demonstração manual sai da janela depois de
-muitas rodadas sem `docker compose down -v`.
+muitas rodadas sem `docker compose down -v` (300 dias desde 06/10, ver Fase 5).
 
 **Demonstração manual conferida:** com ambiente novo e sem ensinar nada,
 `POST /internal/day_close {"close_date": "2026-10-04"}` abriu 05/10 com os
@@ -508,9 +535,65 @@ preços da tabela da seção 4 (fundo 103,99176299).
 espera deixariam a suíte lenta). O caminho é o mesmo da conexão derrubada,
 que está testada.
 
-### Fase 5: ponta a ponta ⬜
+### Fase 5: ponta a ponta ✅
 
-**Planejado:** o teste da seção 5, junto com o módulo de ordens e posição.
+**Objetivo:** provar que o preço que o fechamento grava chega de verdade na
+posição e no resgate do cliente. Veio junto com o Módulo 7 (ordens e posição,
+branch `feature/investment-orders`).
+
+**Ponta a ponta do fundo** (em `tests/integration/test_investment_order.py`).
+Fecha o dia com a cota a 1,23456789, aplica R$ 1.500 (1215,00001105 cotas) e
+fecha de novo com a cota a 1,24. Aí:
+
+- `GET /positions` mostra valor atual **R$ 1.506,60**, resultado R$ 6,60 e
+  44 pb;
+- o resgate de R$ 500 sai com custo R$ 497,80, resultado R$ 2,20 e 44 pb;
+- o resgate total do resto devolve R$ 1.006,60.
+
+São os números do exemplo da seção 5, só que com a cota do exemplo da RFC em
+vez de 100 → 102 → 104.
+
+**Liquidação no vencimento (RN-FEC-09), que mudou o fechamento:**
+
+- No fechamento, depois de gravar os preços e antes de abrir o dia, o banco
+  resgata sozinho cada aplicação da LCI que vence no novo dia, ao preço novo.
+  O dinheiro volta para a conta, mesmo que ela esteja bloqueada.
+- A ordem desse resgate tem `source = MATURITY` e `settled_order_id` (a
+  aplicação que ela devolveu). O `UNIQUE` dessa coluna impede pagar duas
+  vezes. A chave de idempotência é fixa por aplicação (`uuid5`).
+- As travas seguem a mesma ordem das ordens do cliente (conta, depois
+  posição), então não há _deadlock_ com uma aplicação no mesmo instante.
+- Está tudo no mesmo `commit` do fechamento: ou o dia abre com tudo pago, ou
+  nada muda.
+
+**Mock com um ano de preços:**
+
+- `BUSINESS_DAYS` passou de 60 para **300**.
+- Ensinar os 300 dias num pedido só estourava o timeout do mock recém-ligado,
+  e um pedido por dia deixava o `mock-init` trabalhando ~23 s depois de a API
+  subir. Agora vão lotes de 25 dias, com até 5 tentativas por lote.
+- A API só sobe depois que o `mock-init` termina com sucesso (`depends_on` com
+  `service_completed_successfully` no compose).
+- Conferido com três subidas do zero seguidas (`down -v` + `up --build`): nas
+  três, os 300 dias estavam ensinados antes de a API ligar.
+
+**Teste novo:** `tests/integration/test_maturity_settlement.py`.
+
+1. Recria o banco.
+2. Aplica R$ 100 na LCI.
+3. Fecha um dia por vez até o vencimento: cerca de 262 fechamentos, sem
+   ensinar nada ao mock, uns 25 s.
+4. Confere:
+   - o saldo voltou maior que o aplicado;
+   - existe a ordem `MATURITY` com a quantidade da aplicação;
+   - a posição zerou sem sumir;
+   - um fechamento a mais não paga de novo.
+5. Recria o banco de novo no fim.
+
+Primeiro falhou (saldo parado em R$ 9.900), depois passou. `pytest -v`:
+**277 passed**.
+
+**Não conferido:** os `.tex` não foram compilados.
 
 ### Fase 6: apresentação ⬜
 
@@ -530,6 +613,7 @@ que está testada.
 | 04/10/2026 | 2    | Removida a rota `POST /product/{key}/price` (RN-PRO-05, `PPP005004`, `PPP005005`) e os testes dela. Com isso nenhum teste chama mais o `DbUtils.rollback()`, e os dados criados pela suíte ficam no banco.                                                                                          |
 | 05/10/2026 | 2    | Seed de preços e taxas reduzido ao dia em que o banco nasce (eram 30 dias). RFC ajustada.                                                                                                                                                                                                           |
 | 05/10/2026 | 2    | LCI virou "LCI Triple P Bank 12 meses": `term_months` e `tax_exempt` em `product`, `CHECK` do prazo mínimo de 9 meses (Res. CMN 5.119 e 5.168/2024). RFC: RN-PRO-09, RN-ORD-17, RN-FEC-09 (rascunho, liquidação no vencimento) e "Do MVP à produção". O fechamento continua calculando a LCI igual. |
+| 06/10/2026 | 5    | Módulo 7 (ordens, posição, consultas) pronto. Fechamento liquida a LCI no vencimento (RN-FEC-09, deixou de ser rascunho): `source` e `settled_order_id` em `investment_order`. `mock-init` com 300 dias úteis, em lotes com novas tentativas; a API espera o `mock-init` terminar. Removidos `is_active`, `PPP005002` e `PPP005003` (catálogo fixo). |
 | 05/10/2026 | —    | Banco renomeado de Quant Bank para **Triple P Bank**; códigos de erro de `PPP` para `PPP` (mesmo formato); serviço `triple-p-bank-api`. O fundo continua FGV Quant Capital.                                                                                                                         |
 
 ---
@@ -556,5 +640,12 @@ da trava, encontra a data já avançada e recebe 409. Fecha-se um dia só
 
 **Por que os testes não podem conferir uma data fixa?**
 Porque a data de movimento é uma só para o banco inteiro e só anda para
-frente. Depois de algumas execuções da suíte, ela está semanas à frente do
-calendário. `docker compose down -v` volta tudo ao começo.
+frente. Durante a suíte ela chega a ficar um ano à frente (no teste de
+vencimento), e quem roda só alguns arquivos de teste a deixa dias adiante.
+`docker compose down -v` volta tudo ao começo.
+
+**Quem devolve o dinheiro da LCI?**
+O fechamento do dia. Quando a data de movimento chega ao vencimento de uma
+aplicação, o fechamento resgata essa aplicação sozinho, ao preço do dia, e o
+dinheiro volta para a conta do cliente. Antes disso, pedir o resgate dá 422
+(`PPP007005`).
