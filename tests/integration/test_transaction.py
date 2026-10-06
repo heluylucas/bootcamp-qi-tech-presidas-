@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -449,3 +450,252 @@ class TestTransactionRefusals:
 
         assert status == 404
         assert body["code"] == "PPP001001"
+
+
+def statement(customer_key: str, account_key: str, **query_params) -> list:
+    status, body = RequestGenerator.get_transactions(customer_key, account_key, {"limit": "100", **query_params})
+    assert status == 200
+    return body["items"]
+
+
+class TestStatement:
+    """RN-MOV-12: o extrato lista os lançamentos da conta, do mais novo para o mais antigo."""
+
+    def test_statement_rebuilds_balance(self):
+        """O invariante: saldo = soma dos créditos - soma dos débitos do extrato."""
+        customer_key, account_key = open_account()
+        other_customer, other_account = open_account()
+        deposit(customer_key, account_key, 100000)
+        deposit(other_customer, other_account, 10000)
+        withdraw(customer_key, account_key, 3000)
+        transfer(customer_key, account_key, other_account, 20000)
+        transfer(other_customer, other_account, account_key, 5000)
+
+        items = statement(customer_key, account_key)
+
+        credits = sum(item["amount"] for item in items if item["direction"] == "CREDIT")
+        debits = sum(item["amount"] for item in items if item["direction"] == "DEBIT")
+        balance = balance_of(customer_key, account_key)
+        assert balance == 100000 - 3000 - 20000 - TRANSFER_FEE + 5000
+        assert credits - debits == balance
+        assert items[0]["balance_after"] == balance
+
+    def test_transfer_shows_on_both_sides(self):
+        origin_customer, origin_account = open_account()
+        destination_customer, destination_account = open_account()
+        deposit(origin_customer, origin_account, 100000)
+        _, transfer_body = transfer(origin_customer, origin_account, destination_account, 20000)
+
+        origin_items = statement(origin_customer, origin_account, type="TRANSFER")
+        destination_items = statement(destination_customer, destination_account)
+
+        assert [(item["direction"], item["category"], item["amount"]) for item in origin_items] == [
+            ("DEBIT", "FEE", TRANSFER_FEE),
+            ("DEBIT", "PRINCIPAL", 20000),
+        ]
+        assert [item["balance_after"] for item in origin_items] == [79800, 80000]
+        assert all(item["counterparty_account_key"] == destination_account for item in origin_items)
+        assert len(destination_items) == 1
+        assert destination_items[0]["direction"] == "CREDIT"
+        assert destination_items[0]["amount"] == 20000
+        assert destination_items[0]["counterparty_account_key"] == origin_account
+        transaction_keys = {item["transaction_key"] for item in origin_items + destination_items}
+        assert transaction_keys == {transfer_body["transaction_key"]}
+
+    def test_entry_fields(self):
+        customer_key, account_key = open_account()
+        send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000, "description": "salário"})
+
+        items = statement(customer_key, account_key)
+
+        assert len(items) == 1
+        entry = items[0]
+        assert "id" not in entry
+        assert len(entry["transaction_key"]) == 36
+        assert entry["type"] == "DEPOSIT"
+        assert entry["direction"] == "CREDIT"
+        assert entry["category"] == "PRINCIPAL"
+        assert entry["amount"] == 10000
+        assert entry["balance_after"] == 10000
+        assert entry["description"] == "salário"
+        assert entry["counterparty_account_key"] is None
+        assert "created_at" in entry
+
+    def test_newest_first(self):
+        customer_key, account_key = open_account()
+        for amount in [1000, 2000, 3000]:
+            deposit(customer_key, account_key, amount)
+
+        items = statement(customer_key, account_key)
+
+        assert [item["amount"] for item in items] == [3000, 2000, 1000]
+        assert [item["balance_after"] for item in items] == [6000, 3000, 1000]
+
+    def test_pagination(self):
+        customer_key, account_key = open_account()
+        for amount in [1000, 2000, 3000, 4000, 5000]:
+            deposit(customer_key, account_key, amount)
+
+        pages = []
+        for page in ["1", "2", "3", "4"]:
+            status, body = RequestGenerator.get_transactions(customer_key, account_key, {"page": page, "limit": "2"})
+            assert status == 200
+            assert (body["page"], body["limit"], body["total"]) == (int(page), 2, 5)
+            pages.append([item["amount"] for item in body["items"]])
+
+        assert pages == [[5000, 4000], [3000, 2000], [1000], []]
+
+    def test_default_paging(self):
+        customer_key, account_key = open_account()
+        for _ in range(21):
+            deposit(customer_key, account_key, 100)
+
+        status, body = RequestGenerator.get_transactions(customer_key, account_key)
+
+        assert status == 200
+        assert (body["page"], body["limit"], body["total"]) == (1, 20, 21)
+        assert len(body["items"]) == 20
+
+    @pytest.mark.parametrize(
+        "query_params",
+        [
+            {"page": "0"},
+            {"page": "abc"},
+            {"limit": "0"},
+            {"limit": "101"},
+            {"type": "deposit"},
+            {"from": "01/10/2026"},
+            {"to": "2026-02-30"},
+            {"status": "ACTIVE"},
+        ],
+    )
+    def test_invalid_query(self, query_params):
+        customer_key, account_key = open_account()
+
+        status, body = RequestGenerator.get_transactions(customer_key, account_key, query_params)
+
+        assert status == 400
+        assert body["code"] == "PPP000001"
+
+    def test_from_after_to(self):
+        customer_key, account_key = open_account()
+
+        status, body = RequestGenerator.get_transactions(
+            customer_key, account_key, {"from": "2026-10-10", "to": "2026-10-01"}
+        )
+
+        assert status == 400
+        assert body["code"] == "PPP000005"
+
+    def test_filter_by_type(self):
+        customer_key, account_key = open_account()
+        _, other_account = open_account()
+        deposit(customer_key, account_key, 100000)
+        withdraw(customer_key, account_key, 1000)
+        transfer(customer_key, account_key, other_account, 1000)
+
+        items = statement(customer_key, account_key, type="WITHDRAWAL")
+
+        assert [(item["type"], item["amount"]) for item in items] == [("WITHDRAWAL", 1000)]
+
+    def test_filter_by_date(self):
+        """Datas reais do lançamento (created_at), em UTC, com as duas pontas inclusas."""
+        customer_key, account_key = open_account()
+        deposit(customer_key, account_key, 1000)
+        today = datetime.now(timezone.utc).date()
+        tomorrow = (today + timedelta(days=1)).isoformat()
+        yesterday = (today - timedelta(days=1)).isoformat()
+
+        assert len(statement(customer_key, account_key, **{"from": today.isoformat(), "to": today.isoformat()})) == 1
+        assert statement(customer_key, account_key, **{"from": tomorrow}) == []
+        assert statement(customer_key, account_key, to=yesterday) == []
+
+    def test_blocked_account_still_sees_statement(self):
+        """RN-CON-09: conta bloqueada não movimenta, mas consulta."""
+        customer_key, account_key = open_account()
+        deposit(customer_key, account_key, 1000)
+        RequestGenerator.patch_account(customer_key, account_key, {"status": "BLOCKED", "reason": "teste"})
+
+        assert len(statement(customer_key, account_key)) == 1
+
+    def test_account_of_another_customer(self):
+        _, account_key = open_account()
+        other_customer_key = create_customer()
+
+        status, body = RequestGenerator.get_transactions(other_customer_key, account_key)
+
+        assert status == 404
+        assert body["code"] == "PPP002001"
+
+
+class TestReceipt:
+    """RN-MOV-13: o comprovante só aparece para as contas que participaram da transação."""
+
+    def test_origin_and_destination_see_the_receipt(self):
+        origin_customer, origin_account = open_account()
+        destination_customer, destination_account = open_account()
+        deposit(origin_customer, origin_account, 100000)
+        payload = {
+            "type": "TRANSFER", "amount": 20000, "destination_account_key": destination_account, "description": "aluguel"
+        }
+        _, created = send(origin_customer, origin_account, payload)
+        transaction_key = created["transaction_key"]
+
+        origin_status, origin_receipt = RequestGenerator.get_transaction(
+            origin_customer, origin_account, transaction_key
+        )
+        destination_status, destination_receipt = RequestGenerator.get_transaction(
+            destination_customer, destination_account, transaction_key
+        )
+
+        assert (origin_status, destination_status) == (200, 200)
+        assert origin_receipt == destination_receipt
+        assert origin_receipt == {
+            "transaction_key": transaction_key,
+            "type": "TRANSFER",
+            "amount": 20000,
+            "fee_amount": TRANSFER_FEE,
+            "description": "aluguel",
+            "origin_account_key": origin_account,
+            "destination_account_key": destination_account,
+            "created_at": created["created_at"],
+        }
+
+    def test_deposit_receipt(self):
+        customer_key, account_key = open_account()
+        _, created = deposit(customer_key, account_key, 1000)
+
+        status, receipt = RequestGenerator.get_transaction(customer_key, account_key, created["transaction_key"])
+
+        assert status == 200
+        assert receipt["origin_account_key"] is None
+        assert receipt["destination_account_key"] == account_key
+
+    def test_account_not_involved(self):
+        """R8: a transação existe, mas não envolve esta conta. Resposta igual à de inexistente."""
+        customer_key, account_key = open_account()
+        _, created = deposit(customer_key, account_key, 1000)
+        other_customer, other_account = open_account()
+
+        status, body = RequestGenerator.get_transaction(other_customer, other_account, created["transaction_key"])
+
+        assert status == 404
+        assert body["code"] == "PPP003001"
+
+    def test_transaction_not_found(self):
+        customer_key, account_key = open_account()
+
+        status, body = RequestGenerator.get_transaction(customer_key, account_key, str(uuid.uuid4()))
+
+        assert status == 404
+        assert body["code"] == "PPP003001"
+
+    def test_account_of_another_customer(self):
+        customer_key, account_key = open_account()
+        _, created = deposit(customer_key, account_key, 1000)
+        other_customer_key = create_customer()
+
+        status, body = RequestGenerator.get_transaction(other_customer_key, account_key, created["transaction_key"])
+
+        assert status == 404
+        assert body["code"] == "PPP002001"

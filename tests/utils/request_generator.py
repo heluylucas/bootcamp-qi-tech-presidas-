@@ -104,6 +104,18 @@ class RequestGenerator:
         return response.response_status, response.response_json
 
     @staticmethod
+    def get_transactions(customer_key: str, account_key: str, query_params: dict = None):
+        endpoint = f"/customer/{customer_key}/account/{account_key}/transactions"
+        response = ClientRequisition.send("GET", endpoint, headers=HEADERS, query_params=query_params)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def get_transaction(customer_key: str, account_key: str, transaction_key: str):
+        endpoint = f"/customer/{customer_key}/account/{account_key}/transaction/{transaction_key}"
+        response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
     def get_portfolio_suggestion(customer_key: str, query_params: dict = None):
         endpoint = f"/customer/{customer_key}/portfolio_suggestion"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS, query_params=query_params)
