@@ -230,7 +230,6 @@ CREATE TABLE product(
     -- (Resoluções CMN 5.119/2024 e 5.168/2024).
     tax_exempt                      BOOLEAN NOT NULL DEFAULT false,
     min_application                BIGINT NOT NULL CHECK (min_application > 0),
-    is_active                       BOOLEAN NOT NULL DEFAULT true,
     own_issue                       BOOLEAN NOT NULL DEFAULT false,
     cdi_percentage_bps              SMALLINT CHECK (cdi_percentage_bps > 0),
     admin_fee_bps                   SMALLINT CHECK (admin_fee_bps >= 0),
@@ -374,6 +373,12 @@ CREATE TABLE investment_order(
     quantity                        NUMERIC(24,8) NOT NULL CHECK (quantity > 0),
     unit_price                      NUMERIC(20,8) NOT NULL CHECK (unit_price > 0),
     cost_amount                     BIGINT NOT NULL CHECK (cost_amount >= 0),
+    -- Vencimento da aplicação em produto com prazo (RN-ORD-17). Nulo nos demais casos.
+    maturity_date                   DATE,
+    -- Quem pediu: o cliente ou a liquidação no vencimento, feita pelo fechamento do dia (RN-FEC-09).
+    source                          VARCHAR(8) NOT NULL DEFAULT 'CUSTOMER' CHECK (source IN ('CUSTOMER', 'MATURITY')),
+    -- Na liquidação, a aplicação que ela devolveu. O UNIQUE impede liquidar a mesma aplicação duas vezes.
+    settled_order_id                INTEGER UNIQUE REFERENCES investment_order(id),
     transaction_id                  INTEGER NOT NULL UNIQUE REFERENCES transaction(id),
     status                          VARCHAR(8) NOT NULL DEFAULT 'EXECUTED' CHECK (status IN ('EXECUTED')),
     idempotency_key                 CHAR(36) NOT NULL,
