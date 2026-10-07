@@ -157,6 +157,13 @@ def create_app() -> FastAPI:
         account_resource.on_get_status_events,
         methods=["GET"]
     )
+    # A rota do banco: bloquear, desbloquear e encerrar (RN-CON-11). Fica em
+    # /internal/ e por isso exige o token de operador (RN-GER-14).
+    application.add_api_route(
+        "/internal/account/{account_key}/status",
+        account_resource.on_patch_internal,
+        methods=["PATCH"]
+    )
 
     suitability_resource = SuitabilityResource()
     suitability_path = "/customer/{customer_key}/suitability"
