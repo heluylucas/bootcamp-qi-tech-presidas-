@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    participant O as Operador (rota interna)
+    participant API as API (controller)
+    participant DB as PostgreSQL
+    participant F as Administradora do fundo
+    participant T as Tesouro
+    participant BC as Banco Central
+
+    O->>API: POST /internal/day_close {close_date}
+    API->>DB: FOR UPDATE no business_day atual e relê a data
+    Note over API: close_date ≠ data atual → 409 PPP000006<br/>(clique duplo: o segundo encontra a data já avançada)
+    Note over API: próximo dia útil (sexta → segunda)
+    API->>F: cota do novo dia (timeout 5 s)
+    API->>T: preço dos 3 títulos
+    API->>BC: CDI e Selic
+    alt fora do ar, erro ou timeout
+        API-->>O: 502 PPP005006 (nada gravado, a data não anda)
+    else resposta sem sentido (preço ≤ 0, data errada, título faltando)
+        API-->>O: 502 PPP005007 (nada gravado)
+    end
+    Note over API: CDB e LCI = preço anterior × (1 + c × %CDI)<br/>c = (1 + CDI)^(1/252) − 1
+    API->>DB: INSERT 6 product_price + 2 reference_rate
+    loop cada aplicação com maturity_date ≤ novo dia ainda não liquidada (account_id crescente)
+        API->>DB: FOR UPDATE na conta, depois na position
+        API->>DB: INSERT investment_order REDEEM, source = MATURITY,<br/>settled_order_id (UNIQUE), chave uuid5 da aplicação
+        API->>DB: INSERT transaction INVESTMENT_REDEEM + ledger_entry CREDIT<br/>UPDATE balance e position
+    end
+    API->>DB: INSERT business_day (novo dia)
+    API->>DB: COMMIT: preços, taxas, liquidações e data, tudo ou nada
+    API-->>O: 201 nova data, preços e taxas

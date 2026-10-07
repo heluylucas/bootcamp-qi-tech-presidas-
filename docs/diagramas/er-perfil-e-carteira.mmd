@@ -1,0 +1,55 @@
+erDiagram
+    customer ||--o{ suitability_assessment : "responde"
+    investor_profile ||--o{ suitability_assessment : "resulta em"
+    suitability_assessment ||--|{ suitability_answer : "7 respostas"
+    suitability_question ||--|{ suitability_option : "4 opções"
+    suitability_option ||--o{ suitability_answer : "escolhida"
+    investor_profile ||--|| model_portfolio : "carteira-modelo"
+    model_portfolio ||--|{ model_portfolio_item : "itens"
+    product ||--o{ model_portfolio_item : "compõe"
+
+    suitability_question {
+        int id PK
+        string code UK "Q1 a Q7"
+        string dimension
+    }
+    suitability_option {
+        int id PK
+        int question_id FK "UK com code"
+        smallint code
+        smallint points "1 a 4"
+    }
+    investor_profile {
+        int id PK
+        string enumerator UK "CONSERVATIVE, MODERATE, AGGRESSIVE"
+        smallint min_score
+        smallint max_score
+        smallint max_risk_level
+    }
+    suitability_assessment {
+        int id PK
+        char assessment_key UK
+        int customer_id FK
+        int profile_id FK
+        smallint score
+        boolean forced_by_rule
+        timestamptz valid_until "hora real + 24 meses"
+        timestamptz created_at "mais recente = vigente"
+    }
+    suitability_answer {
+        int id PK
+        int assessment_id FK "UK com question_id"
+        int question_id FK
+        int option_id FK
+    }
+    model_portfolio {
+        int id PK
+        int profile_id FK "UK"
+        string name
+    }
+    model_portfolio_item {
+        int id PK
+        int model_portfolio_id FK "UK com product_id"
+        int product_id FK
+        smallint weight_bps "soma 10000"
+    }

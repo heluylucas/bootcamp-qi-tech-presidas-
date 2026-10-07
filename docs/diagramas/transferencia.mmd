@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    participant C as Cliente da API
+    participant API as API (controller)
+    participant DB as PostgreSQL
+
+    C->>API: POST .../account/{ak}/transaction<br/>type=TRANSFER, amount, destination_account_key<br/>Idempotency-Key
+    Note over API: schema: falta campo ou chave → 400
+    API->>DB: busca origem e confere o dono
+    Note over API: de outro cliente ou inexistente → 404
+    API->>DB: busca destino
+    Note over API: inexistente → 404 PPP003002<br/>igual à origem → 422 PPP003006
+    API->>DB: SELECT ... FOR UPDATE nas duas contas,<br/>em ordem crescente de id
+    API->>DB: procura transaction (requester_account_id, idempotency_key)
+    alt já existe com o mesmo request_hash
+        API-->>C: 200 com o corpo original (nada é debitado de novo)
+    else já existe com outro hash
+        API-->>C: 409 PPP000004
+    end
+    Note over API: com as travas: contas ACTIVE?<br/>balance ≥ amount + 200?
+    alt não passa
+        API->>DB: ROLLBACK (nada foi escrito, só solta as travas)
+        API-->>C: 409 PPP003003 / PPP003007 / PPP002005
+    end
+    API->>DB: INSERT transaction (fee_amount = 200, request_hash)
+    API->>DB: INSERT 3 ledger_entry com balance_after<br/>DEBIT/PRINCIPAL e DEBIT/FEE na origem, CREDIT/PRINCIPAL no destino
+    API->>DB: UPDATE account.balance das duas contas
+    API->>DB: COMMIT (solta as travas)
+    API-->>C: 201 transaction_key e saldo novo

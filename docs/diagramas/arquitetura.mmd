@@ -1,0 +1,20 @@
+flowchart LR
+    cli["Cliente da API<br/>(app, teste, Postman)"]
+
+    subgraph compose["docker compose up"]
+        direction LR
+        subgraph api["API (FastAPI)"]
+            direction TB
+            res["resources/<br/>HTTP + JSON Schema"] --> ctl["controllers/<br/>regras + commit"]
+            ctl --> rep["repositories/<br/>única camada com SQL"]
+            ctl -. fechamento do dia .-> con["connectors/"]
+        end
+        db[("PostgreSQL 16<br/>schema + seeds")]
+        mock["MockServer<br/>administradora do fundo,<br/>Tesouro, Banco Central"]
+        init["mock-init<br/>ensina 300 dias úteis"]
+    end
+
+    cli -- "HTTP + INTERNAL-TOKEN<br/>+ Idempotency-Key" --> res
+    rep --> db
+    con -- "cota, preços, CDI/Selic<br/>(timeout 5 s)" --> mock
+    init -. roda uma vez .-> mock

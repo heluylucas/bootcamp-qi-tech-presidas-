@@ -1,0 +1,13 @@
+flowchart LR
+    fora["Mundo de fora<br/>(simulado)"]
+    cc["Conta corrente<br/>account.balance"]
+    inv["Posição investida<br/>position.quantity"]
+    outra["Outra conta<br/>do Triple P Bank"]
+    banco["Receita do banco<br/>(lançamentos FEE)"]
+
+    fora -- depósito --> cc
+    cc -- saque --> fora
+    cc -- aplicação --> inv
+    inv -- "resgate / vencimento" --> cc
+    cc -- transferência --> outra
+    cc -- "tarifa R$ 2,00" --> banco
