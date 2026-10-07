@@ -244,7 +244,8 @@ escrita. O cliente recebe 422 (\tb{PPP004002}).
   \item Confere cada resposta: data igual à pedida, preço e taxa $> 0$, todos os produtos com
         \tb{external_code} presentes.
   \item Calcula CDB e LCI: preço anterior $\times (1 + c \times$ \tb{cdi_percentage_bps}$/10000)$,
-        com $c = (1 + \text{CDI})^{1/252} - 1$.
+        com $c = (1 + \text{CDI do dia que fecha})^{1/252} - 1$, lido de \tb{reference_rate}
+        (o CDI do novo dia, que acabou de chegar, rende o fechamento seguinte).
   \item Grava os 6 \tb{product_price} e as 2 \tb{reference_rate}.
   \item \textbf{Liquida o que venceu} (RN-FEC-09): busca as aplicações com \tb{maturity_date}
         $\leq$ novo dia que nenhuma ordem aponta em \tb{settled_order_id}, em ordem crescente de

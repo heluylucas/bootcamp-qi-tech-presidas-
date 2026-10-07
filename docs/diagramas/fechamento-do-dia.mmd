@@ -19,8 +19,9 @@ sequenceDiagram
     else resposta sem sentido (preço ≤ 0, data errada, título faltando)
         API-->>O: 502 PPP005007 (nada gravado)
     end
-    Note over API: CDB e LCI = preço anterior × (1 + c × %CDI)<br/>c = (1 + CDI)^(1/252) − 1
-    API->>DB: INSERT 6 product_price + 2 reference_rate
+    API->>DB: CDI do dia que fecha (reference_rate)
+    Note over API: CDB e LCI = preço anterior × (1 + c × %CDI)<br/>c = (1 + CDI do dia que fecha)^(1/252) − 1
+    API->>DB: INSERT 6 product_price + 2 reference_rate (taxas do novo dia)
     loop cada aplicação com maturity_date ≤ novo dia ainda não liquidada (account_id crescente)
         API->>DB: FOR UPDATE na conta, depois na position
         API->>DB: INSERT investment_order REDEEM, source = MATURITY,<br/>settled_order_id (UNIQUE), chave uuid5 da aplicação

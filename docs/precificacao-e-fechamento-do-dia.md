@@ -61,7 +61,8 @@ preço novo é o fechamento do dia:
         ↓
   5. as respostas fazem sentido?                não → 502, nada gravado
         ↓
-  6. calcula o CDB e a LCI com o CDI que chegou
+  6. calcula o CDB e a LCI com o CDI de 05/10 (o dia que fecha),
+     lido da reference_rate; o de 06/10 que chegou rende amanhã
         ↓
   7. grava os 6 preços e as 2 taxas
         ↓
@@ -108,12 +109,16 @@ MockServer **não tem memória**: ele só responde ao que perguntam.
 | Tesouro Prefixado 2029 | Mock (Tesouro)        | `100 × 1,13^(d/252)`                                       | Sobe um pouco todo dia      |
 | Tesouro IPCA+ 2035     | Mock (Tesouro)        | `100 × (1,045 × 1,06)^(d/252)`                             | Sobe um pouco todo dia      |
 | CDI e Selic            | Mock (Banco Central)  | 14,9% e 15% ao ano                                         | Uma taxa nova por dia útil  |
-| CDB Triple P Bank      | **O banco**           | preço de ontem × (1 + CDI do dia × 95%)                    | Rende pelo CDI que chegou   |
-| LCI Triple P Bank      | **O banco**           | preço de ontem × (1 + CDI do dia × 93%)                    | Rende pelo CDI que chegou   |
+| CDB Triple P Bank      | **O banco**           | preço de ontem × (1 + CDI do dia × 95%)                    | Rende pelo CDI de ontem     |
+| LCI Triple P Bank      | **O banco**           | preço de ontem × (1 + CDI do dia × 93%)                    | Rende pelo CDI de ontem     |
 | FGV Quant Capital      | Mock (administradora) | `100 × (1,10 × 0,99)^(d/252) × (1 + 3% × sen((d + 15)/7))` | **Sobe e desce**            |
 
 O "CDI do dia" é a taxa anual convertida para um dia útil:
 `(1 + 14,9%)^(1/252) − 1 ≈ 0,0551%`.
+
+Qual dia? O do dia que **fecha**, lido da `reference_rate`. No mercado, a
+taxa publicada para 05/10 é a que rende de 05/10 para 06/10. O CDI de 06/10,
+que chega no mesmo fechamento, só é gravado: ele rende o fechamento seguinte.
 
 **Lendo a fórmula do fundo, por partes:**
 
@@ -255,6 +260,7 @@ O registro completo, com o preço de cada alternativa, está na seção
 | Buscar preço uma vez por dia                                     | Buscar na hora em que o cliente pede                        | O cliente não fica dependendo de serviço externo, e todos veem o mesmo preço no dia.                                                                                              |
 | Fórmula que depende só da data                                   | Seno acumulado dia a dia (versão antiga do seed)            | O mock não tem memória.                                                                                                                                                           |
 | Histórico de taxas em `reference_rate`                           | Uma taxa fixa / apagar a tabela                             | Uma taxa fixa criaria dois CDIs diferentes, e o relatório de receita precisa das taxas.                                                                                           |
+| CDB e LCI rendem pelo CDI do dia que fecha, lido da tabela       | CDI do novo dia, usado direto da memória                    | É a convenção do mercado (a taxa de `d` rende de `d` para `d+1`) e era o que a RN-REC-08 já mandava. A diferença em dinheiro é mínima.                                           |
 | Preço diário                                                     | Preço intradiário                                           | Fundo tem uma cota por dia; renda fixa rende por dia útil.                                                                                                                        |
 | Preço só pelo fechamento do dia                                  | Rota de publicação manual (`POST /product/{key}/price`)     | Preço não se reescreve, o fechamento não deixa buraco e fim de semana usa o último preço: a rota só conseguia gravar dias que ninguém lê. E o teste dela apagava o banco inteiro. |
 | LCI como oferta com prazo de 12 meses (vencimento por aplicação) | LCI com vencimento fixo e prazo mínimo checado na aplicação | Emissão própria é uma emissão nova a cada aplicação. Com vencimento fixo, a LCI ficaria bloqueada nos últimos 9 meses. O prazo mínimo do CMN virou `CHECK` no banco.              |
