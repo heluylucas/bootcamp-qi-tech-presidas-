@@ -4,8 +4,12 @@ from tests.utils.requisition import ClientRequisition
 
 
 INTERNAL_TOKEN = environ.get("INTERNAL_TOKEN", "default_token")
+OPERATOR_TOKEN = environ.get("OPERATOR_TOKEN", "default_operator_token")
 
 HEADERS = {"INTERNAL-TOKEN": INTERNAL_TOKEN}
+
+# As rotas /internal/... são da operação do banco e pedem também o token de operador (RN-GER-14).
+OPERATOR_HEADERS = {**HEADERS, "OPERATOR-TOKEN": OPERATOR_TOKEN}
 
 
 class RequestGenerator:
@@ -13,12 +17,22 @@ class RequestGenerator:
 
     @staticmethod
     def get_business_date():
-        response = ClientRequisition.send("GET", "/internal/business_date", headers=HEADERS)
+        response = ClientRequisition.send("GET", "/internal/business_date", headers=OPERATOR_HEADERS)
         return response.response_status, response.response_json
 
     @staticmethod
     def post_day_close(payload: dict):
-        response = ClientRequisition.send("POST", "/internal/day_close", payload=payload, headers=HEADERS)
+        response = ClientRequisition.send("POST", "/internal/day_close", payload=payload, headers=OPERATOR_HEADERS)
+        return response.response_status, response.response_json
+
+    @staticmethod
+    def patch_internal_account_status(account_key: str, payload: dict, operator_token=OPERATOR_TOKEN):
+        """A rota do banco (RN-CON-11). operator_token=None não manda o cabeçalho: é assim que se testa o 403."""
+        headers = dict(HEADERS)
+        if operator_token is not None:
+            headers["OPERATOR-TOKEN"] = operator_token
+        endpoint = f"/internal/account/{account_key}/status"
+        response = ClientRequisition.send("PATCH", endpoint, payload=payload, headers=headers)
         return response.response_status, response.response_json
 
     @staticmethod
@@ -114,7 +128,7 @@ class RequestGenerator:
         endpoint = f"/customer/{customer_key}/account/{account_key}/transaction/{transaction_key}"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
         return response.response_status, response.response_json
-    
+
     @staticmethod
     def post_investment_order(customer_key: str, payload: dict, idempotency_key):
         """idempotency_key=None não manda o cabeçalho: é assim que se testa a falta dele."""

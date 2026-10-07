@@ -184,7 +184,7 @@ class TestApplyRefusals:
 
     def test_blocked_account(self):
         customer_key, account_key = investor()
-        RequestGenerator.patch_account(customer_key, account_key, {"status": "BLOCKED", "reason": "Suspeita de fraude"})
+        RequestGenerator.patch_internal_account_status(account_key, {"status": "BLOCKED", "reason": "Suspeita de fraude"})
 
         status, body = apply(customer_key, CDB, 10000)
 
@@ -394,7 +394,7 @@ class TestRedeemRefusals:
     def test_blocked_account(self):
         customer_key, account_key = investor()
         apply(customer_key, CDB, 10000)
-        RequestGenerator.patch_account(customer_key, account_key, {"status": "BLOCKED", "reason": "Suspeita de fraude"})
+        RequestGenerator.patch_internal_account_status(account_key, {"status": "BLOCKED", "reason": "Suspeita de fraude"})
 
         status, body = redeem(customer_key, CDB, 4000)
 

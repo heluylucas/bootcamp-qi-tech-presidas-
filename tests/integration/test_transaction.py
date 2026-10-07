@@ -193,9 +193,7 @@ class TestTransfer:
         origin_customer, origin_account = open_account()
         destination_customer, destination_account = open_account()
         deposit(origin_customer, origin_account, 10000)
-        RequestGenerator.patch_account(
-            destination_customer, destination_account, {"status": target_status, "reason": "teste"}
-        )
+        RequestGenerator.patch_internal_account_status(destination_account, {"status": target_status, "reason": "teste"})
 
         status, body = transfer(origin_customer, origin_account, destination_account, 1000)
 
@@ -207,7 +205,7 @@ class TestTransfer:
         origin_customer, origin_account = open_account()
         _, destination_account = open_account()
         deposit(origin_customer, origin_account, 10000)
-        RequestGenerator.patch_account(origin_customer, origin_account, {"status": "BLOCKED", "reason": "teste"})
+        RequestGenerator.patch_internal_account_status(origin_account, {"status": "BLOCKED", "reason": "teste"})
 
         status, body = transfer(origin_customer, origin_account, destination_account, 1000)
 
@@ -351,7 +349,7 @@ class TestIdempotency:
         key = str(uuid.uuid4())
         payload = {"type": "DEPOSIT", "amount": 10000}
         _, first = RequestGenerator.post_transaction(customer_key, account_key, payload, key)
-        RequestGenerator.patch_account(customer_key, account_key, {"status": "BLOCKED", "reason": "teste"})
+        RequestGenerator.patch_internal_account_status(account_key, {"status": "BLOCKED", "reason": "teste"})
 
         status, body = RequestGenerator.post_transaction(customer_key, account_key, payload, key)
 
@@ -420,7 +418,7 @@ class TestTransactionRefusals:
     @pytest.mark.parametrize("target_status", ["BLOCKED", "CLOSED"])
     def test_account_not_active(self, transaction_type, target_status):
         customer_key, account_key = open_account()
-        RequestGenerator.patch_account(customer_key, account_key, {"status": target_status, "reason": "teste"})
+        RequestGenerator.patch_internal_account_status(account_key, {"status": target_status, "reason": "teste"})
 
         status, body = send(customer_key, account_key, {"type": transaction_type, "amount": 1000})
 
@@ -614,7 +612,7 @@ class TestStatement:
         """RN-CON-09: conta bloqueada não movimenta, mas consulta."""
         customer_key, account_key = open_account()
         deposit(customer_key, account_key, 1000)
-        RequestGenerator.patch_account(customer_key, account_key, {"status": "BLOCKED", "reason": "teste"})
+        RequestGenerator.patch_internal_account_status(account_key, {"status": "BLOCKED", "reason": "teste"})
 
         assert len(statement(customer_key, account_key)) == 1
 
