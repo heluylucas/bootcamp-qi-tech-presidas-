@@ -156,6 +156,12 @@ docker compose up
 O `-v` apaga o volume do banco, e **leva junto tudo que você criou na
 mão**.
 
+### `Operator Only` (`PPP000007`) ao chamar `/internal/...`
+
+Faltou o cabeçalho do token de operador. As rotas do banco pedem os dois:
+`INTERNAL-TOKEN` **e** `OPERATOR-TOKEN` (seção 5). Os testes mandam os dois
+sozinhos; quem esquece é a demonstração manual (curl, Postman).
+
 ### Demonstração manual do fechamento dando 404
 
 O `mock-init` ensina ao mock 300 dias úteis (pouco mais de um ano) a partir
@@ -233,6 +239,30 @@ INTERNAL-TOKEN: default_token
 Sem ele, a API responde **403** (`PPP000002`). Ficam abertas só a rota
 raiz e o `/health_check`, que o próprio Docker consulta.
 
+As rotas que começam com `/internal/` são da **operação do banco**
+(fechamento do dia, data de movimento, bloquear e desbloquear conta) e
+pedem também o token de operador:
+
+```
+OPERATOR-TOKEN: default_operator_token
+```
+
+Sem ele, ou com o valor errado, a API responde **403** (`PPP000007`). A
+ideia é que o cliente tenha só o primeiro token, nunca o segundo: é isso
+que impede um cliente bloqueado de se desbloquear sozinho (RN-CON-11).
+
+```bash
+# rota de cliente: só o INTERNAL-TOKEN
+curl -H "INTERNAL-TOKEN: default_token" localhost:3000/products
+
+# rota do banco: os dois
+curl -H "INTERNAL-TOKEN: default_token" -H "OPERATOR-TOKEN: default_operator_token" \
+     localhost:3000/internal/business_date
+```
+
+Como o outro, o valor vem da variável `OPERATOR_TOKEN` (padrão no
+`docker-compose.yml`, troca pelo `.env`).
+
 ---
 
 ## 6. Os códigos de erro
@@ -256,6 +286,7 @@ que toda rota pode devolver, moram em `src/errors/base_error.py`:
 | `PPP000001` | 400  | o JSON ou a query string estão fora do formato (schema)                     |
 | `PPP000002` | 403  | faltou o `INTERNAL-TOKEN`, ou ele está errado                               |
 | `PPP000005` | 400  | parâmetros no formato certo que se contradizem (ex.: `from` depois de `to`) |
+| `PPP000007` | 403  | rota `/internal/...` sem o `OPERATOR-TOKEN`, ou com ele errado              |
 | `PPP000404` | 404  | essa rota não existe                                                        |
 | `PPP000405` | 405  | a rota existe, mas não aceita esse método                                   |
 | `PPP000500` | 500  | erro inesperado                                                             |
