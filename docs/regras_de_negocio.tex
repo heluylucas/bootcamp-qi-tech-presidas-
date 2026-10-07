@@ -862,7 +862,9 @@ Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $
         ``95\% do CDI'', e é a mesma que o fechamento do dia repete (RN-FEC-05).
   \item \tb{reference_rate} (histórico, RN-REC-08): o seed grava CDI \tb{1490} bps e Selic
         \tb{1500} bps com a data de hoje. O cenário padrão do mock repete esses valores todo dia.
-  \item Todos os produtos valem \rs 100,00 na data âncora ($d = 0$).
+  \item Os títulos valem \rs 100,00 na data âncora ($d = 0$). O fundo começa em
+        \rs 102,52236132, porque o deslocamento da onda deixa $\sin(15/7) \approx 0{,}84$ em $d = 0$;
+        a tendência parte de 100, e é a onda que soma os 2,5\%.
   \item O seed grava um preço por produto, o de hoje (o dia em que o banco nasce); os dias
         seguintes entram pelo fechamento do dia. Se o banco nascer no fim de semana, $d$ não muda
         e o preço é o de sexta.
@@ -1736,7 +1738,8 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   cobre os dias sem linha.
   \item \textbf{Preço inicial parecido com o mercado} (Tesouro Selic $\approx$ \rs 17.000, cota
   $\approx$ \rs 1,00) --- descartada porque dificulta conferir as contas na mão. Ganharia se o
-  objetivo fosse realismo visual. \emph{Escolhido:} todos valem \rs 100,00 na data âncora.
+  objetivo fosse realismo visual. \emph{Escolhido:} base \rs 100,00 na data âncora (o fundo
+  começa em \rs 102,52 por causa da onda, ver os parâmetros do seed).
   \item \textbf{Códigos de erro com numeração livre} (o número do meio sem ligação com o módulo,
   como era antes: os erros de ordens, Módulo 7, usavam \tb{PPP006}) --- descartada porque quem lê
   \tb{PPP006xxx} espera um erro do Módulo 6, e a carteira (Módulo 6) ficava misturada com as
