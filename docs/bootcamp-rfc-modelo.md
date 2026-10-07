@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Time** | Lucas Heluy · \<nome 2\> · \<nome 3\> |
+| **Time** | Lucas Heluy · Álvaro Duarte · Thomas Miguellone |
 | **Data** | 07/10/2026 |
 | **Versão** | 1 |
 
