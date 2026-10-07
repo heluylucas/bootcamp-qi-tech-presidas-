@@ -78,13 +78,22 @@ realizada de estimada é o que deixa o número defensável.
 - **Relógio real como "hoje":** descartada porque o dia seguinte só chegaria depois de 24 h, e não daria
   para testar nem demonstrar rendimento e vencimento. Ganharia sem rentabilidade para mostrar. Idade
   mínima e validade do perfil continuam no relógio real, porque são fatos regulatórios.
+- **Uma rota só para bloquear, desbloquear e encerrar a conta:** descartada porque, com o mesmo
+  `INTERNAL-TOKEN` para todos, um cliente bloqueado por fraude ou ordem judicial conseguia se
+  desbloquear. Separar as rotas sem credencial nova também não bastava: quem tem o token chamaria a
+  rota do banco do mesmo jeito. Ganharia com autenticação real do cliente ou com um *gateway* que só
+  expõe `/customer/...`. Ficamos com o cliente só encerrando e o banco bloqueando e desbloqueando
+  pela rota interna, protegida pelo `OPERATOR-TOKEN`.
 
 ## Implementação
 
 ### Rotas
 
 Toda rota exige o cabeçalho `INTERNAL-TOKEN`, menos `/` e `/health_check`. Sem ele, a resposta é
-`403`. Um recurso de outro cliente responde `404`, igual a um inexistente. As rotas marcadas como
+`403` (`PPP000002`). As rotas `/internal/...` são da operação do banco e exigem também o cabeçalho
+`OPERATOR-TOKEN`; sem ele ou com valor errado, `403` (`PPP000007`). O cliente só tem o primeiro
+token, e é isso que o impede de se desbloquear sozinho. Um recurso de outro cliente responde `404`,
+igual a um inexistente. As rotas marcadas como
 **idempotentes** exigem o cabeçalho `Idempotency-Key` (UUID); sem ele, `400` (`PPP000003`). Se a
 mesma chave vier com o mesmo corpo, a resposta é `200` com o corpo original e nada se move de novo.
 Se vier com um corpo diferente, `409` (`PPP000004`). Quem garante isso é a dupla `idempotency_key` +
@@ -97,8 +106,9 @@ Se vier com um corpo diferente, `409` (`PPP000004`). Quem garante isso é a dupl
 | `GET` | `/customer/{ck}` | Lê o cliente (CPF mascarado) | — | `200`; `404` |
 | `POST` | `/customer/{ck}/account` | Abre a conta corrente (nasce `ACTIVE`, saldo 0) | — | `201` `account_key`; `404` cliente; `409` já tem conta não encerrada |
 | `GET` | `/customer/{ck}/account/{ak}` | Saldo e status | — | `200`; `404` |
-| `PATCH` | `/customer/{ck}/account/{ak}` | Bloqueia, desbloqueia ou encerra, gerando evento | `status`, `reason` | `200`; `400` status fora do enum; `404`; `409` transição proibida ou conta não vazia; `422` sem motivo |
-| `GET` | `/customer/{ck}/account/{ak}/status_events` | Trilha de status | — | `200`; `404` |
+| `PATCH` | `/customer/{ck}/account/{ak}` | O cliente encerra a própria conta (só vazia), gerando evento | `status`, `reason` | `200`; `400` status fora do enum; `403` bloquear ou desbloquear (só o banco); `404`; `409` transição proibida ou conta não vazia; `422` sem motivo |
+| `PATCH` | `/internal/account/{ak}/status` | O banco bloqueia, desbloqueia ou encerra, gerando evento. Exige `OPERATOR-TOKEN` | `status`, `reason` | `200`; `400` schema; `403` sem token de operador; `404`; `409` transição proibida ou conta não vazia; `422` sem motivo |
+| `GET` | `/customer/{ck}/account/{ak}/status_events` | Trilha de status, com quem fez cada mudança (`CUSTOMER` ou `BANK`) | — | `200`; `404` |
 | `POST` | `/customer/{ck}/account/{ak}/transaction` | Depósito, saque ou transferência (tarifa de R$ 2,00). **Idempotente**: `UNIQUE(requester_account_id, idempotency_key)` | `type`, `amount` (centavos), `destination_account_key` | `201` `transaction_key` e saldo; `200` repetição; `400` schema ou sem chave; `404` conta ou destino; `409` conta/destino não ativos, saldo insuficiente, chave reutilizada; `422` valor ≤ 0, acima do limite, origem = destino |
 | `GET` | `/customer/{ck}/account/{ak}/transactions` | Extrato paginado, do mais novo ao mais antigo | `page`, `limit`, `from`, `to`, `type` | `200` `{items, page, limit, total}`; `400` filtro inválido; `404` |
 | `GET` | `/customer/{ck}/account/{ak}/transaction/{tk}` | Comprovante | — | `200`; `404` (inexistente ou não envolve a conta) |
@@ -114,9 +124,9 @@ Se vier com um corpo diferente, `409` (`PPP000004`). Quem garante isso é a dupl
 | `GET` | `/customer/{ck}/investment_orders` | Histórico de ordens | `page`, `limit`, `product_key` | `200` (produto inexistente: lista vazia); `400`; `404` |
 | `GET` | `/customer/{ck}/investment_order/{ok}` | Detalhe da ordem | — | `200`; `404` |
 | `GET` | `/customer/{ck}/positions` | Posição, valor do dia e rentabilidade | `include_closed` | `200`; `400`; `404` |
-| `GET` | `/internal/business_date` | Data de movimento atual | — | `200` |
-| `POST` | `/internal/day_close` | Fecha o dia: busca preços e taxas lá fora, liquida o que venceu e abre o próximo dia útil. Clique duplo não fecha dois dias (trava + data conferida) | `close_date` | `201` nova data, preços, taxas; `400`; `409` `close_date` não é a data atual; `502` fonte fora do ar ou resposta sem sentido (nada gravado) |
-| `GET` | `/internal/revenue` | Receita realizada (tarifas) e estimada (fundo, spread, float) | `from`, `to` | `200`; `400` período invertido ou maior que 366 dias |
+| `GET` | `/internal/business_date` | Data de movimento atual. Exige `OPERATOR-TOKEN` | — | `200`; `403` sem token de operador |
+| `POST` | `/internal/day_close` | Fecha o dia: busca preços e taxas lá fora, liquida o que venceu e abre o próximo dia útil. Clique duplo não fecha dois dias (trava + data conferida). Exige `OPERATOR-TOKEN` | `close_date` | `201` nova data, preços, taxas; `400`; `403` sem token de operador; `409` `close_date` não é a data atual; `502` fonte fora do ar ou resposta sem sentido (nada gravado) |
+| `GET` | `/internal/revenue` | Receita realizada (tarifas) e estimada (fundo, spread, float). Exige `OPERATOR-TOKEN` | `from`, `to` | `200`; `400` período invertido ou maior que 366 dias; `403` sem token de operador |
 
 ### Banco de Dados (Somente diagrama)
 

@@ -325,7 +325,8 @@ R8 & Autorização: ``esse recurso é seu?'' (IDOR). & Toda rota de recurso de c
 \end{longtable}
 
 Além disso, o repositório-base já exige o cabeçalho \tb{INTERNAL-TOKEN} em toda rota, exceto
-a raiz e o \tb{/health_check} (sem ele: \textbf{403}). Mantemos isso.
+a raiz e o \tb{/health_check} (sem ele: \textbf{403}). Mantemos isso e acrescentamos um segundo
+cabeçalho, \tb{OPERATOR-TOKEN}, só para as rotas \tb{/internal/...} da operação do banco (RN-GER-14).
 
 % =====================================================================
 \section{Visão geral da aplicação}
@@ -339,7 +340,7 @@ a raiz e o \tb{/health_check} (sem ele: \textbf{403}). Mantemos isso.
 \midrule
 \endhead
 1. Clientes & Cadastra pessoas físicas (nome, CPF, nascimento) e as consulta. \\
-2. Contas & Abre a conta corrente do cliente, consulta saldo, bloqueia, desbloqueia e encerra. \\
+2. Contas & Abre a conta corrente do cliente, consulta saldo e encerra; o banco, pela rota interna, bloqueia e desbloqueia. \\
 3. Movimentações & Depósito, saque e transferência entre contas do \banco, com tarifa, extrato e comprovante. \\
 4. Suitability & Questionário, cálculo do perfil do investidor e histórico de perfis. \\
 5. Produtos e preços & Catálogo de produtos (renda fixa + \fundo) e o preço unitário de cada dia. \\
@@ -475,8 +476,10 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   \emph{operação do banco}, não do cliente: além do \tb{INTERNAL-TOKEN}, exige o cabeçalho
   \tb{OPERATOR-TOKEN} (valor na variável de ambiente \tb{OPERATOR_TOKEN}). Sem ele ou com valor
   errado $\to$ 403 (\tb{PPP000007}). Vale para a data de movimento, o fechamento do dia, o status de
-  conta pelo banco (RN-CON-11) e as rotas internas que vierem. Num banco real, essa credencial só
-  existiria nos sistemas da operação; o cliente nunca a receberia.
+  conta pelo banco (RN-CON-11), a receita e as rotas internas que vierem. A conferência fica no
+  mesmo middleware do \tb{INTERNAL-TOKEN}, logo depois dele (sem o primeiro, sai \tb{PPP000002};
+  com o primeiro e sem o segundo, \tb{PPP000007}): nenhuma rota precisa lembrar de conferir. Num
+  banco real, essa credencial só existiria nos sistemas da operação; o cliente nunca a receberia.
 \end{regras}
 
 \subsection*{Quando usar cada status HTTP}
@@ -488,7 +491,7 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
 200 & Leitura bem-sucedida; alteração (PATCH) bem-sucedida; repetição idempotente de um pedido já feito. \\
 201 & Algo foi criado (cliente, conta, transação, perfil, ordem, preço). Devolve a \tb{key}. \\
 400 & Corpo ou cabeçalho mal formado: falta campo, tipo errado, valor fora do \emph{enum}, falta \tb{Idempotency-Key}. Barrado no schema, antes de qualquer regra. \\
-403 & Falta o \tb{INTERNAL-TOKEN}. \\
+403 & Falta o \tb{INTERNAL-TOKEN}; rota \tb{/internal/...} sem o \tb{OPERATOR-TOKEN} (RN-GER-14); cliente pedindo bloquear ou desbloquear a própria conta (RN-CON-11). \\
 404 & A \tb{key} do caminho não existe \textbf{ou} não pertence ao cliente do caminho (R8). \\
 409 & O pedido é válido, mas o \textbf{estado atual} não permite: CPF já cadastrado, conta não ativa, saldo insuficiente, perfil vencido, transição de status proibida, chave de idempotência reutilizada. \\
 422 & O pedido está bem formado, mas o \textbf{conteúdo} viola uma regra de negócio: CPF com dígito errado, menor de idade, valor zero ou acima do limite, produto fora do perfil, resgate antes do vencimento. \\
@@ -596,7 +599,9 @@ tem estado é a conta.
   nas duas rotas (RN-CON-06 a RN-CON-08). Na rota do cliente, a ordem é: dono da conta (404) $\to$
   ação reservada ao banco (403) $\to$ transição (409) $\to$ motivo (422) $\to$ conta vazia (409).
   A rota do banco não é aninhada no cliente: é operação interna, protegida pelo token de operador
-  (RN-GER-14). O encerramento é em uma etapa: as conferências automáticas (saldo zero, nenhuma
+  (RN-GER-14); \tb{account_key} inexistente nela $\to$ 404 (\tb{PPP002001}). O cliente encerra
+  também uma conta que o banco bloqueou: ela só fecha vazia, então nenhum dinheiro sai por esse
+  caminho. O encerramento é em uma etapa: as conferências automáticas (saldo zero, nenhuma
   posição) fazem o papel da confirmação do banco.
 \end{regras}
 
@@ -885,7 +890,8 @@ produção, mudando só o endereço.
 \begin{regras}
   \item[RN-FEC-01 \dec] \textbf{Rotas.} \tb{GET /internal/business_date} devolve a data de
   movimento. \tb{POST /internal/day_close} com \tb{\{"close_date": "AAAA-MM-DD"\}} fecha esse dia e
-  abre o próximo dia útil. As duas são internas (só \tb{INTERNAL-TOKEN}).
+  abre o próximo dia útil. As duas são internas: exigem \tb{INTERNAL-TOKEN} e \tb{OPERATOR-TOKEN}
+  (RN-GER-14).
   \item[RN-FEC-02 \dec] \textbf{Contra clique duplo.} O \tb{close_date} precisa ser a data de
   movimento atual: trava a linha de \tb{business_day} (\tb{FOR UPDATE}) e \textbf{relê} a data
   atual depois da trava. Diferente $\to$ 409 (\tb{PPP000006}) e nada muda. Assim, dois pedidos
@@ -1199,8 +1205,8 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   duas partes, em centavos. O período filtra pelo \tb{created_at} (hora real) dos lançamentos.
   Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
   intervalo maior que 366 dias $\to$ 400 (\tb{PPP000005}). A rota é interna (não pertence a
-  nenhum cliente) e fica protegida pelo \tb{INTERNAL-TOKEN}; num banco real ela exigiria perfil de
-  administrador, o que está fora do escopo.
+  nenhum cliente) e fica protegida pelo \tb{OPERATOR-TOKEN} (RN-GER-14); num banco real ela
+  exigiria login por funcionário com perfil de administrador, o que está fora do escopo.
   \item[RN-REC-10 \dec] Tesouro Direto não tem taxa para o cliente.
 \end{regras}
 
@@ -1588,11 +1594,11 @@ fazem a requisição e conferem \textbf{status e corpo}. Nomes sugeridos, lidos 
 \midrule
 \endhead
 Clientes & cria cliente e devolve key (não id); recusa CPF inválido com 422; recusa CPF repetido com 409; recusa CPF repetido com pontuação diferente; recusa menor de idade (idade calculada sobre a data real); devolve CPF mascarado; cliente inexistente dá 404. \\
-Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409; recusa conta para cliente inexistente com 404; conta de outro cliente dá 404; bloqueia e desbloqueia; não sai de CLOSED; não encerra com saldo nem com investimento (posição $> 0$); encerra depois de resgatar e sacar tudo; exige motivo; histórico registra todas as transições. \\
+Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409; recusa conta para cliente inexistente com 404; conta de outro cliente dá 404 (mesmo pedindo bloquear: o dono vem antes do 403); \textbf{cliente} encerra a conta vazia, inclusive bloqueada pelo banco; cliente não bloqueia nem desbloqueia (403, status não muda); ação reservada ao banco é conferida antes do motivo; \textbf{banco} bloqueia, desbloqueia e encerra pela rota interna; rota interna sem token de operador ou com token errado dá 403; conta inexistente na rota interna dá 404; não sai de CLOSED; não encerra com saldo nem com investimento (posição $> 0$), pelas duas rotas; encerra depois de resgatar e sacar tudo; exige motivo; histórico registra todas as transições e quem fez cada uma (\tb{CUSTOMER}/\tb{BANK}); pedido recusado não grava evento. \\
 Movimentações & depósito aumenta saldo; saque diminui saldo; \textbf{transferência debita valor + tarifa na origem e credita só o valor no destino}; recusa saldo insuficiente sem alterar nenhum saldo; recusa transferência para si mesmo; recusa destino inexistente; recusa conta bloqueada (origem e destino); recusa valor zero e acima do limite; mesmo Idempotency-Key não debita duas vezes; mesma chave com corpo diferente dá 409; sem chave dá 400; extrato reconstrói o saldo; extrato pagina; comprovante de outra conta dá 404; tipo INVESTMENT_APPLY recusado na rota de transação. \\
 Suitability & calcula cada um dos três perfis; trava da Q3 força Conservador; recusa respostas incompletas; recusa opção de outra pergunta; refazer mantém histórico e muda o perfil atual; cliente sem perfil dá 404. \\
 Produtos & lista catálogo; filtra por risco e por tipo; detalhe traz o preço do dia; histórico de preços no período; produto inexistente dá 404. \\
-Fechamento do dia & devolve a data de movimento; fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova; \textbf{liquidação no vencimento}: aplica na LCI, fecha um dia por vez até o vencimento (cerca de 262 fechamentos), o dinheiro volta com rendimento, existe a ordem \tb{MATURITY}, a posição zera sem sumir e um fechamento a mais não paga de novo. \\
+Fechamento do dia & devolve a data de movimento; data de movimento e fechamento sem token de operador dão 403 (o fechamento não muda a data); fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova; \textbf{liquidação no vencimento}: aplica na LCI, fecha um dia por vez até o vencimento (cerca de 262 fechamentos), o dinheiro volta com rendimento, existe a ordem \tb{MATURITY}, a posição zera sem sumir e um fechamento a mais não paga de novo. \\
 Carteira & soma dos pesos de cada carteira-modelo é 10.000; sugestão soma exatamente o valor pedido (inclusive com centavos quebrados); recusa sem perfil; recusa valor abaixo do mínimo. \\
 Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate devolve custo, resultado e rentabilidade (inclusive na repetição idempotente); resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate sem perfil válido (não dá para vencer um perfil pela API: garantido porque o resgate não consulta o perfil); mesmo Idempotency-Key não aplica nem resgata duas vezes; ordem de outro cliente dá 404; \tb{GET} da ordem devolve o mesmo corpo da criação; histórico da mais nova para a mais antiga, paginado e filtrado por produto (produto inexistente: lista vazia); posição com valor atual, resultado, rentabilidade e total; posição zerada só com \tb{include_closed}; query inválida dá 400. \\
 Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. \\

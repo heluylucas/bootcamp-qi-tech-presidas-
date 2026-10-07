@@ -47,7 +47,7 @@ cliente recebe 500 com o banco intacto. O \tb{commit} é a última linha do cont
   \item Trava a linha do cliente (\tb{SELECT ... FOR UPDATE}).
   \item Conta as contas do cliente com status diferente de \tb{CLOSED}: zero.
   \item Cria \tb{account} com \tb{balance = 0}. Conta: \tb{ACTIVE}.
-  \item Grava \tb{account_status_event} (\tb{null} $\to$ \tb{ACTIVE}).
+  \item Grava \tb{account_status_event} (\tb{null} $\to$ \tb{ACTIVE}, \tb{actor = CUSTOMER}).
   \item \tb{commit}; 201 com \tb{account_key}.
 \end{enumerate}
 
