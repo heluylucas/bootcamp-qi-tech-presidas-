@@ -34,6 +34,7 @@ erDiagram
         int from_status_id FK "nulo no nascimento"
         int to_status_id FK
         string reason
+        string actor "CUSTOMER ou BANK"
         timestamptz created_at
     }
     transaction_type {

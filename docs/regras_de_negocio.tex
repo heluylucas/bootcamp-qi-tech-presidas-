@@ -471,6 +471,12 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   porque são fatos regulatórios e a data de movimento pode estar à frente do calendário. É assim que um banco real trabalha (data contábil e
   virada de data), e é o que permite mostrar ``aplica no dia $t$, resgata no dia $t+n$'' em
   segundos, na frente da banca.
+  \item[RN-GER-14 \dec] \textbf{Token de operador.} Toda rota \tb{/internal/...} é ação da
+  \emph{operação do banco}, não do cliente: além do \tb{INTERNAL-TOKEN}, exige o cabeçalho
+  \tb{OPERATOR-TOKEN} (valor na variável de ambiente \tb{OPERATOR_TOKEN}). Sem ele ou com valor
+  errado $\to$ 403 (\tb{PPP000007}). Vale para a data de movimento, o fechamento do dia, o status de
+  conta pelo banco (RN-CON-11) e as rotas internas que vierem. Num banco real, essa credencial só
+  existiria nos sistemas da operação; o cliente nunca a receberia.
 \end{regras}
 
 \subsection*{Quando usar cada status HTTP}
@@ -556,7 +562,9 @@ tem estado é a conta.
   \item[RN-CON-04 \obr] O saldo nunca fica negativo (não existe cheque especial). Garantido no
   controller \emph{e} no banco (\tb{CHECK (balance >= 0)}).
   \item[RN-CON-05 \obr] Toda mudança de status gera uma linha em \tb{account_status_event} com
-  status de origem, de destino, motivo e data.
+  status de origem, de destino, motivo, data e \textbf{quem fez} (\tb{actor}): \tb{CUSTOMER} na
+  abertura e nas ações pela rota do cliente; \tb{BANK} nas ações pela rota interna (RN-CON-11). É
+  o \emph{tipo} de quem fez, não a pessoa: não há login por funcionário (fora do escopo).
   \item[RN-CON-06 \dec] Bloquear e encerrar exigem um motivo (\tb{reason}); sem motivo $\to$ 422
   (\tb{PPP002006}).
   \item[RN-CON-07 \obr] Transições fora da tabela acima $\to$ 409 (\tb{PPP002003}). \tb{CLOSED} é
@@ -567,6 +575,29 @@ tem estado é a conta.
   recebe depósito nem transferência, não faz saque, não aplica, não resgata $\to$ 409
   (\tb{PPP002005}). Consultas (saldo, extrato) continuam funcionando.
   \item[RN-CON-10 \obr] Consultar uma conta de outro cliente $\to$ 404 (R8).
+  \item[RN-CON-11 \dec] \textbf{Quem pode o quê.} O cliente só \textbf{encerra} a própria conta;
+  bloquear e desbloquear são decisões do banco (fraude, ordem judicial), e quem foi bloqueado não
+  pode se desbloquear sozinho. A rota do cliente é \tb{PATCH /customer/\{ck\}/account/\{ak\}}; a do
+  banco, \tb{PATCH /internal/account/\{ak\}/status}.
+
+  \begin{center}
+  \begin{tabular}{@{}lcc@{}}
+  \toprule
+  \textbf{Ação} & \textbf{Rota do cliente} & \textbf{Rota do banco} \\
+  \midrule
+  Encerrar (vazia, com motivo) & sim & sim \\
+  Bloquear & não (403) & sim \\
+  Desbloquear & não (403) & sim \\
+  \bottomrule
+  \end{tabular}
+  \end{center}
+
+  Pedir pela rota do cliente uma ação do banco $\to$ 403 (\tb{PPP002007}). As demais regras valem
+  nas duas rotas (RN-CON-06 a RN-CON-08). Na rota do cliente, a ordem é: dono da conta (404) $\to$
+  ação reservada ao banco (403) $\to$ transição (409) $\to$ motivo (422) $\to$ conta vazia (409).
+  A rota do banco não é aninhada no cliente: é operação interna, protegida pelo token de operador
+  (RN-GER-14). O encerramento é em uma etapa: as conferências automáticas (saldo zero, nenhuma
+  posição) fazem o papel da confirmação do banco.
 \end{regras}
 
 % =====================================================================
@@ -1213,7 +1244,7 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \tb{customer} & \tb{customer_key}; \tb{name TEXT NOT NULL}; \tb{document_number CHAR(14) NOT NULL UNIQUE}; \tb{birth_date DATE NOT NULL}; \tb{created_at}. \\
 \tb{account_status} & Enumerador: \tb{ACTIVE}, \tb{BLOCKED}, \tb{CLOSED}. \\
 \tb{account} & \tb{account_key}; \tb{customer_id} FK $\to$ customer (NOT NULL); \tb{status_id} FK $\to$ account_status; \tb{balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0)}; \tb{created_at}, \tb{updated_at}. Índice único parcial \tb{UNIQUE(customer_id) WHERE status <> CLOSED} para o banco também barrar a segunda conta (rede de segurança). \\
-\tb{account_status_event} & \tb{account_id} FK; \tb{from_status_id} FK (nulo no nascimento); \tb{to_status_id} FK NOT NULL; \tb{reason VARCHAR(255)}; \tb{created_at}. \\
+\tb{account_status_event} & \tb{account_id} FK; \tb{from_status_id} FK (nulo no nascimento); \tb{to_status_id} FK NOT NULL; \tb{reason VARCHAR(255)}; \tb{actor VARCHAR(8) NOT NULL} (\tb{CUSTOMER}/\tb{BANK}, com \tb{CHECK}, RN-CON-05); \tb{created_at}. \\
 \tb{transaction_type} & Enumerador: \tb{DEPOSIT}, \tb{WITHDRAWAL}, \tb{TRANSFER}, \tb{INVESTMENT_APPLY}, \tb{INVESTMENT_REDEEM}. \\
 \tb{transaction} & \tb{transaction_key}; \tb{type_id} FK; \tb{requester_account_id} FK NOT NULL (quem pediu); \tb{origin_account_id} FK (nulo no depósito e no resgate); \tb{destination_account_id} FK (nulo no saque e na aplicação); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{fee_amount BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0)}; \tb{description VARCHAR(140)}; \tb{idempotency_key CHAR(36) NOT NULL}; \tb{request_hash CHAR(64) NOT NULL}; \tb{created_at}. \tb{UNIQUE(requester_account_id, idempotency_key)}. \\
 \tb{ledger_entry} & \tb{entry_key}; \tb{transaction_id} FK NOT NULL; \tb{account_id} FK NOT NULL; \tb{direction} (\tb{DEBIT}/\tb{CREDIT}, com \tb{CHECK}); \tb{category} (\tb{PRINCIPAL}/\tb{FEE}); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{balance_after BIGINT NOT NULL CHECK (balance_after >= 0)}; \tb{created_at}. Índice em \tb{(account_id, created_at)} para o extrato. \\
@@ -1297,8 +1328,9 @@ GET & \rota|/customer/{ck}| & Lê cliente (CPF mascarado). & 200; 404. \\
 \multicolumn{4}{@{}l}{\textbf{Contas}} \\
 POST & \rota|/customer/{ck}/account| & Abre a conta corrente. & 201 \tb{account_key}; 404 cliente; 409 já tem conta não encerrada. \\
 GET & \rota|/customer/{ck}/account/{ak}| & Saldo e status. & 200; 404 (inexistente ou de outro cliente). \\
-PATCH & \rota|/customer/{ck}/account/{ak}| & Muda status. \tb{status}, \tb{reason}. & 200; 400 status fora do enum; 404; 409 transição proibida ou conta não vazia; 422 sem motivo. \\
-GET & \rota|/customer/{ck}/account/{ak}/status_events| & Histórico de status. & 200; 404. \\
+PATCH & \rota|/customer/{ck}/account/{ak}| & Cliente encerra a conta (RN-CON-11). \tb{status}, \tb{reason}. & 200; 400 status fora do enum; 403 bloquear ou desbloquear (só o banco); 404; 409 transição proibida ou conta não vazia; 422 sem motivo. \\
+GET & \rota|/customer/{ck}/account/{ak}/status_events| & Histórico de status, com quem fez (\tb{actor}). & 200; 404. \\
+PATCH & \rota|/internal/account/{ak}/status| & Banco bloqueia, desbloqueia ou encerra (RN-CON-11). \tb{status}, \tb{reason}. Exige \tb{OPERATOR-TOKEN}. & 200; 400 schema; 403 sem token de operador; 404; 409 transição proibida ou conta não vazia; 422 sem motivo. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Movimentações}} \\
 POST & \rota|/customer/{ck}/account/{ak}/transaction| & Depósito, saque ou transferência. \tb{type}, \tb{amount}, \tb{destination_account_key} (só transferência), \tb{description}. \textbf{Idem.} & 201 \tb{transaction_key} e saldo; 200 repetição idempotente; 400 schema/sem chave; 404 conta ou destino; 409 conta/destino não ativos, saldo insuficiente, chave reutilizada; 422 valor inválido, acima do limite, origem = destino. \\
@@ -1317,8 +1349,8 @@ GET & \rota|/product/{product_key}| & Detalhe + preço do dia. & 200; 404. \\
 GET & \rota|/product/{product_key}/prices| & Histórico de preços. Query: \tb{from}, \tb{to}. & 200; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Data de movimento e fechamento do dia}} \\
-GET & \rota|/internal/business_date| & Data de movimento atual. & 200 \tb{\{business_date\}}. \\
-POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, buscando preços e taxas lá fora. \tb{close_date}. & 201 nova data, preços e taxas; 400 schema; 409 \tb{close_date} não é a data atual; 502 fonte externa fora do ar ou com resposta inválida (nada gravado). \\
+GET & \rota|/internal/business_date| & Data de movimento atual. Exige \tb{OPERATOR-TOKEN}. & 200 \tb{\{business_date\}}; 403 sem token de operador. \\
+POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, buscando preços e taxas lá fora. \tb{close_date}. Exige \tb{OPERATOR-TOKEN}. & 201 nova data, preços e taxas; 400 schema; 403 sem token de operador; 409 \tb{close_date} não é a data atual; 502 fonte externa fora do ar ou com resposta inválida (nada gravado). \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Carteira sugerida}} \\
 GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 400 \tb{amount} ausente ou inválido; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
@@ -1330,11 +1362,11 @@ GET & \rota|/customer/{ck}/investment_order/{order_key}| & Detalhe da ordem. & 2
 GET & \rota|/customer/{ck}/positions| & Posição consolidada e rentabilidade (RN-POS-04). Query: \tb{include_closed}. & 200; 400 query inválida; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Receita}} \\
-GET & \rota|/internal/revenue| & Receita realizada e estimada. Query: \tb{from}, \tb{to}. & 200; 400 período inválido. \\
+GET & \rota|/internal/revenue| & Receita realizada e estimada. Query: \tb{from}, \tb{to}. Exige \tb{OPERATOR-TOKEN}. & 200; 400 período inválido; 403 sem token de operador. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Incrementos (\ext)}} \\
 POST & \rota|/customer/{ck}/portfolio_application| & Aplica a carteira sugerida inteira numa só transação. \tb{amount}. \textbf{Idem.} & 201 lista de ordens; mesmos erros da ordem. \\
-GET & \rota|/internal/reconciliation| & Confere, para todas as contas, se saldo = soma do extrato. & 200 relatório. \\
+GET & \rota|/internal/reconciliation| & Confere, para todas as contas, se saldo = soma do extrato. Exige \tb{OPERATOR-TOKEN}. & 200 relatório; 403 sem token de operador. \\
 \bottomrule
 \end{longtable}
 \endgroup
@@ -1373,6 +1405,7 @@ PPP000003 & 400 & Missing Idempotency Key & Rota de dinheiro sem \tb{Idempotency
 PPP000004 & 409 & Idempotency Key Reused & Mesma chave com corpo diferente. \\
 PPP000005 & 400 & Invalid Query Parameter & Parâmetros com formato certo que se contradizem (ex.: \tb{from} depois de \tb{to}, período maior que 366 dias). \\
 PPP000006 & 409 & Business Date Mismatch & \tb{close_date} do fechamento não é a data de movimento atual. \\
+PPP000007 & 403 & Operator Only & Rota \tb{/internal/...} sem \tb{OPERATOR-TOKEN} ou com valor errado (RN-GER-14). \\
 \midrule
 PPP001001 & 404 & Customer Not Found & \tb{customer_key} não existe. \\
 PPP001002 & 409 & Document Already Registered & CPF já cadastrado. \\
@@ -1385,6 +1418,7 @@ PPP002003 & 409 & Invalid Status Transition & Transição proibida (ex.: sair de
 PPP002004 & 409 & Account Not Empty & Encerrar com saldo ou posição. \\
 PPP002005 & 409 & Account Not Active & Movimentar conta bloqueada ou encerrada. \\
 PPP002006 & 422 & Status Reason Required & Bloquear/encerrar sem motivo. \\
+PPP002007 & 403 & Status Change Reserved To Bank & Cliente pediu bloquear ou desbloquear: só o banco faz (RN-CON-11). \\
 \midrule
 PPP003001 & 404 & Transaction Not Found & Inexistente ou não envolve a conta. \\
 PPP003002 & 404 & Destination Account Not Found & Conta de destino não existe. \\
@@ -1780,6 +1814,26 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   o filtro só restringe a busca, e ``nenhuma ordem desse produto'' é uma resposta verdadeira.
   Ganharia se quiséssemos avisar quem integra de que a chave está errada. \emph{Escolhido:} lista
   vazia (RN-POS-05).
+  \item \textbf{Uma rota só para todas as mudanças de status da conta} (como era: o mesmo
+  \tb{PATCH} bloqueava, desbloqueava e encerrava) --- descartada porque, com o mesmo
+  \tb{INTERNAL-TOKEN} para todos, o cliente conseguia desbloquear a própria conta, inclusive uma
+  bloqueada por fraude ou ordem judicial. Ganharia se não existisse bloqueio por decisão do banco.
+  \emph{Escolhido:} rota do cliente só encerra; bloquear e desbloquear só pela rota interna
+  (RN-CON-11).
+  \item \textbf{Separar as rotas sem credencial nova} (a rota interna com o mesmo
+  \tb{INTERNAL-TOKEN}) --- descartada porque a separação valeria só por convenção: quem tem o token
+  chamaria a rota do banco do mesmo jeito. Autenticação real do cliente (token por pessoa) resolveria
+  de vez, mas está fora do escopo. Ganharia se a rede já isolasse as rotas internas (um
+  \emph{gateway} que só expõe \tb{/customer/...} ao cliente). \emph{Escolhido:} \tb{OPERATOR-TOKEN}
+  nas rotas \tb{/internal/...} (RN-GER-14), barrado no código e testável.
+  \item \textbf{Encerramento em duas etapas} (o cliente pede, a conta vai para
+  \tb{CLOSURE_REQUESTED} e para de movimentar, e o banco confirma ou recusa) --- descartada porque
+  as únicas pendências do MVP (saldo zero e nenhuma posição) são conferidas na hora, e a etapa do
+  banco nunca teria motivo para recusar. Ganharia com pendências que exigem conferência manual
+  (dívidas, cartões, débitos agendados, transferência a caminho): o pedido viraria prova com data,
+  a conta congelaria no meio do caminho, o cliente poderia desistir e o banco confirmaria a
+  identidade contra fraude. \emph{Escolhido:} uma etapa; as regras automáticas fazem o papel da
+  confirmação do banco (RN-CON-11).
 
 \end{enumerate}
 

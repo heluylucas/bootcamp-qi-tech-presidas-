@@ -201,7 +201,8 @@ nunca sai da conta sem virar posição}.
         \tb{return_bps} (RN-ORD-16).
 \end{itemize}
 
-\textbf{Encerrar conta com investimento.} O \tb{PATCH} para \tb{CLOSED} trava a conta e, além do
+\textbf{Encerrar conta com investimento.} O \tb{PATCH} para \tb{CLOSED} (pela rota do cliente ou
+pela do banco, RN-CON-11) trava a conta e, além do
 saldo zero, confere que nenhuma posição do cliente tem quantidade $> 0$; senão, 409
 (\tb{PPP002004}). Como toda ordem trava a conta antes da posição, não há aplicação no meio do
 encerramento.
