@@ -51,7 +51,7 @@ class BusinessDayController(BaseController):
         prices.update(self._fetch_treasury_prices(products, new_day))
         cdi_bps = self._fetch_rate(CDI_SERIES, new_day)
         selic_bps = self._fetch_rate(SELIC_SERIES, new_day)
-        prices.update(self._own_issue_prices(products, close_date, cdi_bps))
+        prices.update(self._own_issue_prices(products, close_date))
 
         # O UNIQUE de product_price, reference_rate e business_day é a rede
         # de segurança: se outro fechamento gravou o mesmo dia, recusa aqui.
@@ -126,8 +126,10 @@ class BusinessDayController(BaseController):
 
         return annual_rate_bps
 
-    def _own_issue_prices(self, products: List[Product], close_date: date, cdi_bps: int) -> Dict[int, Decimal]:
-        """CDB e LCI: preço anterior × (1 + c × percentual do CDI), c = CDI do novo dia (RN-FEC-05)."""
+    def _own_issue_prices(self, products: List[Product], close_date: date) -> Dict[int, Decimal]:
+        """CDB e LCI: preço anterior × (1 + c × percentual do CDI), c = CDI do dia que fecha (RN-FEC-05)."""
+        # Sempre existe: o seed grava a do primeiro dia e cada fechamento grava a do dia que abre.
+        cdi_bps = ReferenceRateRepository.get_on(self.context, "CDI", close_date).annual_rate_bps
         daily_cdi = (1 + Decimal(cdi_bps) / 10000) ** (Decimal(1) / 252) - 1
         prices = {}
         for product in products:
