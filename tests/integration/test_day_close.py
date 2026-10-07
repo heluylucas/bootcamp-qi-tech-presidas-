@@ -73,14 +73,17 @@ class TestDayClose:
         assert fund["price"] == {"reference_date": body["business_date"], "unit_price": "102.00000000"}
         assert selic["price"]["unit_price"] == "123.45000000"
 
-    def test_own_issue_grows_by_cdi(self):
+    def test_own_issue_grows_by_cdi_of_the_closing_day(self):
+        # O primeiro fechamento abre um dia com CDI de 12%; o segundo fecha esse dia
+        # e abre outro com 20%. O CDB do segundo fechamento rende pelos 12%.
+        assert close_day(cdi="12.00")[0] == 201
         previous = Decimal(product_named("CDB Triple P Bank Liquidez")["price"]["unit_price"])
 
-        status, _ = close_day(cdi="14.90")
+        status, _ = close_day(cdi="20.00")
 
         assert status == 201
         # CDB = preço anterior × (1 + c × 95%), c = CDI de um dia útil (RN-FEC-05).
-        daily_cdi = (Decimal("1.149") ** (Decimal(1) / Decimal(252))) - 1
+        daily_cdi = (Decimal("1.12") ** (Decimal(1) / Decimal(252))) - 1
         expected = (previous * (1 + daily_cdi * Decimal("0.95"))).quantize(Decimal("0.00000001"), ROUND_HALF_UP)
         assert Decimal(product_named("CDB Triple P Bank Liquidez")["price"]["unit_price"]) == expected
 

@@ -897,8 +897,11 @@ produção, mudando só o endereço.
   \fundo{} (administradora), o preço dos três títulos (Tesouro) e o CDI e a Selic anualizados
   (Banco Central). Contratos na tabela abaixo.
   \item[RN-FEC-05 \dec] \textbf{O que o banco calcula:} CDB e LCI $=$ preço anterior $\times$
-  $(1 + c \times$ \tb{cdi_percentage_bps}$/10000)$, com $c = (1 + \text{CDI do novo dia})^{1/252}
-  - 1$, em \tb{Decimal} e arredondado em 8 casas.
+  $(1 + c \times$ \tb{cdi_percentage_bps}$/10000)$, com $c = (1 + \text{CDI do dia que
+  fecha})^{1/252} - 1$, em \tb{Decimal} e arredondado em 8 casas. O CDI é lido de
+  \tb{reference_rate} (RN-REC-08), como no mercado: a taxa publicada para o dia $d$ é a que rende
+  de $d$ para $d+1$. O CDI do novo dia, buscado agora, só é gravado; ele rende o fechamento
+  seguinte.
   \item[RN-FEC-06 \obr] \textbf{Tudo ou nada.} Serviço fora do ar, demorando mais que o timeout (5 s)
   ou respondendo erro $\to$ 502 (\tb{PPP005006}). Resposta sem sentido (preço $\le 0$, data
   diferente da pedida, título ou fundo faltando, taxa ausente) $\to$ 502 (\tb{PPP005007}). Nos dois
@@ -1799,6 +1802,12 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   seriam diferentes e o banco aceitaria pagar em dobro. \emph{Escolhido:} \tb{uuid5} da
   \tb{order_key} da aplicação, sempre a mesma; o \tb{UNIQUE} de \tb{settled_order_id} é a
   segunda rede.
+  \item \textbf{CDB e LCI rendendo pelo CDI do novo dia} (a taxa que acabou de chegar do Banco
+  Central, usada direto da memória) --- descartada porque, no mercado, a taxa do dia $d$ é a que
+  rende de $d$ para $d+1$, e porque contradizia a RN-REC-08, que manda ler a taxa de
+  \tb{reference_rate} pela data de movimento. A diferença em dinheiro é mínima (o CDI quase não
+  muda de um dia para o outro). \emph{Escolhido:} o CDI do dia que fecha, lido da tabela
+  (RN-FEC-05).
   \item \textbf{Avançar um mês por fechamento} (para o teste chegar ao vencimento em 12 chamadas)
   --- descartada porque deixaria buracos de preço e erraria o rendimento diário do CDB e da LCI,
   que crescem pelo CDI de cada dia útil (RN-FEC-05). \emph{Também descartado:} um
