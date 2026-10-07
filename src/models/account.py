@@ -36,6 +36,8 @@ class AccountStatusEvent(Base):
     from_status_id = Column(Integer, ForeignKey("account_status.id"))
     to_status_id = Column(Integer, ForeignKey("account_status.id"), nullable=False)
     reason = Column(String(255))
+    # CUSTOMER ou BANK: quem fez a mudança (RN-CON-05).
+    actor = Column(String(8), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     from_status = relationship(AccountStatus, foreign_keys=[from_status_id])

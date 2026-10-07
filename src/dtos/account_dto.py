@@ -19,6 +19,8 @@ def status_event_to_dict(event: AccountStatusEvent) -> dict:
         "from_status": event.from_status.enumerator if event.from_status else None,
         "to_status": event.to_status.enumerator,
         "reason": event.reason,
+        # Quem fez: CUSTOMER (rota do cliente) ou BANK (rota interna), RN-CON-05.
+        "actor": event.actor,
         "created_at": to_utc_text(event.created_at),
     }
 

@@ -6,6 +6,7 @@ from errors import (
     AccountNotFound,
     CustomerNotFound,
     InvalidStatusTransition,
+    StatusChangeReservedToBank,
     StatusReasonRequired,
 )
 from models import Account
@@ -21,6 +22,13 @@ ALLOWED_TRANSITIONS = {
 }
 
 REASON_REQUIRED = {"BLOCKED", "CLOSED"}
+
+# RN-CON-11: pela rota do cliente, só encerrar. Bloquear e desbloquear são do banco.
+CUSTOMER_ALLOWED_TARGETS = {"CLOSED"}
+
+# Quem fez a mudança, gravado no evento (RN-CON-05).
+ACTOR_CUSTOMER = "CUSTOMER"
+ACTOR_BANK = "BANK"
 
 
 class AccountController(BaseController):
@@ -40,7 +48,7 @@ class AccountController(BaseController):
 
         active = AccountRepository.get_status(self.context, "ACTIVE")
         account = AccountRepository.create(self.context, customer.id, active.id)
-        AccountRepository.create_status_event(self.context, account.id, None, active.id, None)
+        AccountRepository.create_status_event(self.context, account.id, None, active.id, None, ACTOR_CUSTOMER)
 
         self.session.commit()
         return account_to_dict(account)
@@ -50,8 +58,27 @@ class AccountController(BaseController):
         return account_to_dict(account)
 
     def change_status(self, customer_key: str, account_key: str, payload: dict) -> dict:
-        # Travada: o status e o saldo lidos aqui decidem a mudança.
+        """Rota do cliente (RN-CON-11): ele só encerra a própria conta."""
+        # Travada: o status e o saldo lidos aqui decidem a mudança. O dono vem
+        # antes de tudo (R8): conta de outro cliente dá 404, nem o 403 vaza.
         account = self.get_owned_account(customer_key, account_key, for_update=True)
+
+        if payload["status"] not in CUSTOMER_ALLOWED_TARGETS:
+            raise StatusChangeReservedToBank()
+
+        return self._apply_status_change(account, payload, ACTOR_CUSTOMER)
+
+    def change_status_by_bank(self, account_key: str, payload: dict) -> dict:
+        """Rota do banco (RN-CON-11): bloqueia, desbloqueia e encerra. O token de operador já foi conferido na porta."""
+        account = AccountRepository.get_by_key_any_owner_for_update(self.context, account_key)
+
+        if account is None:
+            raise AccountNotFound()
+
+        return self._apply_status_change(account, payload, ACTOR_BANK)
+
+    def _apply_status_change(self, account: Account, payload: dict, actor: str) -> dict:
+        """As regras que valem nas duas rotas: transição, motivo, conta vazia e o evento com quem fez."""
         current = account.status.enumerator
         target = payload["status"]
         # Motivo só com espaços conta como motivo nenhum.
@@ -73,7 +100,7 @@ class AccountController(BaseController):
         from_status_id = account.status_id
         to_status = AccountRepository.get_status(self.context, target)
         AccountRepository.update_status(self.context, account, to_status.id)
-        AccountRepository.create_status_event(self.context, account.id, from_status_id, to_status.id, reason)
+        AccountRepository.create_status_event(self.context, account.id, from_status_id, to_status.id, reason, actor)
 
         self.session.commit()
         return account_to_dict(account)

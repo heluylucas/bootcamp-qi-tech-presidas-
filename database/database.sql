@@ -45,6 +45,9 @@ CREATE TABLE account_status_event(
     from_status_id                  INTEGER REFERENCES account_status(id),
     to_status_id                    INTEGER NOT NULL REFERENCES account_status(id),
     reason                          VARCHAR(255),
+    -- Quem fez a mudança (RN-CON-05): CUSTOMER pela rota do cliente, BANK pela
+    -- rota interna (RN-CON-11). Sem DEFAULT: esquecer de informar vira erro.
+    actor                           VARCHAR(8) NOT NULL CHECK (actor IN ('CUSTOMER', 'BANK')),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

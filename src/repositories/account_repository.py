@@ -73,12 +73,14 @@ class AccountRepository:
         from_status_id: Optional[int],
         to_status_id: int,
         reason: Optional[str],
+        actor: str,
     ) -> AccountStatusEvent:
         event = AccountStatusEvent(
             account_id=account_id,
             from_status_id=from_status_id,
             to_status_id=to_status_id,
             reason=reason,
+            actor=actor,
         )
         context.db_session.add(event)
         context.db_session.flush()
@@ -99,6 +101,18 @@ class AccountRepository:
         # Sem filtro de dono: só para o DESTINO de uma transferência, que pode
         # ser de outro cliente (RN-MOV-05). Nunca use para a conta do caminho.
         return context.db_session.query(Account).filter(Account.account_key == account_key).first()
+
+    @staticmethod
+    def get_by_key_any_owner_for_update(context: Context, account_key: str) -> Optional[Account]:
+        # Sem filtro de dono: só para a rota do banco (RN-CON-11), que não é
+        # aninhada em cliente. Travada, porque o status e o saldo lidos decidem a mudança.
+        return (
+            context.db_session.query(Account)
+            .filter(Account.account_key == account_key)
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
 
     @staticmethod
     def get_by_id_for_update(context: Context, account_id: int) -> Optional[Account]:
