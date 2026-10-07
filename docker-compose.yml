@@ -38,6 +38,9 @@ services:
       # A senha que protege os endpoints internos. O padrao vale pra
       # estudar; num sistema de verdade, isso nunca teria valor padrao.
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-default_token}
+      # A senha da operação do banco: as rotas /internal/... pedem também
+      # este token (RN-GER-14). O padrão vale pra estudar, como o de cima.
+      OPERATOR_TOKEN: ${OPERATOR_TOKEN:-default_operator_token}
       # As fontes de preço do fechamento do dia. Aqui dentro, quem faz o
       # papel delas é o mock, que atende pelo nome "mock" (mesma regra do
       # DATABASE_URL). Cada serviço tem o seu prefixo dentro do mock; em

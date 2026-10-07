@@ -137,6 +137,17 @@ class ForbiddenNotInternal(QIException):
         super().__init__(title, self.code, http_status, description, translation)
 
 
+class OperatorOnly(QIException):
+    code = "PPP000007"
+
+    def __init__(self) -> None:
+        title = "Operator Only"
+        http_status = 403
+        description = "This route belongs to the bank operation and requires the OPERATOR-TOKEN header."
+        translation = "Esta rota é da operação do banco e exige o token de operador."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
 class InvalidParameter(QIException):
     code = "PPP000005"
 

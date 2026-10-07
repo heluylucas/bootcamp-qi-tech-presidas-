@@ -14,6 +14,12 @@ SERVICE_NAME = os.environ.get("SERVICE_NAME", "triple-p-bank-api")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 INTERNAL_TOKEN = os.environ.get("INTERNAL_TOKEN")
 
+# A senha da operação do banco (RN-GER-14). As rotas que começam com
+# INTERNAL_PREFIX (fechamento do dia, status de conta pelo banco...) pedem
+# este token além do INTERNAL_TOKEN: o cliente tem o segundo, nunca o primeiro.
+OPERATOR_TOKEN = os.environ.get("OPERATOR_TOKEN")
+INTERNAL_PREFIX = "/internal/"
+
 # Liga a impressao de TODO SQL que o SQLAlchemy emite. Serve pra
 # responder "que consulta esse repository virou, afinal?" sem abrir o
 # banco do lado. Quem lê isto é o src/utils/logger.py, e o porquê de
@@ -45,6 +51,7 @@ PRICE_SOURCE_TIMEOUT = 5
 REQUIRED_VARIABLES = [
     "DATABASE_URL",
     "INTERNAL_TOKEN",
+    "OPERATOR_TOKEN",
     "FUND_ADMIN_API_URL",
     "TREASURY_API_URL",
     "CENTRAL_BANK_API_URL",
