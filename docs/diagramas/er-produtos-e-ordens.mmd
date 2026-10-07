@@ -4,7 +4,8 @@ erDiagram
     customer ||--o{ investment_order : "envia"
     account ||--o{ investment_order : "paga / recebe"
     product ||--o{ investment_order : "negociado"
-    transaction ||--o| investment_order : "movimento de dinheiro"
+    transaction ||--o| investment_order : "reflexo no extrato da conta"
+    transaction ||--|{ ledger_entry : "débito na aplicação, crédito no resgate"
     investment_order |o--o| investment_order : "liquidação devolve"
     customer ||--o{ position : "possui"
     product ||--o{ position : "em"
@@ -49,7 +50,7 @@ erDiagram
         int customer_id FK "UK com idempotency_key"
         int account_id FK
         int product_id FK
-        int transaction_id FK "UK"
+        int transaction_id FK "UK, 1 ordem = 1 transação"
         string side "APPLY ou REDEEM"
         bigint amount
         numeric quantity "NUMERIC(24,8)"
@@ -61,6 +62,19 @@ erDiagram
         char idempotency_key
         char request_hash
         timestamptz created_at
+    }
+    transaction {
+        int id PK
+        int type_id FK "APPLY: INVESTMENT_APPLY, REDEEM: INVESTMENT_REDEEM"
+        int origin_account_id FK "só na aplicação"
+        int destination_account_id FK "só no resgate"
+        bigint amount "igual ao da ordem"
+    }
+    ledger_entry {
+        int id PK
+        int transaction_id FK
+        string direction "DEBIT ou CREDIT"
+        bigint balance_after
     }
     position {
         int id PK

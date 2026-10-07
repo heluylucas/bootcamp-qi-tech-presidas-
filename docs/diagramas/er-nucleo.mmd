@@ -38,15 +38,15 @@ erDiagram
     }
     transaction_type {
         int id PK
-        string enumerator UK "DEPOSIT ... INVESTMENT_REDEEM"
+        string enumerator UK "DEPOSIT, WITHDRAWAL, TRANSFER, INVESTMENT_APPLY, INVESTMENT_REDEEM"
     }
     transaction {
         int id PK
         char transaction_key UK
         int type_id FK
         int requester_account_id FK "UK com idempotency_key"
-        int origin_account_id FK "nulo no depósito"
-        int destination_account_id FK "nulo no saque"
+        int origin_account_id FK "nulo no depósito e no resgate"
+        int destination_account_id FK "nulo no saque e na aplicação"
         bigint amount "centavos, > 0"
         bigint fee_amount "tarifa cobrada"
         char idempotency_key
