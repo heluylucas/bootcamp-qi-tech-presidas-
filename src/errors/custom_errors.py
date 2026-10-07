@@ -122,6 +122,17 @@ class StatusReasonRequired(QIException):
         super().__init__(title, self.code, http_status, description, translation)
 
 
+class StatusChangeReservedToBank(QIException):
+    code = "PPP002007"
+
+    def __init__(self) -> None:
+        title = "Status Change Reserved To Bank"
+        http_status = 403
+        description = "Customers can only close their own account; blocking and unblocking are bank decisions."
+        translation = "O cliente só pode encerrar a própria conta; bloquear e desbloquear são decisões do banco."
+        super().__init__(title, self.code, http_status, description, translation)
+
+
 class TransactionNotFound(QIException):
     code = "PPP003001"
 
