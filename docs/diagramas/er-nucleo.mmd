@@ -11,6 +11,7 @@ erDiagram
     customer {
         int id PK "interno, nunca sai"
         char customer_key UK "sai na API (uuid4)"
+        text name
         char document_number UK "CPF normalizado"
         date birth_date
         timestamptz created_at

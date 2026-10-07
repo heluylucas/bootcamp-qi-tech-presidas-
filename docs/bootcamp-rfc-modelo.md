@@ -43,6 +43,22 @@ banco é uma data de movimento própria, que só avança pelo fechamento. É ela
 
 ![Arquitetura](diagramas/arquitetura.png)
 
+**Como o banco ganha dinheiro.** A conta gratuita e o Tesouro Direto sem taxa trazem o cliente. O
+perfil do investidor e a carteira sugerida levam parte do dinheiro dele para os produtos da casa (o
+fundo, o CDB e a LCI), que é onde está a margem.
+
+| Fonte | Como funciona | Tipo |
+|---|---|---|
+| Tarifa de transferência | R$ 2,00 por transferência, cobrados da conta de origem como um lançamento `FEE`. | Realizada |
+| Taxa de administração do fundo | 1% ao ano sobre o patrimônio do FGV Quant Capital, já descontada da cota. | Estimada |
+| Spread dos títulos próprios | O banco paga 95% do CDI no CDB e 93% na LCI e aplica o dinheiro captado a cerca de 100% do CDI. | Estimada |
+| Float | O saldo parado na conta não rende para o cliente; o banco o aplica à Selic. | Estimada |
+| Tesouro Direto | Sem taxa: é o produto de atração. | Nenhuma |
+
+Só a tarifa move dinheiro de verdade. As outras três são o que o banco *ganharia* com o dinheiro sob
+sua guarda: o relatório `/internal/revenue` calcula, mas não grava nada nem mexe em saldo. Separar
+realizada de estimada é o que deixa o número defensável.
+
 **Considerado e descartado:**
 
 - **Saldo só como soma do extrato** (sem coluna `balance`): descartada porque toda leitura de saldo
