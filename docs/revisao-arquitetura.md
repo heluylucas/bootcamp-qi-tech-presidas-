@@ -268,16 +268,17 @@ existentes provam que nada mudou para fora.
 
 ### Fase 6: documentação sem divergência
 
-- `docs/diagramas/er-*.mmd`: **todas** as colunas de cada tabela, iguais ao `database.sql`.
-  Hoje faltam, por exemplo, `transaction.description`, `suitability_question.text/position`,
-  `product.name/issuer/indexer/rate_description/own_issue`, `investment_order.status` e vários
-  `created_at`. Regerar os PNG com `npx -p @mermaid-js/mermaid-cli mmdc`.
+- Diagramas ER em mermaid (`docs/diagramas/er-*.mmd`, PNG ao lado): **todas** as colunas de cada
+  tabela, iguais ao `database.sql`, cada tabela completa em exatamente um diagrama (nos outros, só
+  no relacionamento). Antes faltavam, por exemplo, `transaction.description`,
+  `suitability_question.text`, `product.name/issuer/indexer` e vários `created_at`. O topo de cada
+  arquivo liga o layout ELK, que desenha as linhas em ângulo reto e sem cruzamento.
 - Script pequeno `scripts/check_er.py` (só biblioteca padrão): lê os `CREATE TABLE` do SQL e os
   blocos dos `.mmd` e lista as diferenças. Roda à mão depois de mexer no SQL.
 - `docs/regras_de_negocio.tex`: tabela de colunas, RN-GER-08, RN-ORD-15, RN-FEC-09, catálogo
   `PPP000004` ("chave já usada por outro pedido") e decisões descartadas (R7: hash, chave por dono,
-  donos misturados, tabelas de enumerador, receita sem conta). Apagar o diagrama mermaid duplicado
-  do apêndice e apontar para os `.mmd`.
+  donos misturados, tabelas de enumerador, receita sem conta). O diagrama mermaid duplicado do
+  apêndice virou um apontamento para os `.mmd`.
 - `docs/rfc_fluxos.tex` e `docs/bootcamp-rfc-v0.md`: passos de idempotência e de transferência.
 
 ---
