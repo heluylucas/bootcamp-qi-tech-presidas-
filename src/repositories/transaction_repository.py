@@ -132,7 +132,6 @@ class TransactionRepository:
         balance_after: int,
     ) -> LedgerEntry:
         entry = LedgerEntry(
-            entry_key=str(uuid.uuid4()),
             transaction_id=transaction_id,
             account_id=account_id,
             direction=direction,
