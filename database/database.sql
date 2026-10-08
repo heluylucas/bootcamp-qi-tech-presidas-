@@ -32,7 +32,8 @@ INSERT INTO account_status (enumerator) VALUES
 CREATE TABLE account(
     id                              SERIAL PRIMARY KEY,
     account_key                     CHAR(36) NOT NULL UNIQUE,
-    customer_id                     INTEGER NOT NULL REFERENCES customer(id),
+    -- Nulo só na conta do próprio banco (seed abaixo), que recebe as tarifas.
+    customer_id                     INTEGER REFERENCES customer(id),
     status_id                       INTEGER NOT NULL REFERENCES account_status(id),
     balance                         BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -98,6 +99,12 @@ CREATE INDEX ledger_entry_account_created_idx ON ledger_entry (account_id, creat
 
 -- Rede de segurança: no máximo uma conta não encerrada por cliente. 3 = CLOSED (ordem do seed acima).
 CREATE UNIQUE INDEX account_one_open_per_customer_idx ON account (customer_id) WHERE status_id <> 3;
+
+-- A conta do banco: a tarifa sai do cliente e entra aqui, então nenhum centavo some
+-- (RN-REC-03). Sem cliente, nenhuma rota /customer/... a alcança. Nasce primeiro, com o
+-- menor id: na ordem crescente de travas, é sempre a primeira a ser travada.
+INSERT INTO account (account_key, customer_id, status_id)
+SELECT gen_random_uuid()::text, NULL, id FROM account_status WHERE enumerator = 'ACTIVE';
 
 -- =====================================================================
 -- Suitability

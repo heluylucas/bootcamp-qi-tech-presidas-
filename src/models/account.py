@@ -17,7 +17,8 @@ class Account(Base):
 
     id = Column(Integer, primary_key=True)
     account_key = Column(CHAR(36), nullable=False, unique=True)
-    customer_id = Column(Integer, ForeignKey("customer.id"), nullable=False)
+    # Nulo só na conta do próprio banco, que recebe as tarifas.
+    customer_id = Column(Integer, ForeignKey("customer.id"))
     status_id = Column(Integer, ForeignKey("account_status.id"), nullable=False)
     balance = Column(BigInteger, nullable=False, server_default="0")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
