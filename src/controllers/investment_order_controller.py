@@ -273,7 +273,10 @@ class InvestmentOrderController(BaseController):
         return {**empty, "items": [order_to_dict(order) for order in orders], "total": total}
 
     def positions(self, customer_key: str, include_closed: bool) -> dict:
-        """RN-POS-01 a 03: cada posição ao preço do dia, e o total consolidado."""
+        """RN-POS-01 a 03: cada posição ao preço do dia, e o total consolidado com o caixa.
+
+        Calculado na leitura, não gravado: o valor dos investimentos muda a cada fechamento do dia.
+        """
         customer = self.get_customer(customer_key)
         business_date = BusinessDayRepository.get_current(self.context).reference_date
         items = [
@@ -282,7 +285,10 @@ class InvestmentOrderController(BaseController):
             )
             for position in PositionRepository.list_by_customer(self.context, customer.id, include_closed)
         ]
-        return {"items": items, "total": total_to_dict(items)}
+        # O caixa é o saldo da conta não encerrada; sem conta, nada em caixa.
+        account = AccountRepository.get_not_closed_by_customer(self.context, customer.id)
+        cash_amount = account.balance if account is not None else 0
+        return {"items": items, "total": total_to_dict(items, cash_amount)}
 
     def find_original(self, idempotency_key: str, account: Account) -> Optional[InvestmentOrder]:
         """A ordem já feita com esta chave nesta conta; None se a chave é nova."""

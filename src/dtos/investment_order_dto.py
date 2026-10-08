@@ -46,13 +46,22 @@ def position_to_dict(position: Position, unit_price: Decimal) -> dict:
     }
 
 
-def total_to_dict(items: list) -> dict:
+def total_to_dict(items: list, cash_amount: int) -> dict:
+    """Os investimentos somados e o capital total no banco: caixa + investimentos ao preço do dia."""
     current_amount = sum(item["current_amount"] for item in items)
     invested_amount = sum(item["invested_amount"] for item in items)
+    net_worth_amount = cash_amount + current_amount
+    # Pontos-base inteiros (10.000 = 100%), sem float. O caixa arredonda para baixo e os
+    # investimentos completam, para a soma fechar sempre em 100%. Sem capital, os dois são 0.
+    cash_bps = cash_amount * 10000 // net_worth_amount if net_worth_amount else 0
     return {
         "current_amount": current_amount,
         "invested_amount": invested_amount,
         **result_to_dict(current_amount, invested_amount),
+        "cash_amount": cash_amount,
+        "net_worth_amount": net_worth_amount,
+        "cash_bps": cash_bps,
+        "investments_bps": 10000 - cash_bps if net_worth_amount else 0,
     }
 
 
