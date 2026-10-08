@@ -15,15 +15,9 @@ class TransactionRepository:
         return context.db_session.query(TransactionType).filter(TransactionType.enumerator == enumerator).first()
 
     @staticmethod
-    def get_by_idempotency_key(context: Context, requester_account_id: int, idempotency_key: str) -> Optional[Transaction]:
-        return (
-            context.db_session.query(Transaction)
-            .filter(
-                Transaction.requester_account_id == requester_account_id,
-                Transaction.idempotency_key == idempotency_key,
-            )
-            .first()
-        )
+    def get_by_idempotency_key(context: Context, idempotency_key: str) -> Optional[Transaction]:
+        # A chave é única no banco inteiro: a busca não filtra por dono, quem confere é o controller.
+        return context.db_session.query(Transaction).filter(Transaction.idempotency_key == idempotency_key).first()
 
     @staticmethod
     def get_balance_after(context: Context, transaction_id: int, account_id: int) -> Optional[int]:
@@ -80,12 +74,12 @@ class TransactionRepository:
 
     @staticmethod
     def get_by_key_for_account(context: Context, transaction_key: str, account_id: int) -> Optional[Transaction]:
-        # Só se a conta participou (origem ou destino): a de fora volta None, igual à inexistente (R8).
+        # Só se a conta participou (dona ou destino): a de fora volta None, igual à inexistente (R8).
         return (
             context.db_session.query(Transaction)
             .filter(
                 Transaction.transaction_key == transaction_key,
-                or_(Transaction.origin_account_id == account_id, Transaction.destination_account_id == account_id),
+                or_(Transaction.account_id == account_id, Transaction.destination_account_id == account_id),
             )
             .first()
         )
@@ -94,26 +88,22 @@ class TransactionRepository:
     def create(
         context: Context,
         type_id: int,
-        requester_account_id: int,
-        origin_account_id: Optional[int],
+        account_id: int,
         destination_account_id: Optional[int],
         amount: int,
         fee_amount: int,
         description: Optional[str],
-        idempotency_key: str,
-        request_hash: str,
+        idempotency_key: Optional[str],
     ) -> Transaction:
         transaction = Transaction(
             transaction_key=str(uuid.uuid4()),
             type_id=type_id,
-            requester_account_id=requester_account_id,
-            origin_account_id=origin_account_id,
+            account_id=account_id,
             destination_account_id=destination_account_id,
             amount=amount,
             fee_amount=fee_amount,
             description=description,
             idempotency_key=idempotency_key,
-            request_hash=request_hash,
         )
         context.db_session.add(transaction)
         context.db_session.flush()
