@@ -9,7 +9,7 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import AccountResource, BusinessDayResource, CustomerResource, HealthCheckResource, InvestmentOrderResource, PortfolioResource, ProductResource, SuitabilityResource, TransactionResource
+from resources import AccountResource, BusinessDayResource, CustomerResource, HealthCheckResource, InvestmentOrderResource, PortfolioResource, ProductResource, RevenueResource, SuitabilityResource, TransactionResource
 from utils.logger import setup_logging
 
 
@@ -140,6 +140,11 @@ def create_app() -> FastAPI:
 
     application.add_api_route("/internal/business_date", business_day_resource.on_get, methods=["GET"])
     application.add_api_route("/internal/day_close", business_day_resource.on_post_close, methods=["POST"])
+
+    # Quanto o banco ganhou (RN-REC-09). Em /internal/: exige o token de operador.
+    revenue_resource = RevenueResource()
+
+    application.add_api_route("/internal/revenue", revenue_resource.on_get, methods=["GET"])
 
     customer_resource = CustomerResource()
 
