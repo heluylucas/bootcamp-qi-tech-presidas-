@@ -64,20 +64,22 @@ INSERT INTO transaction_type (enumerator) VALUES
 ('INVESTMENT_APPLY'),
 ('INVESTMENT_REDEEM');
 
+-- O pedido que mexe em dinheiro. Os efeitos em cada saldo ficam em ledger_entry.
 CREATE TABLE transaction(
     id                              SERIAL PRIMARY KEY,
     transaction_key                 CHAR(36) NOT NULL UNIQUE,
     type_id                         INTEGER NOT NULL REFERENCES transaction_type(id),
-    requester_account_id            INTEGER NOT NULL REFERENCES account(id),
-    origin_account_id               INTEGER REFERENCES account(id),
-    destination_account_id          INTEGER REFERENCES account(id),
+    -- A dona do pedido: a conta que pediu (no depósito e no resgate, a que recebe).
+    account_id                      INTEGER NOT NULL REFERENCES account(id),
+    -- Só na transferência: a conta que recebe.
+    destination_account_id          INTEGER REFERENCES account(id) CHECK (destination_account_id <> account_id),
     amount                          BIGINT NOT NULL CHECK (amount > 0),
     fee_amount                      BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0),
     description                     VARCHAR(140),
-    idempotency_key                 CHAR(36) NOT NULL,
-    request_hash                    CHAR(64) NOT NULL,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(requester_account_id, idempotency_key)
+    -- Gerada por quem chama a API, única no banco inteiro. Nula quando o próprio
+    -- banco cria a transação (liquidação no vencimento): não há pedido para repetir.
+    idempotency_key                 UUID UNIQUE,
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE ledger_entry(
@@ -365,38 +367,35 @@ JOIN product p ON p.name = v.product_name;
 -- Ordens e posição
 -- =====================================================================
 
+-- O anexo do pedido de investimento: o que só a aplicação e o resgate têm. Dono, lado
+-- (tipo INVESTMENT_APPLY ou INVESTMENT_REDEEM), valor e chave de idempotência ficam na transação.
 CREATE TABLE investment_order(
     id                              SERIAL PRIMARY KEY,
     order_key                       CHAR(36) NOT NULL UNIQUE,
-    customer_id                     INTEGER NOT NULL REFERENCES customer(id),
-    account_id                      INTEGER NOT NULL REFERENCES account(id),
+    transaction_id                  INTEGER NOT NULL UNIQUE REFERENCES transaction(id),
     product_id                      INTEGER NOT NULL REFERENCES product(id),
-    side                            VARCHAR(6) NOT NULL CHECK (side IN ('APPLY', 'REDEEM')),
-    amount                          BIGINT NOT NULL CHECK (amount > 0),
     quantity                        NUMERIC(24,8) NOT NULL CHECK (quantity > 0),
     unit_price                      NUMERIC(20,8) NOT NULL CHECK (unit_price > 0),
     cost_amount                     BIGINT NOT NULL CHECK (cost_amount >= 0),
+    -- O cliente pediu resgate total (RN-ORD-12). O pedido não traz valor, então é isto que
+    -- diferencia uma repetição dele de um resgate parcial com a mesma chave.
+    redeem_all                      BOOLEAN NOT NULL DEFAULT false,
     -- Vencimento da aplicação em produto com prazo (RN-ORD-17). Nulo nos demais casos.
     maturity_date                   DATE,
-    -- Quem pediu: o cliente ou a liquidação no vencimento, feita pelo fechamento do dia (RN-FEC-09).
-    source                          VARCHAR(8) NOT NULL DEFAULT 'CUSTOMER' CHECK (source IN ('CUSTOMER', 'MATURITY')),
-    -- Na liquidação, a aplicação que ela devolveu. O UNIQUE impede liquidar a mesma aplicação duas vezes.
+    -- Só na liquidação feita pelo fechamento do dia (RN-FEC-09): a aplicação que ela devolveu.
+    -- O UNIQUE impede liquidar a mesma aplicação duas vezes.
     settled_order_id                INTEGER UNIQUE REFERENCES investment_order(id),
-    transaction_id                  INTEGER NOT NULL UNIQUE REFERENCES transaction(id),
-    status                          VARCHAR(8) NOT NULL DEFAULT 'EXECUTED' CHECK (status IN ('EXECUTED')),
-    idempotency_key                 CHAR(36) NOT NULL,
-    request_hash                    CHAR(64) NOT NULL,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(customer_id, idempotency_key)
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Da conta, como o saldo: a conta só encerra com todas as posições zeradas (RN-CON-08).
 CREATE TABLE position(
     id                              SERIAL PRIMARY KEY,
-    customer_id                     INTEGER NOT NULL REFERENCES customer(id),
+    account_id                      INTEGER NOT NULL REFERENCES account(id),
     product_id                      INTEGER NOT NULL REFERENCES product(id),
     quantity                        NUMERIC(24,8) NOT NULL DEFAULT 0 CHECK (quantity >= 0),
     invested_amount                 BIGINT NOT NULL DEFAULT 0 CHECK (invested_amount >= 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(customer_id, product_id)
+    UNIQUE(account_id, product_id)
 );

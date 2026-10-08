@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, CHAR, Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import BigInteger, CHAR, Column, DateTime, ForeignKey, Integer, String, Uuid, func
 from sqlalchemy.orm import relationship
 
 from models.base import Base
@@ -20,20 +20,19 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True)
     transaction_key = Column(CHAR(36), nullable=False, unique=True)
     type_id = Column(Integer, ForeignKey("transaction_type.id"), nullable=False)
-    requester_account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
-    # Nulo no depósito e no resgate (o dinheiro vem "de fora").
-    origin_account_id = Column(Integer, ForeignKey("account.id"))
-    # Nulo no saque e na aplicação (o dinheiro vai "para fora").
+    # A dona do pedido: a conta que pediu (no depósito e no resgate, a que recebe).
+    account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
+    # Só na transferência: a conta que recebe.
     destination_account_id = Column(Integer, ForeignKey("account.id"))
     amount = Column(BigInteger, nullable=False)
     fee_amount = Column(BigInteger, nullable=False, server_default="0")
     description = Column(String(140))
-    idempotency_key = Column(CHAR(36), nullable=False)
-    request_hash = Column(CHAR(64), nullable=False)
+    # Única no banco inteiro; nula quando o próprio banco cria a transação.
+    idempotency_key = Column(Uuid(as_uuid=False), unique=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     type = relationship(TransactionType)
-    origin_account = relationship("Account", foreign_keys=[origin_account_id])
+    account = relationship("Account", foreign_keys=[account_id])
     destination_account = relationship("Account", foreign_keys=[destination_account_id])
 
 
