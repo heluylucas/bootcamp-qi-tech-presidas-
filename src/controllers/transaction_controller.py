@@ -61,6 +61,7 @@ class TransactionController(BaseController):
         origin = self.get_owned_account(customer_key, account_key)
 
         destination = None
+        bank = None
         if transaction_type == "TRANSFER":
             destination = AccountRepository.get_by_key_any_owner(self.context, payload["destination_account_key"])
 
@@ -70,8 +71,11 @@ class TransactionController(BaseController):
             if destination.id == origin.id:
                 raise SameAccountTransfer()
 
+            # A tarifa entra na conta do banco, que também é escrita e por isso também é travada.
+            bank = AccountRepository.get_bank(self.context)
+
         # Daqui em diante, status e saldo são lidos com as contas travadas (RN-MOV-08).
-        origin, destination = self.lock_accounts(origin, destination)
+        origin, destination, bank = self.lock_accounts(origin, destination, bank)
 
         # Idempotência DEPOIS da trava (rfc_fluxos): um reenvio que chega enquanto o
         # original roda espera a trava e encontra a transação já gravada, em vez de
@@ -102,7 +106,7 @@ class TransactionController(BaseController):
         elif transaction_type == "WITHDRAWAL":
             transaction, balance = self.withdraw(origin, amount, description, idempotency_key)
         else:
-            transaction, balance = self.transfer(origin, destination, amount, description, idempotency_key)
+            transaction, balance = self.transfer(origin, destination, bank, amount, description, idempotency_key)
 
         self.session.commit()
         return transaction_to_dict(transaction, balance), True
@@ -153,22 +157,19 @@ class TransactionController(BaseController):
 
         return account
 
-    def lock_accounts(self, origin: Account, destination: Optional[Account]) -> tuple:
-        """Trava as contas sempre em ordem crescente de id.
+    def lock_accounts(self, *accounts: Optional[Account]) -> list:
+        """Trava as contas sempre em ordem crescente de id e as devolve na ordem recebida (None fica None).
 
         Se A -> B e B -> A chegassem juntas e cada uma travasse primeiro a
         própria origem, cada uma seguraria uma conta esperando a outra para
         sempre (deadlock). Na mesma ordem, as duas disputam a mesma primeira trava.
+        A conta do banco tem o menor id, então é sempre a primeira.
         """
-        accounts = [origin] if destination is None else sorted([origin, destination], key=lambda account: account.id)
         locked = {}
-        for account in accounts:
+        for account in sorted((account for account in accounts if account), key=lambda account: account.id):
             locked[account.id] = AccountRepository.get_by_id_for_update(self.context, account.id)
 
-        if destination is None:
-            return locked[origin.id], None
-
-        return locked[origin.id], locked[destination.id]
+        return [locked[account.id] if account else None for account in accounts]
 
     def deposit(self, account: Account, amount: int, description: Optional[str], idempotency_key: str) -> tuple:
         new_balance = account.balance + amount
@@ -183,19 +184,26 @@ class TransactionController(BaseController):
         return transaction, new_balance
 
     def transfer(
-        self, origin: Account, destination: Account, amount: int, description: Optional[str], idempotency_key: str
+        self,
+        origin: Account,
+        destination: Account,
+        bank: Account,
+        amount: int,
+        description: Optional[str],
+        idempotency_key: str,
     ) -> tuple:
-        """Um pedido, três lançamentos: principal e tarifa saem da origem, só o principal entra no destino."""
+        """Um pedido, quatro lançamentos: principal e tarifa saem da origem, o principal entra
+        no destino e a tarifa entra na conta do banco. Cada débito tem o seu crédito."""
         transaction = self.create_transaction(
             "TRANSFER", origin, destination, amount, TRANSFER_FEE, description, idempotency_key
         )
         after_principal = origin.balance - amount
         after_fee = after_principal - TRANSFER_FEE
-        destination_balance = destination.balance + amount
 
         self.add_entry(transaction, origin, "DEBIT", "PRINCIPAL", amount, after_principal)
         self.add_entry(transaction, origin, "DEBIT", "FEE", TRANSFER_FEE, after_fee)
-        self.add_entry(transaction, destination, "CREDIT", "PRINCIPAL", amount, destination_balance)
+        self.add_entry(transaction, destination, "CREDIT", "PRINCIPAL", amount, destination.balance + amount)
+        self.add_entry(transaction, bank, "CREDIT", "FEE", TRANSFER_FEE, bank.balance + TRANSFER_FEE)
         return transaction, after_fee
 
     def find_repetition(self, idempotency_key: str, account: Account) -> Optional[Transaction]:
