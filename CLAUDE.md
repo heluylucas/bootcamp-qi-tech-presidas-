@@ -19,6 +19,9 @@ desenvolvimento: explique em português simples o que mudou e por quê.
 - Testes: `pytest -v`.
 - Mudou `database/database.sql`? Ele só roda quando o banco nasce e é copiado para a imagem no build:
   `docker compose down -v` e depois `docker compose up -d --build` (sem `--build` roda o SQL antigo).
+  Depois, atualize os diagramas ER (`docs/diagramas/er-*.mmd`, regerando o PNG com
+  `npx -p @mermaid-js/mermaid-cli mmdc -b white -s 2 -i X.mmd -o X.png`) e rode
+  `python scripts/check_er.py` até ele dizer "ok".
 - A banca roda em Linux: arquivos com fim de linha LF.
 
 ## Restrições obrigatórias (nunca violar)
@@ -40,7 +43,8 @@ desenvolvimento: explique em português simples o que mudou e por quê.
 - `controllers/`: todos os `if` de negócio. Toda recusa acontece antes de qualquer escrita.
   O `commit` é a última linha antes do `return`.
 - `repositories/`: única camada com query. Devolve dado ou `None`; não decide nada.
-- `models/`: espelho das tabelas. Enumerador antes da entidade no `models/__init__.py`.
+- `models/`: espelho das tabelas. Listas fixas são tipos ENUM do Postgres no `database.sql`,
+  espelhados com `sqlalchemy.Enum` no próprio modelo (sem tabela de enumerador).
 - `schemas/`: JSON Schema com `"additionalProperties": false`.
 - `dtos/`: o que sai na resposta (troca id por key, mascara o CPF).
 - `errors/`: uma classe por código do catálogo.
@@ -49,8 +53,10 @@ desenvolvimento: explique em português simples o que mudou e por quê.
 ## Regras de dinheiro (as que mais quebram)
 
 - Trave com `SELECT ... FOR UPDATE` toda linha lida para decidir (`with_for_update()`).
-  Duas contas: ordem crescente de `id`. Investimento: conta, depois posição.
-- Idempotência (`Idempotency-Key`) é checada depois das travas. O `UNIQUE` no banco é rede de segurança.
+  Várias contas: ordem crescente de `id` (na transferência entra também a conta do banco, que
+  recebe a tarifa). Investimento: conta, depois posição.
+- Idempotência (`Idempotency-Key`) é checada depois das travas. A chave é `UNIQUE` no banco inteiro
+  (`transaction.idempotency_key`); repetição = mesma conta e pedido idêntico às colunas gravadas.
 - Invariante: `account.balance` = soma dos créditos − soma dos débitos de `ledger_entry`.
 
 ## Como trabalhar
