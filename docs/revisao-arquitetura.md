@@ -227,6 +227,10 @@ A resposta da API não muda, salvo onde está dito.
   porque toda rota filtra por cliente).
 - `transaction_controller.transfer`: 4 lançamentos (débito do principal, débito da tarifa, crédito
   do principal, crédito da tarifa no banco), travando a conta do banco junto, em ordem crescente de id.
+- A conta do banco não pode ser destino de transferência nem ter o status mudado pela rota interna.
+- `GET /internal/revenue` adiantado só com a parte realizada (`realized.fee_amount` = créditos `FEE`
+  na conta do banco no período); a parte estimada fica para o módulo 8, e o float (RN-REC-07)
+  precisa excluir a conta do banco.
 - RFC: atualizar RN-REC-02/03 e a decisão "não existe conta de receitas" (R7: registrar a troca).
 
 ### Fase 3: enumeradores como ENUM nativo
