@@ -4,13 +4,13 @@ from typing import List, Optional
 from sqlalchemy import func
 
 from database import Context
-from models import Account, AccountStatus, AccountStatusEvent
+from models import Account, AccountStatusEvent
 
 
 class AccountRepository:
     @staticmethod
-    def create(context: Context, customer_id: int, status_id: int) -> Account:
-        account = Account(account_key=str(uuid.uuid4()), customer_id=customer_id, status_id=status_id)
+    def create(context: Context, customer_id: int, status: str) -> Account:
+        account = Account(account_key=str(uuid.uuid4()), customer_id=customer_id, status=status)
         context.db_session.add(account)
         context.db_session.flush()
 
@@ -40,8 +40,7 @@ class AccountRepository:
         # No máximo uma, pelo índice account_one_open_per_customer_idx.
         return (
             context.db_session.query(Account)
-            .join(AccountStatus, Account.status_id == AccountStatus.id)
-            .filter(Account.customer_id == customer_id, AccountStatus.enumerator != "CLOSED")
+            .filter(Account.customer_id == customer_id, Account.status != "CLOSED")
             .first()
         )
 
@@ -49,36 +48,31 @@ class AccountRepository:
     def count_not_closed(context: Context, customer_id: int) -> int:
         return (
             context.db_session.query(Account)
-            .join(AccountStatus, Account.status_id == AccountStatus.id)
-            .filter(Account.customer_id == customer_id, AccountStatus.enumerator != "CLOSED")
+            .filter(Account.customer_id == customer_id, Account.status != "CLOSED")
             .count()
         )
 
     @staticmethod
-    def update_status(context: Context, account: Account, status_id: int) -> Account:
-        account.status_id = status_id
+    def update_status(context: Context, account: Account, status: str) -> Account:
+        account.status = status
         account.updated_at = func.now()
         context.db_session.flush()
 
         return account
 
     @staticmethod
-    def get_status(context: Context, enumerator: str) -> Optional[AccountStatus]:
-        return context.db_session.query(AccountStatus).filter(AccountStatus.enumerator == enumerator).first()
-
-    @staticmethod
     def create_status_event(
         context: Context,
         account_id: int,
-        from_status_id: Optional[int],
-        to_status_id: int,
+        from_status: Optional[str],
+        to_status: str,
         reason: Optional[str],
         actor: str,
     ) -> AccountStatusEvent:
         event = AccountStatusEvent(
             account_id=account_id,
-            from_status_id=from_status_id,
-            to_status_id=to_status_id,
+            from_status=from_status,
+            to_status=to_status,
             reason=reason,
             actor=actor,
         )

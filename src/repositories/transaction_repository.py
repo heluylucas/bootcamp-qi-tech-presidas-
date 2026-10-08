@@ -6,14 +6,10 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 
 from database import Context
-from models import LedgerEntry, Transaction, TransactionType
+from models import LedgerEntry, Transaction
 
 
 class TransactionRepository:
-    @staticmethod
-    def get_type(context: Context, enumerator: str) -> Optional[TransactionType]:
-        return context.db_session.query(TransactionType).filter(TransactionType.enumerator == enumerator).first()
-
     @staticmethod
     def get_by_idempotency_key(context: Context, idempotency_key: str) -> Optional[Transaction]:
         # A chave é única no banco inteiro: a busca não filtra por dono, quem confere é o controller.
@@ -48,10 +44,8 @@ class TransactionRepository:
         query = context.db_session.query(LedgerEntry).filter(LedgerEntry.account_id == account_id)
 
         if transaction_type is not None:
-            query = (
-                query.join(Transaction, LedgerEntry.transaction_id == Transaction.id)
-                .join(TransactionType, Transaction.type_id == TransactionType.id)
-                .filter(TransactionType.enumerator == transaction_type)
+            query = query.join(Transaction, LedgerEntry.transaction_id == Transaction.id).filter(
+                Transaction.type == transaction_type
             )
 
         if start is not None:
@@ -104,7 +98,7 @@ class TransactionRepository:
     @staticmethod
     def create(
         context: Context,
-        type_id: int,
+        transaction_type: str,
         account_id: int,
         destination_account_id: Optional[int],
         amount: int,
@@ -114,7 +108,7 @@ class TransactionRepository:
     ) -> Transaction:
         transaction = Transaction(
             transaction_key=str(uuid.uuid4()),
-            type_id=type_id,
+            type=transaction_type,
             account_id=account_id,
             destination_account_id=destination_account_id,
             amount=amount,

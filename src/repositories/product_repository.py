@@ -3,16 +3,16 @@ from decimal import Decimal
 from typing import List, Optional
 
 from database import Context
-from models import Product, ProductPrice, ProductType
+from models import Product, ProductPrice
 
 
 class ProductRepository:
     @staticmethod
-    def list(context: Context, type_enumerator: Optional[str], max_risk: Optional[int]) -> List[Product]:
-        query = context.db_session.query(Product).join(ProductType, Product.type_id == ProductType.id)
+    def list(context: Context, product_type: Optional[str], max_risk: Optional[int]) -> List[Product]:
+        query = context.db_session.query(Product)
 
-        if type_enumerator is not None:
-            query = query.filter(ProductType.enumerator == type_enumerator)
+        if product_type is not None:
+            query = query.filter(Product.type == product_type)
         if max_risk is not None:
             query = query.filter(Product.risk_level <= max_risk)
 
