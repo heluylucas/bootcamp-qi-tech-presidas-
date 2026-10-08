@@ -133,7 +133,8 @@ class BusinessDayController(BaseController):
         daily_cdi = (1 + Decimal(cdi_bps) / 10000) ** (Decimal(1) / 252) - 1
         prices = {}
         for product in products:
-            if not product.own_issue:
+            # Emissão própria é o produto que nenhuma fonte externa publica: sem external_code.
+            if product.external_code is not None:
                 continue
 
             # Sempre existe: o seed grava o preço do dia em que o banco nasce.

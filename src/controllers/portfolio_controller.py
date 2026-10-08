@@ -35,10 +35,10 @@ class PortfolioController(BaseController):
         if amount < MINIMUM_SUGGESTION_AMOUNT:
             raise SuggestionAmountTooLow()
 
-        # O seed grava uma carteira para cada perfil, então ela sempre existe.
-        portfolio = PortfolioRepository.get_by_profile(self.context, assessment.profile_id)
+        # O seed grava uma carteira para cada perfil, então ela sempre tem itens.
+        items = PortfolioRepository.list_items(self.context, assessment.profile_id)
 
-        allocations = split_amount(amount, portfolio.items)
+        allocations = split_amount(amount, items)
         return suggestion_to_dict(assessment.profile.enumerator, amount, allocations)
 
 
