@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Time** | Lucas Heluy · Álvaro Duarte · Thomas Miguellone |
-| **Data** | 07/10/2026 |
-| **Versão** | 1 |
+| **Data** | 08/10/2026 |
+| **Versão** | 2 (revisão do banco depois do feedback da QI Tech) |
 
 ## Contextualização
 
@@ -49,7 +49,7 @@ fundo, o CDB e a LCI), que é onde está a margem.
 
 | Fonte | Como funciona | Tipo |
 |---|---|---|
-| Tarifa de transferência | R$ 2,00 por transferência, cobrados da conta de origem como um lançamento `FEE`. | Realizada |
+| Tarifa de transferência | R$ 2,00 por transferência: sai da conta de origem e entra na conta do banco (lançamentos `FEE`). | Realizada |
 | Taxa de administração do fundo | 1% ao ano sobre o patrimônio do FGV Quant Capital, já descontada da cota. | Estimada |
 | Spread dos títulos próprios | O banco paga 95% do CDI no CDB e 93% na LCI e aplica o dinheiro captado a cerca de 100% do CDI. | Estimada |
 | Float | O saldo parado na conta não rende para o cliente; o banco o aplica à Selic. | Estimada |
@@ -69,9 +69,18 @@ realizada de estimada é o que deixa o número defensável.
   porque a transferência precisa ler duas contas e o status delas antes de decidir. A trava explícita
   é mais fácil de explicar e de testar. Ganharia se só uma conta fosse afetada e o desempenho pesasse
   mais.
-- **Uma conta de receitas do banco com saldo, creditada a cada tarifa:** descartada porque toda
-  transferência travaria a *mesma* linha, e o banco inteiro faria uma transferência por vez. Ganharia
-  com volume pequeno. A receita é a soma dos lançamentos `FEE`.
+- **Tarifa sem conta de destino** (a receita como soma dos débitos `FEE`), escolha da versão 1:
+  descartada porque a tarifa saía do cliente e não entrava em lugar nenhum. Agora uma conta do banco,
+  sem cliente, recebe o crédito: todo débito tem o seu crédito. O preço é que toda transferência trava
+  a *mesma* linha; se virar gargalo, a tarifa passa a ser acumulada e creditada no fechamento do dia.
+- **Chave de idempotência única por dono, com hash do corpo** (versão 1): descartada porque a chave
+  existia em dois lugares e reusar numa aplicação a chave de um depósito dava `500`. Agora a chave é
+  `UNIQUE` no banco inteiro, mora só em `transaction`, e a repetição é conferida comparando o pedido
+  com as colunas já gravadas, sem hash.
+- **Tabelas de enumerador e colunas que repetem outras** (versão 1): descartadas por complexidade sem
+  ganho. Listas fixas viraram tipos ENUM do Postgres, a ordem de investimento virou o anexo da sua
+  transação, a posição passou a ser da conta, e o que pode ser calculado deixou de ser gravado. O banco
+  foi de 21 para 17 tabelas.
 - **Buscar o preço lá fora na hora da aplicação:** descartada porque cada pedido do cliente passaria a
   depender de outro serviço, e dois clientes no mesmo dia poderiam ver preços diferentes. Ganharia com
   ativos de preço minuto a minuto, como ações.
@@ -94,11 +103,11 @@ Toda rota exige o cabeçalho `INTERNAL-TOKEN`, menos `/` e `/health_check`. Sem 
 `OPERATOR-TOKEN`; sem ele ou com valor errado, `403` (`PPP000007`). O cliente só tem o primeiro
 token, e é isso que o impede de se desbloquear sozinho. Um recurso de outro cliente responde `404`,
 igual a um inexistente. As rotas marcadas como
-**idempotentes** exigem o cabeçalho `Idempotency-Key` (UUID); sem ele, `400` (`PPP000003`). Se a
-mesma chave vier com o mesmo corpo, a resposta é `200` com o corpo original e nada se move de novo.
-Se vier com um corpo diferente, `409` (`PPP000004`). Quem garante isso é a dupla `idempotency_key` +
-`request_hash` (SHA-256 do corpo) e o `UNIQUE` indicado. `ck` = `customer_key`, `ak` =
-`account_key`.
+**idempotentes** exigem o cabeçalho `Idempotency-Key`, um UUID gerado por quem chama a API, um por
+pedido; sem ele ou fora do formato, `400` (`PPP000003`). A chave é `UNIQUE` no banco inteiro
+(`transaction.idempotency_key`). Se ela voltar da mesma conta com o mesmo pedido (comparado com o que
+já está gravado), a resposta é `200` com o corpo original e nada se move de novo. Se vier de outra
+conta ou com um pedido diferente, `409` (`PPP000004`). `ck` = `customer_key`, `ak` = `account_key`.
 
 | Método | Caminho | O que faz | Entrada (campos que importam) | Saídas (status e quando) |
 |---|---|---|---|---|
@@ -109,10 +118,10 @@ Se vier com um corpo diferente, `409` (`PPP000004`). Quem garante isso é a dupl
 | `PATCH` | `/customer/{ck}/account/{ak}` | O cliente encerra a própria conta (só vazia), gerando evento | `status`, `reason` | `200`; `400` status fora do enum; `403` bloquear ou desbloquear (só o banco); `404`; `409` transição proibida ou conta não vazia; `422` sem motivo |
 | `PATCH` | `/internal/account/{ak}/status` | O banco bloqueia, desbloqueia ou encerra, gerando evento. Exige `OPERATOR-TOKEN` | `status`, `reason` | `200`; `400` schema; `403` sem token de operador; `404`; `409` transição proibida ou conta não vazia; `422` sem motivo |
 | `GET` | `/customer/{ck}/account/{ak}/status_events` | Trilha de status, com quem fez cada mudança (`CUSTOMER` ou `BANK`) | — | `200`; `404` |
-| `POST` | `/customer/{ck}/account/{ak}/transaction` | Depósito, saque ou transferência (tarifa de R$ 2,00). **Idempotente**: `UNIQUE(requester_account_id, idempotency_key)` | `type`, `amount` (centavos), `destination_account_key` | `201` `transaction_key` e saldo; `200` repetição; `400` schema ou sem chave; `404` conta ou destino; `409` conta/destino não ativos, saldo insuficiente, chave reutilizada; `422` valor ≤ 0, acima do limite, origem = destino |
+| `POST` | `/customer/{ck}/account/{ak}/transaction` | Depósito, saque ou transferência (tarifa de R$ 2,00, creditada na conta do banco). **Idempotente** | `type`, `amount` (centavos), `destination_account_key` | `201` `transaction_key` e saldo; `200` repetição; `400` schema ou sem chave; `404` conta ou destino; `409` conta/destino não ativos, saldo insuficiente, chave reutilizada; `422` valor ≤ 0, acima do limite, origem = destino |
 | `GET` | `/customer/{ck}/account/{ak}/transactions` | Extrato paginado, do mais novo ao mais antigo | `page`, `limit`, `from`, `to`, `type` | `200` `{items, page, limit, total}`; `400` filtro inválido; `404` |
 | `GET` | `/customer/{ck}/account/{ak}/transaction/{tk}` | Comprovante | — | `200`; `404` (inexistente ou não envolve a conta) |
-| `GET` | `/suitability_questions` | Perguntas e opções, sem os pontos | — | `200` |
+| `GET` | `/suitability_questions` | Perguntas e opções (o código da opção, de 1 a 4, é a pontuação dela) | — | `200` |
 | `POST` | `/customer/{ck}/suitability` | Responde o questionário e gera uma avaliação nova | `answers[{question_code, option_code}]` | `201` perfil, pontos, validade; `400` schema; `404`; `422` resposta faltando, repetida ou opção inválida |
 | `GET` | `/customer/{ck}/suitability` | Perfil vigente (a avaliação mais recente) | — | `200`; `404` cliente ou nunca respondeu |
 | `GET` | `/customer/{ck}/suitabilities` | Histórico de avaliações | — | `200`; `404` |
@@ -120,10 +129,10 @@ Se vier com um corpo diferente, `409` (`PPP000004`). Quem garante isso é a dupl
 | `GET` | `/product/{pk}` | Detalhe e preço do dia | — | `200`; `404` |
 | `GET` | `/product/{pk}/prices` | Histórico de preços | `from`, `to` | `200`; `404` |
 | `GET` | `/customer/{ck}/portfolio_suggestion` | Divide um valor pela carteira-modelo do perfil (não grava nada) | `amount` | `200` itens que somam exatamente `amount`; `400`; `404`; `409` sem perfil ou vencido; `422` abaixo de R$ 1.000 |
-| `POST` | `/customer/{ck}/investment_order` | Aplica ou resgata; o dinheiro sai ou entra na conta corrente. **Idempotente**: `UNIQUE(customer_id, idempotency_key)` | `product_key`, `side`, `amount` ou `redeem_all` | `201` `order_key`, quantidade, preço (resgate: custo, resultado, rentabilidade); `200` repetição; `400` schema ou sem chave; `404` produto; `409` sem conta ativa, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; `422` abaixo do mínimo, fora do perfil, resgate antes do vencimento |
+| `POST` | `/customer/{ck}/investment_order` | Aplica ou resgata; o dinheiro sai ou entra na conta corrente. **Idempotente** | `product_key`, `side`, `amount` ou `redeem_all` | `201` `order_key`, quantidade, preço (resgate: custo, resultado, rentabilidade); `200` repetição; `400` schema ou sem chave; `404` produto; `409` sem conta ativa, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; `422` abaixo do mínimo, fora do perfil, resgate antes do vencimento |
 | `GET` | `/customer/{ck}/investment_orders` | Histórico de ordens | `page`, `limit`, `product_key` | `200` (produto inexistente: lista vazia); `400`; `404` |
 | `GET` | `/customer/{ck}/investment_order/{ok}` | Detalhe da ordem | — | `200`; `404` |
-| `GET` | `/customer/{ck}/positions` | Posição, valor do dia e rentabilidade | `include_closed` | `200`; `400`; `404` |
+| `GET` | `/customer/{ck}/positions` | Posição, valor do dia, rentabilidade e capital total no banco (caixa + investimentos, com a divisão em pontos-base) | `include_closed` | `200`; `400`; `404` |
 | `GET` | `/internal/business_date` | Data de movimento atual. Exige `OPERATOR-TOKEN` | — | `200`; `403` sem token de operador |
 | `POST` | `/internal/day_close` | Fecha o dia: busca preços e taxas lá fora, liquida o que venceu e abre o próximo dia útil. Clique duplo não fecha dois dias (trava + data conferida). Exige `OPERATOR-TOKEN` | `close_date` | `201` nova data, preços, taxas; `400`; `403` sem token de operador; `409` `close_date` não é a data atual; `502` fonte fora do ar ou resposta sem sentido (nada gravado) |
 | `GET` | `/internal/revenue` | Receita realizada (tarifas) e estimada (fundo, spread, float). Exige `OPERATOR-TOKEN` | `from`, `to` | `200`; `400` período invertido ou maior que 366 dias; `403` sem token de operador |
@@ -167,8 +176,8 @@ update*). O `CHECK (balance >= 0)` ainda barraria o segundo, mas com um `500`, q
 ninguém desenhou.
 
 **Transferência — falha: o cliente reenvia o mesmo pedido.** Se o original ainda está rodando, o
-reenvio espera na trava. Depois ele encontra a `transaction` já gravada e devolve o corpo original
-(`200`). A checagem fica *depois* da trava de propósito: se viesse antes, o reenvio passaria por ela,
+reenvio espera na trava. Depois ele encontra a `transaction` já gravada com a mesma chave e, sendo o
+mesmo pedido, devolve o corpo original (`200`). A checagem fica *depois* da trava de propósito: se viesse antes, o reenvio passaria por ela,
 esperaria a trava e receberia um falso "saldo insuficiente".
 
 **Transferência — falha: A → B e B → A ao mesmo tempo.** Se cada pedido travasse primeiro a própria
@@ -224,8 +233,9 @@ existe a ordem que aponta para ela, e o `UNIQUE(settled_order_id)` barra a segun
 >   - uma transação de banco por operação, com `commit` só na última linha: tudo ou nada;
 >   - `SELECT ... FOR UPDATE` em toda linha lida para decidir, sempre na mesma ordem (contas por `id`
 >     crescente, depois posição), o que também evita *deadlock*;
->   - idempotência conferida *com a trava segurada*, com o `UNIQUE(..., idempotency_key)` como rede
->     de segurança;
+>   - idempotência conferida *com a trava segurada*, com o `UNIQUE` de `idempotency_key` (única no
+>     banco inteiro) como rede de segurança;
+>   - a tarifa entra na conta do banco: todo débito tem o seu crédito;
 >   - o invariante `account.balance` = Σ créditos − Σ débitos de `ledger_entry`: o `balance_after`
 >     de cada lançamento guarda o saldo naquele instante, e um teste black box confere que o extrato
 >     reconstrói o saldo.

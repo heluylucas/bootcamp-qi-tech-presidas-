@@ -345,8 +345,8 @@ real. E no nosso simulador a data de movimento fica à frente do calendário
 (cada vez que a suíte roda, ela anda alguns dias). Se a idade usasse essa
 data, alguém com 17 anos de verdade poderia abrir conta. Nenhum teste de
 investimento depende dessas duas regras. Por isso o `customer_controller.py`
-e os testes de idade **não mudaram**, e `valid_until` continua
-`TIMESTAMPTZ`. Continuam na data de movimento: vencimento do produto, preço
+e os testes de idade **não mudaram**, e `valid_until` continua no relógio
+real (hoje calculado como `created_at` + 24 meses, sem coluna própria). Continuam na data de movimento: vencimento do produto, preço
 do dia e taxas. A RFC (RN-GER-13, RN-CLI-05, RN-SUI-05, modelo de dados,
 fluxos e decisões) foi ajustada.
 
@@ -564,9 +564,10 @@ vez de 100 → 102 → 104.
 - No fechamento, depois de gravar os preços e antes de abrir o dia, o banco
   resgata sozinho cada aplicação da LCI que vence no novo dia, ao preço novo.
   O dinheiro volta para a conta, mesmo que ela esteja bloqueada.
-- A ordem desse resgate tem `source = MATURITY` e `settled_order_id` (a
-  aplicação que ela devolveu). O `UNIQUE` dessa coluna impede pagar duas
-  vezes. A chave de idempotência é fixa por aplicação (`uuid5`).
+- A ordem desse resgate tem `settled_order_id` (a aplicação que ela
+  devolveu); a API mostra `source = MATURITY` por causa dele. O `UNIQUE`
+  dessa coluna impede pagar duas vezes. A transação desse resgate não tem
+  chave de idempotência: não há pedido de cliente para repetir.
 - As travas seguem a mesma ordem das ordens do cliente (conta, depois
   posição), então não há _deadlock_ com uma aplicação no mesmo instante.
 - Está tudo no mesmo `commit` do fechamento: ou o dia abre com tudo pago, ou
@@ -620,6 +621,7 @@ Primeiro falhou (saldo parado em R$ 9.900), depois passou. `pytest -v`:
 | 05/10/2026 | 2    | Seed de preços e taxas reduzido ao dia em que o banco nasce (eram 30 dias). RFC ajustada.                                                                                                                                                                                                           |
 | 05/10/2026 | 2    | LCI virou "LCI Triple P Bank 12 meses": `term_months` e `tax_exempt` em `product`, `CHECK` do prazo mínimo de 9 meses (Res. CMN 5.119 e 5.168/2024). RFC: RN-PRO-09, RN-ORD-17, RN-FEC-09 (rascunho, liquidação no vencimento) e "Do MVP à produção". O fechamento continua calculando a LCI igual. |
 | 06/10/2026 | 5    | Módulo 7 (ordens, posição, consultas) pronto. Fechamento liquida a LCI no vencimento (RN-FEC-09, deixou de ser rascunho): `source` e `settled_order_id` em `investment_order`. `mock-init` com 300 dias úteis, em lotes com novas tentativas; a API espera o `mock-init` terminar. Removidos `is_active`, `PPP005002` e `PPP005003` (catálogo fixo). |
+| 08/10/2026 | —    | Revisão do banco (feedback da QI Tech, `docs/revisao-arquitetura.md`). No que toca preço e fechamento: emissão própria passou a ser "produto sem `external_code`" (saiu `product.own_issue`); a liquidação no vencimento grava a transação sem chave de idempotência (saiu o `uuid5`) e a ordem sem `source` (calculado de `settled_order_id`); tipos de produto, indexador, liquidez e código de taxa viraram ENUM do Postgres. |
 | 05/10/2026 | —    | Banco renomeado de Quant Bank para **Triple P Bank**; códigos de erro de `PPP` para `PPP` (mesmo formato); serviço `triple-p-bank-api`. O fundo continua FGV Quant Capital.                                                                                                                         |
 
 ---

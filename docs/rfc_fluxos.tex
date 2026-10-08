@@ -63,16 +63,19 @@ trava, conta uma conta ao ser liberado e recebe 409 (\tb{PPP002002}) sem ter esc
   \item Busca a conta de origem pelo \tb{account_key} e confere \tb{account.customer_id} = cliente
         do caminho. Se não for, 404, a mesma resposta de conta inexistente.
   \item Busca a conta de destino. Confere que é diferente da origem.
-  \item Trava as duas linhas de \tb{account} com \tb{FOR UPDATE}, sempre em ordem crescente de
-        \tb{id}.
-  \item Procura \tb{transaction} com (\tb{requester_account_id}, \tb{idempotency_key}) e não
+  \item Trava as três linhas de \tb{account} com \tb{FOR UPDATE}, sempre em ordem crescente de
+        \tb{id}: origem, destino e a conta do banco, que recebe a tarifa (menor \tb{id}, então é a
+        primeira).
+  \item Procura \tb{transaction} pela \tb{idempotency_key} (única no banco inteiro) e não
         encontra.
   \item Com as linhas travadas, confere as duas contas \tb{ACTIVE} e origem com
         \tb{balance} $\geq$ \tb{amount} + 200.
-  \item Grava \tb{transaction} (\tb{TRANSFER}, \tb{fee_amount = 200}, \tb{request_hash}).
-  \item Grava três \tb{ledger_entry}, cada uma com \tb{balance_after}:
-        \tb{DEBIT/PRINCIPAL} e \tb{DEBIT/FEE} na origem, \tb{CREDIT/PRINCIPAL} no destino.
-  \item Atualiza \tb{account.balance} das duas contas.
+  \item Grava \tb{transaction} (\tb{TRANSFER}, \tb{account_id} = origem,
+        \tb{destination_account_id}, \tb{fee_amount = 200}, \tb{idempotency_key}).
+  \item Grava quatro \tb{ledger_entry}, cada uma com \tb{balance_after}:
+        \tb{DEBIT/PRINCIPAL} e \tb{DEBIT/FEE} na origem, \tb{CREDIT/PRINCIPAL} no destino e
+        \tb{CREDIT/FEE} na conta do banco.
+  \item Atualiza \tb{account.balance} das três contas.
   \item \tb{commit}, que libera as travas; 201 com \tb{transaction_key} e o novo saldo.
 \end{enumerate}
 
@@ -124,14 +127,17 @@ segundo, mas com um 500, que é um ramo que ninguém desenhou.
 pelos passos 1 a 4. Se o original ainda está em andamento, o reenvio espera a trava no passo 4. No
 passo 5 ele encontra a \tb{transaction} já gravada:
 \begin{itemize}
-  \item com o mesmo \tb{request_hash}, devolve 200 com o corpo original e não executa os passos 6
-        a 10, então nada é debitado de novo;
-  \item com um hash diferente (mesma chave, corpo diferente), devolve 409 (\tb{PPP000004}).
+  \item da mesma conta e com o pedido idêntico ao gravado (tipo, valor, destino e descrição,
+        comparados com as colunas da \tb{transaction}), devolve 200 com o corpo original e não
+        executa os passos 6 a 10, então nada é debitado de novo;
+  \item de outra conta, ou com um pedido diferente (mesma chave, outro tipo ou valor, por
+        exemplo), devolve 409 (\tb{PPP000004}), sem mostrar nada do pedido original.
 \end{itemize}
 A checagem de idempotência fica \emph{depois} da trava de propósito. Se viesse antes, um reenvio
 simultâneo passaria pela checagem (o original ainda não gravou), esperaria a trava e, ao ver o saldo
-já debitado, receberia um falso ``saldo insuficiente'' em vez da resposta original. O \tb{UNIQUE(requester_account_id, idempotency_key)} fica como
-rede de segurança.
+já debitado, receberia um falso ``saldo insuficiente'' em vez da resposta original. O \tb{UNIQUE}
+de \tb{idempotency_key} fica como rede de segurança: dois pedidos de contas diferentes com a mesma
+chave, ao mesmo tempo, passam os dois pela busca, e o banco recusa o segundo (409).
 
 \textbf{Transferência --- falha: transferências cruzadas (A $\to$ B e B $\to$ A ao mesmo
 tempo).} Se cada pedido travasse primeiro a própria origem, cada um seguraria uma conta e esperaria
@@ -146,21 +152,23 @@ disputam a mesma primeira trava: um passa e o outro espera.
   \item Busca \tb{product}; não existe, 404 (\tb{PPP005001}). O catálogo do MVP não tem produto
         inativo nem vencido. Produto com prazo (LCI) não vence como um todo: o vencimento é
         calculado no passo 11.
-  \item Busca a \tb{suitability_assessment} mais recente. Confere \tb{valid_until} $\geq$ hora
-        real,
+  \item Busca a \tb{suitability_assessment} mais recente. Confere a validade (\tb{created_at} +
+        24 meses) $\geq$ hora real,
         \tb{risk_level} $\leq$ \tb{max_risk_level} do perfil e \tb{amount} $\geq$
         \tb{min_application}.
   \item Busca o preço do dia: o \tb{product_price} de maior \tb{reference_date} $\leq$ data de
         movimento. Ele sempre existe: o fechamento só abre um dia depois de gravar todos os preços.
-  \item Trava a conta. Depois trava a \tb{position} (cliente, produto), ou a cria com
-        \tb{quantity = 0} se ainda não existir.
-  \item Procura \tb{investment_order} com (\tb{customer_id}, \tb{idempotency_key}) e não encontra.
+  \item Trava a conta. Depois trava a \tb{position} (conta, produto), se já existir.
+  \item Procura \tb{transaction} pela \tb{idempotency_key} e não encontra. (Se achar: da mesma
+        conta, com uma ordem de mesmo lado, produto e valor, devolve a ordem original com 200;
+        qualquer outro caso, inclusive a chave de um depósito, 409.)
   \item Confere a conta \tb{ACTIVE} e \tb{balance} $\geq$ \tb{amount}.
-  \item Calcula \tb{quantity = amount / unit_price}, truncada em 8 casas.
-  \item Grava \tb{transaction} \tb{INVESTMENT_APPLY} e um \tb{ledger_entry} \tb{DEBIT}, e
-        atualiza \tb{balance}.
-  \item Grava \tb{investment_order} com \tb{quantity}, \tb{unit_price}, \tb{cost_amount}
-        (= \tb{amount}) e \tb{transaction_id}. Ordem: \tb{EXECUTED}. Se o produto tem prazo,
+  \item Calcula \tb{quantity = amount / unit_price}, truncada em 8 casas, e cria a
+        \tb{position} com \tb{quantity = 0} se ainda não existir.
+  \item Grava \tb{transaction} \tb{INVESTMENT_APPLY} (com a \tb{idempotency_key}) e um
+        \tb{ledger_entry} \tb{DEBIT}, e atualiza \tb{balance}.
+  \item Grava \tb{investment_order} com \tb{transaction_id}, \tb{product_id}, \tb{quantity},
+        \tb{unit_price} e \tb{cost_amount} (= \tb{amount}). Se o produto tem prazo,
         grava também \tb{maturity_date} = data de movimento + \tb{term_months} (RN-ORD-17).
   \item Soma \tb{quantity} e \tb{amount} em \tb{position.quantity} e
         \tb{position.invested_amount}.
@@ -216,12 +224,12 @@ nada foi escrito. O cliente recebe 409 (\tb{PPP007004}).
   \item Busca o cliente pelo \tb{customer_key}.
   \item Confere sete respostas, uma por \tb{suitability_question}, cada \tb{option} pertencendo à
         sua pergunta.
-  \item Soma os \tb{points}. Se Q3 ou Q5 tiver a opção 1, o perfil é \tb{CONSERVATIVE} com
-        \tb{forced_by_rule = true}. Se não, o perfil sai da faixa de pontos em
+  \item Soma os códigos das opções escolhidas (o código é a pontuação). Se Q3 ou Q5 tiver a
+        opção 1, o perfil é \tb{CONSERVATIVE}. Se não, o perfil sai da faixa de pontos em
         \tb{investor_profile}.
-  \item Grava a \tb{suitability_assessment} (\tb{valid_until} = hora real + 24 meses) e
-        as sete
-        \tb{suitability_answer}.
+  \item Grava a \tb{suitability_assessment} (perfil e pontuação) e as sete
+        \tb{suitability_answer}. A validade (\tb{created_at} + 24 meses) e o
+        \tb{forced_by_rule} (perfil fora da faixa da pontuação) são calculados, não gravados.
   \item \tb{commit}; 201 com perfil, pontuação e validade.
 \end{enumerate}
 A avaliação anterior não é alterada. Ela vira histórico porque o perfil vigente é sempre a
@@ -251,10 +259,11 @@ escrita. O cliente recebe 422 (\tb{PPP004002}).
   \item \textbf{Liquida o que venceu} (RN-FEC-09): busca as aplicações com \tb{maturity_date}
         $\leq$ novo dia que nenhuma ordem aponta em \tb{settled_order_id}, em ordem crescente de
         conta. Para cada uma, trava a conta e depois a posição e grava o resgate da quantidade
-        inteira ao preço do novo dia: \tb{investment_order} \tb{REDEEM} com
-        \tb{source = MATURITY} e \tb{settled_order_id}, \tb{transaction} \tb{INVESTMENT_REDEEM}
-        com \tb{ledger_entry} \tb{CREDIT} (mesmo com a conta bloqueada) e a posição reduzida. A
-        chave de idempotência é \tb{uuid5} da \tb{order_key} da aplicação.
+        inteira ao preço do novo dia: \tb{transaction} \tb{INVESTMENT_REDEEM} \textbf{sem chave
+        de idempotência} (não há pedido de cliente para repetir) com \tb{ledger_entry}
+        \tb{CREDIT} (mesmo com a conta bloqueada), \tb{investment_order} ligada a ela com
+        \tb{settled_order_id} = a aplicação (o \tb{UNIQUE} impede pagar duas vezes) e a posição
+        reduzida.
   \item Grava o novo \tb{business_day}.
   \item \tb{commit}; 201 com a nova data, os preços e as taxas.
 \end{enumerate}
@@ -301,8 +310,10 @@ timeout, a transferência sai duas vezes. Com uma falha no meio, o débito é gr
   \item Uma transação de banco por operação, com \tb{commit} só na última linha: tudo ou nada.
   \item \tb{SELECT ... FOR UPDATE} nas linhas lidas para decidir, sempre na mesma ordem: contas
         por \tb{id} crescente, depois posição.
-  \item Idempotência checada \emph{sob a trava}, com o \tb{UNIQUE(requester_account_id,
-        idempotency_key)} como rede de segurança.
+  \item Idempotência checada \emph{sob a trava}, comparando o pedido com as colunas já gravadas,
+        com o \tb{UNIQUE} de \tb{idempotency_key} (única no banco inteiro) como rede de segurança.
+  \item A tarifa entra na conta do banco: todo débito tem o seu crédito, e a soma de todos os
+        saldos só muda com depósito, saque, aplicação e resgate.
   \item O invariante \tb{account.balance} $= \Sigma$ créditos $- \Sigma$ débitos de
         \tb{ledger_entry}, verificado por teste depois de cada cenário acima.
 \end{itemize}
