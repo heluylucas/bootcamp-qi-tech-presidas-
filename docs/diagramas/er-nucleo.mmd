@@ -1,11 +1,16 @@
+---
+config:
+  layout: elk
+  elk:
+    mergeEdges: false
+    nodePlacementStrategy: NETWORK_SIMPLEX
+---
 erDiagram
-    customer ||--o{ account : "tem (1 não encerrada)"
-    account_status ||--o{ account : "estado atual"
+    customer |o--o{ account : "tem (1 não encerrada); a do banco não tem cliente"
     account ||--o{ account_status_event : "trilha de estados"
-    account_status ||--o{ account_status_event : "de / para"
-    transaction_type ||--o{ transaction : "tipo"
-    account ||--o{ transaction : "pede"
-    transaction ||--|{ ledger_entry : "gera 1 a 3"
+    account ||--o{ transaction : "dona do pedido"
+    account |o--o{ transaction : "destino (só transferência)"
+    transaction ||--|{ ledger_entry : "gera 1 a 4"
     account ||--o{ ledger_entry : "lançamentos"
 
     customer {
@@ -17,50 +22,41 @@ erDiagram
         timestamptz created_at
     }
     account {
-        int id PK
+        int id PK "a do banco é a 1"
         char account_key UK
-        int customer_id FK "UK parcial se não CLOSED"
-        int status_id FK
+        int customer_id FK "nulo só na conta do banco; UK parcial se não CLOSED"
+        account_status status "ACTIVE, BLOCKED, CLOSED"
         bigint balance "centavos, CHECK >= 0"
+        timestamptz created_at
         timestamptz updated_at
-    }
-    account_status {
-        int id PK
-        string enumerator UK "ACTIVE, BLOCKED, CLOSED"
     }
     account_status_event {
         int id PK
         int account_id FK
-        int from_status_id FK "nulo no nascimento"
-        int to_status_id FK
-        string reason
-        string actor "CUSTOMER ou BANK"
+        account_status from_status "nulo no nascimento"
+        account_status to_status
+        varchar reason
+        status_actor actor "CUSTOMER ou BANK"
         timestamptz created_at
-    }
-    transaction_type {
-        int id PK
-        string enumerator UK "DEPOSIT, WITHDRAWAL, TRANSFER, INVESTMENT_APPLY, INVESTMENT_REDEEM"
     }
     transaction {
         int id PK
         char transaction_key UK
-        int type_id FK
-        int requester_account_id FK "UK com idempotency_key"
-        int origin_account_id FK "nulo no depósito e no resgate"
-        int destination_account_id FK "nulo no saque e na aplicação"
+        transaction_type type "DEPOSIT, WITHDRAWAL, TRANSFER, INVESTMENT_APPLY, INVESTMENT_REDEEM"
+        int account_id FK "dona do pedido"
+        int destination_account_id FK "só e sempre na TRANSFER"
         bigint amount "centavos, > 0"
         bigint fee_amount "tarifa cobrada"
-        char idempotency_key
-        char request_hash "SHA-256 do corpo"
+        varchar description
+        uuid idempotency_key UK "do cliente; nula na liquidação"
         timestamptz created_at
     }
     ledger_entry {
         int id PK
-        char entry_key UK
         int transaction_id FK
         int account_id FK
-        string direction "DEBIT ou CREDIT"
-        string category "PRINCIPAL ou FEE"
+        entry_direction direction "DEBIT ou CREDIT"
+        entry_category category "PRINCIPAL ou FEE"
         bigint amount
         bigint balance_after "saldo depois, >= 0"
         timestamptz created_at

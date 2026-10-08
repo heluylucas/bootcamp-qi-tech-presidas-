@@ -24,8 +24,8 @@ sequenceDiagram
     API->>DB: INSERT 6 product_price + 2 reference_rate (taxas do novo dia)
     loop cada aplicação com maturity_date ≤ novo dia ainda não liquidada (account_id crescente)
         API->>DB: FOR UPDATE na conta, depois na position
-        API->>DB: INSERT investment_order REDEEM, source = MATURITY,<br/>settled_order_id (UNIQUE), chave uuid5 da aplicação
-        API->>DB: INSERT transaction INVESTMENT_REDEEM + ledger_entry CREDIT<br/>UPDATE balance e position
+        API->>DB: INSERT transaction INVESTMENT_REDEEM sem idempotency_key + ledger_entry CREDIT<br/>UPDATE balance e position
+        API->>DB: INSERT investment_order ligada à transação,<br/>settled_order_id = a aplicação (UNIQUE: não paga duas vezes)
     end
     API->>DB: INSERT business_day (novo dia)
     API->>DB: COMMIT: preços, taxas, liquidações e data, tudo ou nada

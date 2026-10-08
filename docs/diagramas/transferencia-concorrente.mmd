@@ -8,7 +8,7 @@ sequenceDiagram
     B->>DB: SELECT ... FOR UPDATE (conta X)
     Note over B,DB: B fica parado esperando a trava
     Note over A: 100 ≥ 80 + 2: aprova
-    A->>DB: INSERT transaction + 3 ledger_entry
+    A->>DB: INSERT transaction + 4 ledger_entry
     A->>DB: balance = 18, COMMIT
     Note over A: responde 201
     DB-->>B: trava concedida, saldo 18

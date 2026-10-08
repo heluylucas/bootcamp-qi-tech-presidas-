@@ -1,55 +1,59 @@
+---
+config:
+  layout: elk
+  elk:
+    mergeEdges: false
+    nodePlacementStrategy: NETWORK_SIMPLEX
+---
 erDiagram
     customer ||--o{ suitability_assessment : "responde"
     investor_profile ||--o{ suitability_assessment : "resulta em"
     suitability_assessment ||--|{ suitability_answer : "7 respostas"
     suitability_question ||--|{ suitability_option : "4 opções"
     suitability_option ||--o{ suitability_answer : "escolhida"
-    investor_profile ||--|| model_portfolio : "carteira-modelo"
-    model_portfolio ||--|{ model_portfolio_item : "itens"
+    investor_profile ||--|{ model_portfolio_item : "carteira-modelo"
     product ||--o{ model_portfolio_item : "compõe"
 
     suitability_question {
         int id PK
-        string code UK "Q1 a Q7"
-        string dimension
+        varchar code UK "Q1 a Q7, ordem do questionário"
+        text text
+        varchar dimension
+        timestamptz created_at
     }
     suitability_option {
         int id PK
         int question_id FK "UK com code"
-        smallint code
-        smallint points "1 a 4"
+        smallint code "1 a 4, também a pontuação"
+        text text
+        timestamptz created_at
     }
     investor_profile {
         int id PK
-        string enumerator UK "CONSERVATIVE, MODERATE, AGGRESSIVE"
+        varchar enumerator UK "CONSERVATIVE, MODERATE, AGGRESSIVE"
         smallint min_score
         smallint max_score
         smallint max_risk_level
+        timestamptz created_at
     }
     suitability_assessment {
         int id PK
         char assessment_key UK
         int customer_id FK
-        int profile_id FK
+        int profile_id FK "fora da faixa do score = trava (forced_by_rule)"
         smallint score
-        boolean forced_by_rule
-        timestamptz valid_until "hora real + 24 meses"
-        timestamptz created_at "mais recente = vigente"
+        timestamptz created_at "mais recente = vigente; vale 24 meses"
     }
     suitability_answer {
         int id PK
-        int assessment_id FK "UK com question_id"
-        int question_id FK
-        int option_id FK
-    }
-    model_portfolio {
-        int id PK
-        int profile_id FK "UK"
-        string name
+        int assessment_id FK "UK com option_id"
+        int option_id FK "a pergunta vem da opção"
+        timestamptz created_at
     }
     model_portfolio_item {
         int id PK
-        int model_portfolio_id FK "UK com product_id"
+        int profile_id FK "UK com product_id"
         int product_id FK
-        smallint weight_bps "soma 10000"
+        smallint weight_bps "a carteira soma 10000"
+        timestamptz created_at
     }
