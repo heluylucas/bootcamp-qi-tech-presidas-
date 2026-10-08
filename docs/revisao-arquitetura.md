@@ -176,7 +176,7 @@ fechamento do dia.
 | `suitability_answer` | `question_id` | Sai de `option_id` (a opção pertence a uma pergunta) | Tirar; o controller já valida uma resposta por pergunta |
 | `suitability_assessment` | `valid_until` | É `created_at + 24 meses` | Tirar; calcular no controller/DTO |
 | `suitability_assessment` | `forced_by_rule` | É "perfil gravado ≠ perfil da faixa do `score`" | Tirar; calcular no DTO |
-| `model_portfolio` | tabela inteira | 1:1 com `investor_profile` | Juntar: `name` vai para `investor_profile`; `model_portfolio_item.profile_id` |
+| `model_portfolio` | tabela inteira | 1:1 com `investor_profile`; o `name` nunca saía na API | Apagar; `model_portfolio_item.profile_id` |
 | `product` | `own_issue` | ⇔ `external_code IS NULL` | Tirar; derivar (ajustar fechamento do dia e RN-REC-06) |
 | `account_status`, `transaction_type`, `product_type` | tabelas | Enumerador em tabela + `status_id <> 3` "mágico", enquanto `side`/`direction`/`indexer` são texto | Tipos ENUM nativos |
 | `direction`, `category`, `actor`, `indexer`, `liquidity`, `reference_rate.code` | `VARCHAR + CHECK` | Padrão diferente do de cima | Tipos ENUM nativos (um padrão só) |
@@ -253,8 +253,9 @@ Uma subfase por módulo, na ordem do projeto:
 3. produtos (`own_issue`; atualizar `docs/precificacao-e-fechamento-do-dia.md`);
 4. carteira (`model_portfolio` some).
 
-Os campos que saem na API (`forced_by_rule`, `valid_until`) continuam, calculados no DTO ou no
-controller; os testes existentes provam que nada mudou para fora.
+Os campos que saem na API (`forced_by_rule`, `valid_until`) continuam, calculados por propriedades
+do modelo `SuitabilityAssessment` a partir de `created_at`, `score` e da faixa do perfil; os testes
+existentes provam que nada mudou para fora.
 
 ### Fase 5: capital total do cliente na rota de posições
 
