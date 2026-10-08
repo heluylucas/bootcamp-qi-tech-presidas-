@@ -41,7 +41,6 @@ class LedgerEntry(Base):
     __tablename__ = "ledger_entry"
 
     id = Column(Integer, primary_key=True)
-    entry_key = Column(CHAR(36), nullable=False, unique=True)
     transaction_id = Column(Integer, ForeignKey("transaction.id"), nullable=False)
     account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
     direction = Column(EntryDirection, nullable=False)

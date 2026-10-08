@@ -39,7 +39,6 @@ class Product(Base):
     term_months = Column(SmallInteger)
     tax_exempt = Column(Boolean, nullable=False, server_default="false")
     min_application = Column(BigInteger, nullable=False)
-    own_issue = Column(Boolean, nullable=False, server_default="false")
     cdi_percentage_bps = Column(SmallInteger)
     admin_fee_bps = Column(SmallInteger)
     external_code = Column(String(50))
