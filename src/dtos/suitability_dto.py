@@ -23,7 +23,7 @@ def assessment_to_dict(assessment: SuitabilityAssessment) -> dict:
         "valid_until": to_utc_text(assessment.valid_until),
         "created_at": to_utc_text(assessment.created_at),
         "answers": [
-            {"question_code": answer.question.code, "option_code": answer.option.code}
+            {"question_code": answer.option.question.code, "option_code": answer.option.code}
             for answer in assessment.answers
         ],
     }
