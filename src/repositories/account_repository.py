@@ -100,15 +100,21 @@ class AccountRepository:
     def get_by_key_any_owner(context: Context, account_key: str) -> Optional[Account]:
         # Sem filtro de dono: só para o DESTINO de uma transferência, que pode
         # ser de outro cliente (RN-MOV-05). Nunca use para a conta do caminho.
-        return context.db_session.query(Account).filter(Account.account_key == account_key).first()
+        # A conta do banco (sem cliente) fica de fora: ela só recebe tarifa.
+        return (
+            context.db_session.query(Account)
+            .filter(Account.account_key == account_key, Account.customer_id.isnot(None))
+            .first()
+        )
 
     @staticmethod
     def get_by_key_any_owner_for_update(context: Context, account_key: str) -> Optional[Account]:
         # Sem filtro de dono: só para a rota do banco (RN-CON-11), que não é
         # aninhada em cliente. Travada, porque o status e o saldo lidos decidem a mudança.
+        # A conta do banco (sem cliente) fica de fora: ninguém a bloqueia nem encerra.
         return (
             context.db_session.query(Account)
-            .filter(Account.account_key == account_key)
+            .filter(Account.account_key == account_key, Account.customer_id.isnot(None))
             .populate_existing()
             .with_for_update()
             .first()
@@ -126,6 +132,11 @@ class AccountRepository:
             .with_for_update()
             .first()
         )
+
+    @staticmethod
+    def get_bank(context: Context) -> Account:
+        """A conta do próprio banco, a única sem cliente (seed do database.sql)."""
+        return context.db_session.query(Account).filter(Account.customer_id.is_(None)).one()
 
     @staticmethod
     def update_balance(context: Context, account: Account, balance: int) -> Account:

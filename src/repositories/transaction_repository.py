@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Tuple
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 
 from database import Context
@@ -71,6 +71,23 @@ class TransactionRepository:
         )
 
         return entries, total
+
+    @staticmethod
+    def sum_credits(context: Context, account_id: int, category: str, start: datetime, end: datetime) -> int:
+        """Soma dos créditos da categoria na conta, com `start` dentro e `end` fora do período."""
+        total = (
+            context.db_session.query(func.sum(LedgerEntry.amount))
+            .filter(
+                LedgerEntry.account_id == account_id,
+                LedgerEntry.direction == "CREDIT",
+                LedgerEntry.category == category,
+                LedgerEntry.created_at >= start,
+                LedgerEntry.created_at < end,
+            )
+            .scalar()
+        )
+
+        return int(total or 0)
 
     @staticmethod
     def get_by_key_for_account(context: Context, transaction_key: str, account_id: int) -> Optional[Transaction]:
