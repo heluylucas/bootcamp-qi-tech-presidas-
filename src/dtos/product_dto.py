@@ -7,7 +7,7 @@ def product_to_dict(product: Product) -> dict:
     return {
         "product_key": product.product_key,
         "name": product.name,
-        "type": product.type.enumerator,
+        "type": product.type,
         "issuer": product.issuer,
         "indexer": product.indexer,
         "rate_description": product.rate_description,

@@ -9,7 +9,7 @@ def order_to_dict(order: InvestmentOrder) -> dict:
     Lado e valor vêm da transação da ordem, que é o pedido de dinheiro.
     """
     transaction = order.transaction
-    side = "APPLY" if transaction.type.enumerator == "INVESTMENT_APPLY" else "REDEEM"
+    side = "APPLY" if transaction.type == "INVESTMENT_APPLY" else "REDEEM"
     response = {
         "order_key": order.order_key,
         "product_key": order.product.product_key,

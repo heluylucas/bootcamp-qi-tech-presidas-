@@ -81,7 +81,7 @@ class BusinessDayController(BaseController):
         """Administradora: a cota de cada fundo, já líquida da taxa de administração (RN-REC-04)."""
         quotes = {}
         for product in products:
-            if product.type.enumerator != "FUND":
+            if product.type != "FUND":
                 continue
 
             cnpj_digits = "".join(character for character in product.external_code if character.isdigit())
@@ -104,7 +104,7 @@ class BusinessDayController(BaseController):
         published = {field(bond, "name"): field(bond, "unit_price") for bond in body["bonds"]}
         prices = {}
         for product in products:
-            if product.type.enumerator != "PUBLIC_BOND":
+            if product.type != "PUBLIC_BOND":
                 continue
             if product.external_code not in published:
                 raise InvalidPriceSourceResponse()

@@ -87,7 +87,7 @@ class InvestmentOrderController(BaseController):
                 raise IdempotencyKeyReused()
             return order_to_dict(original), False
 
-        if account.status.enumerator != "ACTIVE":
+        if account.status != "ACTIVE":
             raise AccountNotActive()
 
         if account.balance < amount:
@@ -143,7 +143,7 @@ class InvestmentOrderController(BaseController):
                 raise IdempotencyKeyReused()
             return order_to_dict(original), False
 
-        if account.status.enumerator != "ACTIVE":
+        if account.status != "ACTIVE":
             raise AccountNotActive()
 
         held = position.quantity if position is not None else Decimal(0)
@@ -300,9 +300,9 @@ class InvestmentOrderController(BaseController):
 
         return order
 
-    def money_transaction(self, type_enumerator: str, account: Account, amount: int, idempotency_key: Optional[str]):
+    def money_transaction(self, transaction_type: str, account: Account, amount: int, idempotency_key: Optional[str]):
         """O pedido de dinheiro da ordem: o dono é a conta, o tipo diz se é aplicação ou resgate."""
-        return TransactionController().create_transaction(type_enumerator, account, None, amount, 0, None, idempotency_key)
+        return TransactionController().create_transaction(transaction_type, account, None, amount, 0, None, idempotency_key)
 
     def get_customer(self, customer_key: str) -> Customer:
         customer = CustomerRepository.get_by_key(self.context, customer_key)
@@ -319,7 +319,7 @@ class InvestmentOrderController(BaseController):
         if account is None:
             raise NoActiveAccount()
 
-        if account.status.enumerator != "ACTIVE":
+        if account.status != "ACTIVE":
             raise AccountNotActive()
 
         return account
@@ -340,7 +340,7 @@ def is_same_order(original: InvestmentOrder, payload: dict, product: Product) ->
     """
     redeem_all = payload.get("redeem_all", False)
     return (
-        original.transaction.type.enumerator == SIDE_TRANSACTION_TYPES[payload["side"]]
+        original.transaction.type == SIDE_TRANSACTION_TYPES[payload["side"]]
         and original.product_id == product.id
         and original.redeem_all == redeem_all
         and (redeem_all or original.transaction.amount == payload["amount"])

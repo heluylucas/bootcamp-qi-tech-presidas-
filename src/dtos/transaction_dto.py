@@ -6,7 +6,7 @@ def transaction_to_dict(transaction: Transaction, balance: int) -> dict:
     """`balance` é o saldo da conta do caminho logo depois desta transação."""
     return {
         "transaction_key": transaction.transaction_key,
-        "type": transaction.type.enumerator,
+        "type": transaction.type,
         "amount": transaction.amount,
         "fee_amount": transaction.fee_amount,
         "description": transaction.description,
@@ -20,7 +20,7 @@ def entry_to_dict(entry: LedgerEntry) -> dict:
     transaction = entry.transaction
     return {
         "transaction_key": transaction.transaction_key,
-        "type": transaction.type.enumerator,
+        "type": transaction.type,
         "direction": entry.direction,
         "category": entry.category,
         "amount": entry.amount,
@@ -37,14 +37,14 @@ INCOMING_TYPES = ("DEPOSIT", "INVESTMENT_REDEEM")
 
 def receipt_to_dict(transaction: Transaction) -> dict:
     """O comprovante (RN-MOV-13). Sem saldo: o destino não pode ver o saldo da origem."""
-    if transaction.type.enumerator in INCOMING_TYPES:
+    if transaction.type in INCOMING_TYPES:
         origin, destination = None, transaction.account
     else:
         origin, destination = transaction.account, transaction.destination_account
 
     return {
         "transaction_key": transaction.transaction_key,
-        "type": transaction.type.enumerator,
+        "type": transaction.type,
         "amount": transaction.amount,
         "fee_amount": transaction.fee_amount,
         "description": transaction.description,

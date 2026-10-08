@@ -89,10 +89,10 @@ class TransactionController(BaseController):
             balance = TransactionRepository.get_balance_after(self.context, previous.id, origin.id)
             return transaction_to_dict(previous, balance), False
 
-        if origin.status.enumerator != "ACTIVE":
+        if origin.status != "ACTIVE":
             raise AccountNotActive()
 
-        if destination is not None and destination.status.enumerator != "ACTIVE":
+        if destination is not None and destination.status != "ACTIVE":
             raise DestinationAccountNotActive()
 
         fee = TRANSFER_FEE if transaction_type == "TRANSFER" else 0
@@ -229,13 +229,12 @@ class TransactionController(BaseController):
         description: Optional[str],
         idempotency_key: Optional[str],
     ) -> Transaction:
-        type_row = TransactionRepository.get_type(self.context, transaction_type)
         # Dois pedidos com a mesma chave em contas diferentes, ao mesmo tempo, passam os dois
         # pelo find_repetition (cada um trava só a sua conta); o UNIQUE recusa o segundo aqui.
         try:
             return TransactionRepository.create(
                 self.context,
-                type_id=type_row.id,
+                transaction_type=transaction_type,
                 account_id=account.id,
                 destination_account_id=destination.id if destination else None,
                 amount=amount,
@@ -264,7 +263,7 @@ def is_same_transaction(previous: Transaction, payload: dict, destination: Optio
     Faz o papel do antigo hash do corpo sem guardar nada a mais: o pedido original já está gravado.
     """
     return (
-        previous.type.enumerator == payload["type"]
+        previous.type == payload["type"]
         and previous.amount == payload["amount"]
         and previous.destination_account_id == (destination.id if destination else None)
         and previous.description == payload.get("description")

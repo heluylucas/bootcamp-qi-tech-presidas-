@@ -46,9 +46,8 @@ class AccountController(BaseController):
         if AccountRepository.count_not_closed(self.context, customer.id) > 0:
             raise AccountAlreadyExists()
 
-        active = AccountRepository.get_status(self.context, "ACTIVE")
-        account = AccountRepository.create(self.context, customer.id, active.id)
-        AccountRepository.create_status_event(self.context, account.id, None, active.id, None, ACTOR_CUSTOMER)
+        account = AccountRepository.create(self.context, customer.id, "ACTIVE")
+        AccountRepository.create_status_event(self.context, account.id, None, "ACTIVE", None, ACTOR_CUSTOMER)
 
         self.session.commit()
         return account_to_dict(account)
@@ -79,7 +78,7 @@ class AccountController(BaseController):
 
     def _apply_status_change(self, account: Account, payload: dict, actor: str) -> dict:
         """As regras que valem nas duas rotas: transição, motivo, conta vazia e o evento com quem fez."""
-        current = account.status.enumerator
+        current = account.status
         target = payload["status"]
         # Motivo só com espaços conta como motivo nenhum.
         reason = payload.get("reason", "").strip() or None
@@ -97,10 +96,8 @@ class AccountController(BaseController):
         ):
             raise AccountNotEmpty()
 
-        from_status_id = account.status_id
-        to_status = AccountRepository.get_status(self.context, target)
-        AccountRepository.update_status(self.context, account, to_status.id)
-        AccountRepository.create_status_event(self.context, account.id, from_status_id, to_status.id, reason, actor)
+        AccountRepository.update_status(self.context, account, target)
+        AccountRepository.create_status_event(self.context, account.id, current, target, reason, actor)
 
         self.session.commit()
         return account_to_dict(account)
