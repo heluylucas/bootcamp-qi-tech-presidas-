@@ -18,23 +18,20 @@ CREATE TABLE customer(
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE account_status(
-    id                              SERIAL PRIMARY KEY,
-    enumerator                      VARCHAR(50) NOT NULL UNIQUE,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-INSERT INTO account_status (enumerator) VALUES
-('ACTIVE'),
-('BLOCKED'),
-('CLOSED');
+-- Enumeradores: listas fixas de valores, conferidas pelo próprio banco. Valor fora da
+-- lista é recusado na gravação. Acrescentar um valor: ALTER TYPE ... ADD VALUE.
+CREATE TYPE account_status AS ENUM ('ACTIVE', 'BLOCKED', 'CLOSED');
+CREATE TYPE status_actor AS ENUM ('CUSTOMER', 'BANK');
+CREATE TYPE transaction_type AS ENUM ('DEPOSIT', 'WITHDRAWAL', 'TRANSFER', 'INVESTMENT_APPLY', 'INVESTMENT_REDEEM');
+CREATE TYPE entry_direction AS ENUM ('DEBIT', 'CREDIT');
+CREATE TYPE entry_category AS ENUM ('PRINCIPAL', 'FEE');
 
 CREATE TABLE account(
     id                              SERIAL PRIMARY KEY,
     account_key                     CHAR(36) NOT NULL UNIQUE,
     -- Nulo só na conta do próprio banco (seed abaixo), que recebe as tarifas.
     customer_id                     INTEGER REFERENCES customer(id),
-    status_id                       INTEGER NOT NULL REFERENCES account_status(id),
+    status                          account_status NOT NULL,
     balance                         BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -43,36 +40,24 @@ CREATE TABLE account(
 CREATE TABLE account_status_event(
     id                              SERIAL PRIMARY KEY,
     account_id                      INTEGER NOT NULL REFERENCES account(id),
-    from_status_id                  INTEGER REFERENCES account_status(id),
-    to_status_id                    INTEGER NOT NULL REFERENCES account_status(id),
+    -- Nulo no nascimento da conta (RN-CON-03).
+    from_status                     account_status,
+    to_status                       account_status NOT NULL,
     reason                          VARCHAR(255),
     -- Quem fez a mudança (RN-CON-05): CUSTOMER pela rota do cliente, BANK pela
     -- rota interna (RN-CON-11). Sem DEFAULT: esquecer de informar vira erro.
-    actor                           VARCHAR(8) NOT NULL CHECK (actor IN ('CUSTOMER', 'BANK')),
+    actor                           status_actor NOT NULL,
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
-CREATE TABLE transaction_type(
-    id                              SERIAL PRIMARY KEY,
-    enumerator                      VARCHAR(50) NOT NULL UNIQUE,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-INSERT INTO transaction_type (enumerator) VALUES
-('DEPOSIT'),
-('WITHDRAWAL'),
-('TRANSFER'),
-('INVESTMENT_APPLY'),
-('INVESTMENT_REDEEM');
 
 -- O pedido que mexe em dinheiro. Os efeitos em cada saldo ficam em ledger_entry.
 CREATE TABLE transaction(
     id                              SERIAL PRIMARY KEY,
     transaction_key                 CHAR(36) NOT NULL UNIQUE,
-    type_id                         INTEGER NOT NULL REFERENCES transaction_type(id),
+    type                            transaction_type NOT NULL,
     -- A dona do pedido: a conta que pediu (no depósito e no resgate, a que recebe).
     account_id                      INTEGER NOT NULL REFERENCES account(id),
-    -- Só na transferência: a conta que recebe.
+    -- Só na transferência, e nela sempre: a conta que recebe.
     destination_account_id          INTEGER REFERENCES account(id) CHECK (destination_account_id <> account_id),
     amount                          BIGINT NOT NULL CHECK (amount > 0),
     fee_amount                      BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0),
@@ -80,7 +65,8 @@ CREATE TABLE transaction(
     -- Gerada por quem chama a API, única no banco inteiro. Nula quando o próprio
     -- banco cria a transação (liquidação no vencimento): não há pedido para repetir.
     idempotency_key                 UUID UNIQUE,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK ((type = 'TRANSFER') = (destination_account_id IS NOT NULL))
 );
 
 CREATE TABLE ledger_entry(
@@ -88,8 +74,8 @@ CREATE TABLE ledger_entry(
     entry_key                       CHAR(36) NOT NULL UNIQUE,
     transaction_id                  INTEGER NOT NULL REFERENCES transaction(id),
     account_id                      INTEGER NOT NULL REFERENCES account(id),
-    direction                       VARCHAR(6) NOT NULL CHECK (direction IN ('DEBIT', 'CREDIT')),
-    category                        VARCHAR(9) NOT NULL CHECK (category IN ('PRINCIPAL', 'FEE')),
+    direction                       entry_direction NOT NULL,
+    category                        entry_category NOT NULL,
     amount                          BIGINT NOT NULL CHECK (amount > 0),
     balance_after                   BIGINT NOT NULL CHECK (balance_after >= 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -97,14 +83,13 @@ CREATE TABLE ledger_entry(
 
 CREATE INDEX ledger_entry_account_created_idx ON ledger_entry (account_id, created_at);
 
--- Rede de segurança: no máximo uma conta não encerrada por cliente. 3 = CLOSED (ordem do seed acima).
-CREATE UNIQUE INDEX account_one_open_per_customer_idx ON account (customer_id) WHERE status_id <> 3;
+-- Rede de segurança: no máximo uma conta não encerrada por cliente.
+CREATE UNIQUE INDEX account_one_open_per_customer_idx ON account (customer_id) WHERE status <> 'CLOSED';
 
 -- A conta do banco: a tarifa sai do cliente e entra aqui, então nenhum centavo some
 -- (RN-REC-03). Sem cliente, nenhuma rota /customer/... a alcança. Nasce primeiro, com o
 -- menor id: na ordem crescente de travas, é sempre a primeira a ser travada.
-INSERT INTO account (account_key, customer_id, status_id)
-SELECT gen_random_uuid()::text, NULL, id FROM account_status WHERE enumerator = 'ACTIVE';
+INSERT INTO account (account_key, customer_id, status) VALUES (gen_random_uuid()::text, NULL, 'ACTIVE');
 
 -- =====================================================================
 -- Suitability
@@ -213,27 +198,21 @@ JOIN suitability_question q ON q.code = o.question_code;
 -- Produtos e preços
 -- =====================================================================
 
-CREATE TABLE product_type(
-    id                              SERIAL PRIMARY KEY,
-    enumerator                      VARCHAR(50) NOT NULL UNIQUE,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-INSERT INTO product_type (enumerator) VALUES
-('PUBLIC_BOND'),
-('PRIVATE_BOND'),
-('FUND');
+CREATE TYPE product_type AS ENUM ('PUBLIC_BOND', 'PRIVATE_BOND', 'FUND');
+CREATE TYPE product_indexer AS ENUM ('SELIC', 'CDI', 'PREFIXED', 'IPCA', 'QUOTA');
+CREATE TYPE product_liquidity AS ENUM ('DAILY', 'AT_MATURITY');
+CREATE TYPE reference_rate_code AS ENUM ('CDI', 'SELIC');
 
 CREATE TABLE product(
     id                              SERIAL PRIMARY KEY,
     product_key                     CHAR(36) NOT NULL UNIQUE,
     name                            VARCHAR(100) NOT NULL,
-    type_id                         INTEGER NOT NULL REFERENCES product_type(id),
+    type                            product_type NOT NULL,
     issuer                          VARCHAR(100) NOT NULL,
-    indexer                         VARCHAR(8) NOT NULL CHECK (indexer IN ('SELIC', 'CDI', 'PREFIXED', 'IPCA', 'QUOTA')),
+    indexer                         product_indexer NOT NULL,
     rate_description                VARCHAR(100) NOT NULL,
     risk_level                      SMALLINT NOT NULL CHECK (risk_level BETWEEN 1 AND 5),
-    liquidity                       VARCHAR(11) NOT NULL CHECK (liquidity IN ('DAILY', 'AT_MATURITY')),
+    liquidity                       product_liquidity NOT NULL,
     -- Título com vencimento fixo (Tesouro) usa maturity_date. Emissão própria com prazo usa
     -- term_months: cada aplicação vence em data da aplicação + prazo (RN-PRO-09).
     maturity_date                   DATE,
@@ -256,7 +235,7 @@ CREATE TABLE product(
 -- Histórico das taxas (RN-REC-08): uma linha por taxa e por data, nunca alterada.
 CREATE TABLE reference_rate(
     id                              SERIAL PRIMARY KEY,
-    code                            VARCHAR(5) NOT NULL CHECK (code IN ('CDI', 'SELIC')),
+    code                            reference_rate_code NOT NULL,
     reference_date                  DATE NOT NULL,
     annual_rate_bps                 INTEGER NOT NULL CHECK (annual_rate_bps > 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -276,10 +255,11 @@ INSERT INTO reference_rate (code, reference_date, annual_rate_bps) VALUES
 ('CDI', CURRENT_DATE, 1490),
 ('SELIC', CURRENT_DATE, 1500);
 
-INSERT INTO product (product_key, name, type_id, issuer, indexer, rate_description, risk_level, liquidity,
+INSERT INTO product (product_key, name, type, issuer, indexer, rate_description, risk_level, liquidity,
                      maturity_date, term_months, tax_exempt, min_application, own_issue, cdi_percentage_bps,
                      admin_fee_bps, external_code)
-SELECT gen_random_uuid()::text, v.name, t.id, v.issuer, v.indexer, v.rate_description, v.risk_level, v.liquidity,
+SELECT gen_random_uuid()::text, v.name, v.type::product_type, v.issuer, v.indexer::product_indexer,
+       v.rate_description, v.risk_level, v.liquidity::product_liquidity,
        v.maturity_date::date, v.term_months, v.tax_exempt, v.min_application, v.own_issue, v.cdi_percentage_bps,
        v.admin_fee_bps, v.external_code
 FROM (VALUES
@@ -290,8 +270,7 @@ FROM (VALUES
     ('Tesouro IPCA+ 2035',      'PUBLIC_BOND',  'Tesouro Nacional',  'IPCA',     'IPCA + 6% a.a.',          3, 'DAILY',       '2035-05-15', NULL, false, 5000,  false, NULL, NULL, 'TESOURO IPCA+ 2035'),
     ('FGV Quant Capital FIM',   'FUND',         'FGV Quant Capital', 'QUOTA',    'Varia com a cota',        3, 'DAILY',       NULL,         NULL, false, 10000, false, NULL, 100,  '12.345.678/0001-95')
 ) AS v(name, type, issuer, indexer, rate_description, risk_level, liquidity,
-       maturity_date, term_months, tax_exempt, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
-JOIN product_type t ON t.enumerator = v.type;
+       maturity_date, term_months, tax_exempt, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code);
 
 -- Preço do dia em que o banco nasce, pelas fórmulas da RN-PRO-06 (as mesmas do mock).
 -- Os dias seguintes entram pelo fechamento do dia.

@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    Enum,
     ForeignKey,
     Integer,
     Numeric,
@@ -12,17 +13,14 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.orm import relationship
 
 from models.base import Base
 
 
-class ProductType(Base):
-    __tablename__ = "product_type"
-
-    id = Column(Integer, primary_key=True)
-    enumerator = Column(String(50), nullable=False, unique=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+# Espelho dos tipos ENUM do database.sql: o banco recusa qualquer valor fora da lista.
+ProductType = Enum("PUBLIC_BOND", "PRIVATE_BOND", "FUND", name="product_type")
+ProductIndexer = Enum("SELIC", "CDI", "PREFIXED", "IPCA", "QUOTA", name="product_indexer")
+ProductLiquidity = Enum("DAILY", "AT_MATURITY", name="product_liquidity")
 
 
 class Product(Base):
@@ -31,12 +29,12 @@ class Product(Base):
     id = Column(Integer, primary_key=True)
     product_key = Column(CHAR(36), nullable=False, unique=True)
     name = Column(String(100), nullable=False)
-    type_id = Column(Integer, ForeignKey("product_type.id"), nullable=False)
+    type = Column(ProductType, nullable=False)
     issuer = Column(String(100), nullable=False)
-    indexer = Column(String(8), nullable=False)
+    indexer = Column(ProductIndexer, nullable=False)
     rate_description = Column(String(100), nullable=False)
     risk_level = Column(SmallInteger, nullable=False)
-    liquidity = Column(String(11), nullable=False)
+    liquidity = Column(ProductLiquidity, nullable=False)
     maturity_date = Column(Date)
     term_months = Column(SmallInteger)
     tax_exempt = Column(Boolean, nullable=False, server_default="false")
@@ -47,8 +45,6 @@ class Product(Base):
     external_code = Column(String(50))
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-    type = relationship(ProductType)
 
 
 class ProductPrice(Base):

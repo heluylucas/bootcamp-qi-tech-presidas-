@@ -1,15 +1,15 @@
-from sqlalchemy import BigInteger, CHAR, Column, DateTime, ForeignKey, Integer, String, Uuid, func
+from sqlalchemy import BigInteger, CHAR, Column, DateTime, Enum, ForeignKey, Integer, String, Uuid, func
 from sqlalchemy.orm import relationship
 
 from models.base import Base
 
 
-class TransactionType(Base):
-    __tablename__ = "transaction_type"
-
-    id = Column(Integer, primary_key=True)
-    enumerator = Column(String(50), nullable=False, unique=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+# Espelho dos tipos ENUM do database.sql: o banco recusa qualquer valor fora da lista.
+TransactionType = Enum(
+    "DEPOSIT", "WITHDRAWAL", "TRANSFER", "INVESTMENT_APPLY", "INVESTMENT_REDEEM", name="transaction_type"
+)
+EntryDirection = Enum("DEBIT", "CREDIT", name="entry_direction")
+EntryCategory = Enum("PRINCIPAL", "FEE", name="entry_category")
 
 
 class Transaction(Base):
@@ -19,10 +19,10 @@ class Transaction(Base):
 
     id = Column(Integer, primary_key=True)
     transaction_key = Column(CHAR(36), nullable=False, unique=True)
-    type_id = Column(Integer, ForeignKey("transaction_type.id"), nullable=False)
+    type = Column(TransactionType, nullable=False)
     # A dona do pedido: a conta que pediu (no depósito e no resgate, a que recebe).
     account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
-    # Só na transferência: a conta que recebe.
+    # Só na transferência, e nela sempre: a conta que recebe.
     destination_account_id = Column(Integer, ForeignKey("account.id"))
     amount = Column(BigInteger, nullable=False)
     fee_amount = Column(BigInteger, nullable=False, server_default="0")
@@ -31,13 +31,12 @@ class Transaction(Base):
     idempotency_key = Column(Uuid(as_uuid=False), unique=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    type = relationship(TransactionType)
     account = relationship("Account", foreign_keys=[account_id])
     destination_account = relationship("Account", foreign_keys=[destination_account_id])
 
 
 class LedgerEntry(Base):
-    """O lançamento: o que aconteceu em UMA conta. Uma transferência gera três."""
+    """O lançamento: o que aconteceu em UMA conta. Uma transferência gera quatro."""
 
     __tablename__ = "ledger_entry"
 
@@ -45,8 +44,8 @@ class LedgerEntry(Base):
     entry_key = Column(CHAR(36), nullable=False, unique=True)
     transaction_id = Column(Integer, ForeignKey("transaction.id"), nullable=False)
     account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
-    direction = Column(String(6), nullable=False)
-    category = Column(String(9), nullable=False)
+    direction = Column(EntryDirection, nullable=False)
+    category = Column(EntryCategory, nullable=False)
     amount = Column(BigInteger, nullable=False)
     balance_after = Column(BigInteger, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
