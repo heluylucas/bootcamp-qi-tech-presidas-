@@ -677,7 +677,17 @@ class TestPositions:
                 "return_bps": 44,
             }
         ]
-        assert body["total"] == {"current_amount": 150660, "invested_amount": 150000, "result_amount": 660, "return_bps": 44}
+        # Aplicou o saldo inteiro: nada em caixa, tudo investido.
+        assert body["total"] == {
+            "current_amount": 150660,
+            "invested_amount": 150000,
+            "result_amount": 660,
+            "return_bps": 44,
+            "cash_amount": 0,
+            "net_worth_amount": 150660,
+            "cash_bps": 0,
+            "investments_bps": 10000,
+        }
 
     def test_total_adds_up_every_product(self):
         customer_key, _ = investor()
@@ -695,20 +705,67 @@ class TestPositions:
 
     def test_closed_position_only_when_asked(self):
         """RN-POS-03: a posição zerada some da lista, mas continua existindo (RN-ORD-14)."""
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
         apply(customer_key, CDB, 10000)
         redeem(customer_key, CDB)
 
         _, default = RequestGenerator.get_positions(customer_key)
         status, with_closed = RequestGenerator.get_positions(customer_key, {"include_closed": "true"})
 
+        cash = balance_of(customer_key, account_key)
         assert default["items"] == []
-        assert default["total"] == {"current_amount": 0, "invested_amount": 0, "result_amount": 0, "return_bps": 0}
+        assert default["total"] == {
+            "current_amount": 0,
+            "invested_amount": 0,
+            "result_amount": 0,
+            "return_bps": 0,
+            "cash_amount": cash,
+            "net_worth_amount": cash,
+            "cash_bps": 10000,
+            "investments_bps": 0,
+        }
         assert status == 200
         assert len(with_closed["items"]) == 1
         closed = with_closed["items"][0]
         assert (closed["quantity"], closed["current_amount"], closed["invested_amount"]) == ("0.00000000", 0, 0)
         assert closed["return_bps"] == 0
+
+    def test_capital_split_between_cash_and_investments(self):
+        """O capital no banco é o caixa (saldo da conta) mais os investimentos ao preço do dia."""
+        customer_key, account_key = investor(balance=1_000_000)
+        apply(customer_key, CDB, 250000)
+
+        status, body = RequestGenerator.get_positions(customer_key)
+
+        total = body["total"]
+        cash = balance_of(customer_key, account_key)
+        net_worth = cash + total["current_amount"]
+        assert status == 200
+        assert total["cash_amount"] == cash == 750000
+        assert total["net_worth_amount"] == net_worth
+        # Pontos-base inteiros, arredondados para baixo; o investido completa os 10.000.
+        assert total["cash_bps"] == cash * 10000 // net_worth
+        assert total["cash_bps"] + total["investments_bps"] == 10000
+
+    def test_only_cash(self):
+        customer_key, _ = investor(balance=50000)
+
+        _, body = RequestGenerator.get_positions(customer_key)
+
+        assert body["total"]["cash_amount"] == 50000
+        assert body["total"]["net_worth_amount"] == 50000
+        assert (body["total"]["cash_bps"], body["total"]["investments_bps"]) == (10000, 0)
+
+    def test_customer_without_account_has_nothing(self):
+        customer_key = create_customer()
+
+        status, body = RequestGenerator.get_positions(customer_key)
+
+        assert status == 200
+        assert body["items"] == []
+        total = body["total"]
+        assert (total["cash_amount"], total["net_worth_amount"]) == (0, 0)
+        assert (total["cash_bps"], total["investments_bps"]) == (0, 0)
 
     def test_customer_not_found(self):
         status, body = RequestGenerator.get_positions(str(uuid.uuid4()))
