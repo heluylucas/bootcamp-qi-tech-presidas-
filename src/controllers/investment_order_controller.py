@@ -1,11 +1,10 @@
 from datetime import date
 from decimal import ROUND_DOWN, Decimal
 from typing import Dict, Optional, Tuple
-from uuid import NAMESPACE_URL, uuid5
 
 from controllers.base_controller import BaseController
 from controllers.suitability_controller import SuitabilityController
-from controllers.transaction_controller import TransactionController, hash_request
+from controllers.transaction_controller import TransactionController, parse_idempotency_key
 from dtos.investment_order_dto import order_to_dict, position_to_dict, total_to_dict
 from errors import (
     AccountNotActive,
@@ -15,7 +14,6 @@ from errors import (
     InsufficientBalance,
     InsufficientPosition,
     InvalidAmount,
-    MissingIdempotencyKey,
     NoActiveAccount,
     OrderNotFound,
     ProductNotFound,
@@ -30,12 +28,14 @@ from repositories import (
     InvestmentOrderRepository,
     PositionRepository,
     ProductRepository,
-    TransactionRepository,
 )
 from utils.dates import add_months
 
 
 EIGHT_PLACES = Decimal("0.00000001")
+
+# O tipo da transação de cada lado da ordem.
+SIDE_TRANSACTION_TYPES = {"APPLY": "INVESTMENT_APPLY", "REDEEM": "INVESTMENT_REDEEM"}
 
 
 class InvestmentOrderController(BaseController):
@@ -44,8 +44,7 @@ class InvestmentOrderController(BaseController):
 
     def create(self, customer_key: str, payload: dict, idempotency_key: Optional[str]) -> Tuple[dict, bool]:
         """Devolve (ordem, criada). criada=False é a repetição idempotente: o resource responde 200."""
-        if idempotency_key is None:
-            raise MissingIdempotencyKey()
+        idempotency_key = parse_idempotency_key(idempotency_key)
 
         if payload["side"] == "REDEEM":
             return self.redeem_order(customer_key, payload, idempotency_key)
@@ -77,15 +76,14 @@ class InvestmentOrderController(BaseController):
 
         # Daqui em diante, saldo e posição são lidos travados: conta, depois posição (RN-GER-12).
         account = AccountRepository.get_by_id_for_update(self.context, account.id)
-        position = PositionRepository.get_for_update(self.context, customer.id, product.id)
+        position = PositionRepository.get_for_update(self.context, account.id, product.id)
 
         # Idempotência depois das travas: um reenvio simultâneo espera o original
         # e recebe a resposta dele, e não um falso "saldo insuficiente" (RN-GER-08).
-        request_hash = hash_request(payload)
-        original = InvestmentOrderRepository.get_by_idempotency_key(self.context, customer.id, idempotency_key)
+        original = self.find_original(idempotency_key, account)
 
         if original is not None:
-            if original.request_hash != request_hash:
+            if not is_same_order(original, payload, product):
                 raise IdempotencyKeyReused()
             return order_to_dict(original), False
 
@@ -96,28 +94,22 @@ class InvestmentOrderController(BaseController):
             raise InsufficientBalance()
 
         if position is None:
-            position = PositionRepository.create(self.context, customer.id, product.id)
+            position = PositionRepository.create(self.context, account.id, product.id)
 
         # RN-ORD-06: valor em reais / preço, truncado em 8 casas. O débito é o valor pedido.
         quantity = (Decimal(amount) / 100 / price.unit_price).quantize(EIGHT_PLACES, ROUND_DOWN)
         maturity_date = add_months(business_date, product.term_months) if product.term_months else None
 
-        transaction = self.money_transaction("INVESTMENT_APPLY", account, amount, idempotency_key, request_hash)
+        transaction = self.money_transaction("INVESTMENT_APPLY", account, amount, idempotency_key)
         TransactionController().add_entry(transaction, account, "DEBIT", "PRINCIPAL", amount, account.balance - amount)
         order = InvestmentOrderRepository.create(
             self.context,
-            customer_id=customer.id,
-            account_id=account.id,
+            transaction_id=transaction.id,
             product_id=product.id,
-            side="APPLY",
-            amount=amount,
             quantity=quantity,
             unit_price=price.unit_price,
             cost_amount=amount,
             maturity_date=maturity_date,
-            transaction_id=transaction.id,
-            idempotency_key=idempotency_key,
-            request_hash=request_hash,
         )
         PositionRepository.update(
             self.context, position, position.quantity + quantity, position.invested_amount + amount
@@ -142,13 +134,12 @@ class InvestmentOrderController(BaseController):
 
         # Mesma ordem de travas da aplicação: conta, depois posição (RN-GER-12).
         account = AccountRepository.get_by_id_for_update(self.context, account.id)
-        position = PositionRepository.get_for_update(self.context, customer.id, product.id)
+        position = PositionRepository.get_for_update(self.context, account.id, product.id)
 
-        request_hash = hash_request(payload)
-        original = InvestmentOrderRepository.get_by_idempotency_key(self.context, customer.id, idempotency_key)
+        original = self.find_original(idempotency_key, account)
 
         if original is not None:
-            if original.request_hash != request_hash:
+            if not is_same_order(original, payload, product):
                 raise IdempotencyKeyReused()
             return order_to_dict(original), False
 
@@ -167,10 +158,18 @@ class InvestmentOrderController(BaseController):
         if quantity <= 0 or quantity > held:
             raise InsufficientPosition()
 
-        if product.liquidity == "AT_MATURITY" and not self.has_matured(customer.id, product, business_date):
+        if product.liquidity == "AT_MATURITY" and not self.has_matured(account.id, product, business_date):
             raise RedemptionNotAllowed()
 
-        order = self.redeem(account, position, price.unit_price, quantity, amount, idempotency_key, request_hash)
+        order = self.redeem(
+            account,
+            position,
+            price.unit_price,
+            quantity,
+            amount,
+            idempotency_key,
+            redeem_all=payload.get("redeem_all", False),
+        )
 
         response = order_to_dict(order)
         self.session.commit()
@@ -183,9 +182,8 @@ class InvestmentOrderController(BaseController):
         unit_price: Decimal,
         quantity: Decimal,
         amount: int,
-        idempotency_key: str,
-        request_hash: str,
-        source: str = "CUSTOMER",
+        idempotency_key: Optional[str],
+        redeem_all: bool = False,
         settled_order_id: Optional[int] = None,
     ) -> InvestmentOrder:
         """As escritas do resgate, com conta e posição já travadas. Não decide nada: só grava."""
@@ -195,23 +193,17 @@ class InvestmentOrderController(BaseController):
         else:
             cost_amount = int(position.invested_amount * quantity // position.quantity)
 
-        transaction = self.money_transaction("INVESTMENT_REDEEM", account, amount, idempotency_key, request_hash)
+        transaction = self.money_transaction("INVESTMENT_REDEEM", account, amount, idempotency_key)
         TransactionController().add_entry(transaction, account, "CREDIT", "PRINCIPAL", amount, account.balance + amount)
         order = InvestmentOrderRepository.create(
             self.context,
-            customer_id=position.customer_id,
-            account_id=account.id,
+            transaction_id=transaction.id,
             product_id=position.product_id,
-            side="REDEEM",
-            amount=amount,
             quantity=quantity,
             unit_price=unit_price,
             cost_amount=cost_amount,
-            source=source,
+            redeem_all=redeem_all,
             settled_order_id=settled_order_id,
-            transaction_id=transaction.id,
-            idempotency_key=idempotency_key,
-            request_hash=request_hash,
         )
         # RN-ORD-14: a posição zerada fica com quantidade 0, não é apagada.
         PositionRepository.update(
@@ -227,16 +219,13 @@ class InvestmentOrderController(BaseController):
         # Em ordem crescente de conta, e em cada uma conta depois posição: a mesma
         # ordem de travas das ordens do cliente, então ninguém espera ninguém em círculo.
         for application in InvestmentOrderRepository.list_due_applications(self.context, day):
-            account = AccountRepository.get_by_id_for_update(self.context, application.account_id)
-            position = PositionRepository.get_for_update(self.context, application.customer_id, application.product_id)
+            account = AccountRepository.get_by_id_for_update(self.context, application.transaction.account_id)
+            position = PositionRepository.get_for_update(self.context, account.id, application.product_id)
             unit_price = prices[application.product_id]
             quantity = application.quantity
 
-            # Sem chave do cliente: uma fixa por aplicação cumpre os UNIQUE de
-            # transaction e investment_order, e repetir a liquidação dá erro em vez de pagar duas vezes.
-            reference = {"settled_order_key": application.order_key}
-            idempotency_key = str(uuid5(NAMESPACE_URL, f"maturity:{application.order_key}"))
-
+            # Sem chave de idempotência: não há pedido de cliente para repetir. O que impede
+            # pagar duas vezes é o UNIQUE de settled_order_id.
             # O crédito vale mesmo com a conta bloqueada: o banco devolver não é o cliente movimentar.
             self.redeem(
                 account,
@@ -244,16 +233,14 @@ class InvestmentOrderController(BaseController):
                 unit_price,
                 quantity,
                 int(quantity * unit_price * 100),
-                idempotency_key,
-                hash_request(reference),
-                source="MATURITY",
+                None,
                 settled_order_id=application.id,
             )
 
-    def has_matured(self, customer_id: int, product: Product, business_date: date) -> bool:
+    def has_matured(self, account_id: int, product: Product, business_date: date) -> bool:
         """RN-ORD-11: com prazo, vale o vencimento da aplicação mais recente ainda não liquidada."""
         if product.term_months:
-            maturity = InvestmentOrderRepository.latest_open_maturity(self.context, customer_id, product.id)
+            maturity = InvestmentOrderRepository.latest_open_maturity(self.context, account_id, product.id)
         else:
             maturity = product.maturity_date
 
@@ -297,22 +284,25 @@ class InvestmentOrderController(BaseController):
         ]
         return {"items": items, "total": total_to_dict(items)}
 
-    def money_transaction(self, type_enumerator: str, account: Account, amount: int, idempotency_key: str, request_hash: str):
-        """A transação na conta: a aplicação "sai para fora" (só origem), o resgate "vem de fora" (só destino)."""
-        is_apply = type_enumerator == "INVESTMENT_APPLY"
-        type_row = TransactionRepository.get_type(self.context, type_enumerator)
-        return TransactionRepository.create(
-            self.context,
-            type_id=type_row.id,
-            requester_account_id=account.id,
-            origin_account_id=account.id if is_apply else None,
-            destination_account_id=None if is_apply else account.id,
-            amount=amount,
-            fee_amount=0,
-            description=None,
-            idempotency_key=idempotency_key,
-            request_hash=request_hash,
-        )
+    def find_original(self, idempotency_key: str, account: Account) -> Optional[InvestmentOrder]:
+        """A ordem já feita com esta chave nesta conta; None se a chave é nova."""
+        previous = TransactionController().find_repetition(idempotency_key, account)
+
+        if previous is None:
+            return None
+
+        # A chave mora na transação. Se ela não tem ordem (um depósito, por exemplo),
+        # a chave foi usada em outro pedido.
+        order = InvestmentOrderRepository.get_by_transaction(self.context, previous.id)
+
+        if order is None:
+            raise IdempotencyKeyReused()
+
+        return order
+
+    def money_transaction(self, type_enumerator: str, account: Account, amount: int, idempotency_key: Optional[str]):
+        """O pedido de dinheiro da ordem: o dono é a conta, o tipo diz se é aplicação ou resgate."""
+        return TransactionController().create_transaction(type_enumerator, account, None, amount, 0, None, idempotency_key)
 
     def get_customer(self, customer_key: str) -> Customer:
         customer = CustomerRepository.get_by_key(self.context, customer_key)
@@ -341,3 +331,17 @@ class InvestmentOrderController(BaseController):
             raise ProductNotFound()
 
         return product
+
+
+def is_same_order(original: InvestmentOrder, payload: dict, product: Product) -> bool:
+    """O pedido repetido é idêntico ao gravado? Compara o corpo com as colunas da ordem e da transação.
+
+    O resgate total não traz valor (é calculado na hora): nele, compara-se o redeem_all gravado.
+    """
+    redeem_all = payload.get("redeem_all", False)
+    return (
+        original.transaction.type.enumerator == SIDE_TRANSACTION_TYPES[payload["side"]]
+        and original.product_id == product.id
+        and original.redeem_all == redeem_all
+        and (redeem_all or original.transaction.amount == payload["amount"])
+    )

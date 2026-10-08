@@ -93,7 +93,7 @@ class AccountController(BaseController):
         # RN-CON-08: só fecha vazia, sem saldo e sem investimento. A conta já está
         # travada, e toda ordem trava a conta antes da posição: não há aplicação no meio.
         if target == "CLOSED" and (
-            account.balance > 0 or PositionRepository.has_open_position(self.context, account.customer_id)
+            account.balance > 0 or PositionRepository.has_open_position(self.context, account.id)
         ):
             raise AccountNotEmpty()
 

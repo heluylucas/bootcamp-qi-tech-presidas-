@@ -4,24 +4,31 @@ from models import InvestmentOrder, Position
 
 
 def order_to_dict(order: InvestmentOrder) -> dict:
-    """Quantidade e preço saem como texto: um decimal no JSON costuma ser lido como float (R6)."""
+    """Quantidade e preço saem como texto: um decimal no JSON costuma ser lido como float (R6).
+
+    Lado e valor vêm da transação da ordem, que é o pedido de dinheiro.
+    """
+    transaction = order.transaction
+    side = "APPLY" if transaction.type.enumerator == "INVESTMENT_APPLY" else "REDEEM"
     response = {
         "order_key": order.order_key,
         "product_key": order.product.product_key,
-        "side": order.side,
-        "source": order.source,
-        "amount": order.amount,
+        "side": side,
+        # Só a liquidação do vencimento (fechamento do dia) aponta para a aplicação que devolveu.
+        "source": "CUSTOMER" if order.settled_order_id is None else "MATURITY",
+        "amount": transaction.amount,
         "unit_price": f"{order.unit_price:.8f}",
         "quantity": f"{order.quantity:.8f}",
         "maturity_date": order.maturity_date.isoformat() if order.maturity_date else None,
-        "status": order.status,
-        "transaction_key": order.transaction.transaction_key,
+        # Toda ordem é executada na hora: não há fila nem cotização com prazo.
+        "status": "EXECUTED",
+        "transaction_key": transaction.transaction_key,
     }
 
-    if order.side == "REDEEM":
+    if side == "REDEEM":
         # RN-ORD-16: tudo vem do custo gravado na ordem, então a repetição devolve os mesmos números.
         response["cost_amount"] = order.cost_amount
-        response.update(result_to_dict(order.amount, order.cost_amount))
+        response.update(result_to_dict(transaction.amount, order.cost_amount))
 
     return response
 

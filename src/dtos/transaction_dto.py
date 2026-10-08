@@ -31,26 +31,35 @@ def entry_to_dict(entry: LedgerEntry) -> dict:
     }
 
 
+# Nestes tipos o dinheiro entra na conta dona vindo "de fora": ela é o destino, e não há origem.
+INCOMING_TYPES = ("DEPOSIT", "INVESTMENT_REDEEM")
+
+
 def receipt_to_dict(transaction: Transaction) -> dict:
     """O comprovante (RN-MOV-13). Sem saldo: o destino não pode ver o saldo da origem."""
+    if transaction.type.enumerator in INCOMING_TYPES:
+        origin, destination = None, transaction.account
+    else:
+        origin, destination = transaction.account, transaction.destination_account
+
     return {
         "transaction_key": transaction.transaction_key,
         "type": transaction.type.enumerator,
         "amount": transaction.amount,
         "fee_amount": transaction.fee_amount,
         "description": transaction.description,
-        "origin_account_key": account_key_or_none(transaction.origin_account),
-        "destination_account_key": account_key_or_none(transaction.destination_account),
+        "origin_account_key": account_key_or_none(origin),
+        "destination_account_key": account_key_or_none(destination),
         "created_at": to_utc_text(transaction.created_at),
     }
 
 
 def counterparty_key(transaction: Transaction, account_id: int):
     """A OUTRA conta da transação; None quando o dinheiro veio ou foi para fora (depósito, saque)."""
-    if transaction.origin_account_id == account_id:
+    if transaction.account_id == account_id:
         return account_key_or_none(transaction.destination_account)
 
-    return account_key_or_none(transaction.origin_account)
+    return account_key_or_none(transaction.account)
 
 
 def account_key_or_none(account):
