@@ -156,6 +156,75 @@ class TestApplyIdempotency:
         assert body["code"] == "PPP000004"
         assert balance_of(customer_key, account_key) == 1_000_000 - 10000
 
+    def test_same_key_with_another_product(self):
+        customer_key, account_key = investor()
+        key = str(uuid.uuid4())
+        apply(customer_key, CDB, 10000, key)
+
+        status, body = apply(customer_key, FUND, 10000, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 - 10000
+
+    def test_key_already_used_in_a_deposit_is_refused(self):
+        """A mesma chave não serve para dois pedidos, nem em rotas diferentes."""
+        customer_key, account_key = investor()
+        key = str(uuid.uuid4())
+        RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 5000}, key)
+
+        status, body = apply(customer_key, CDB, 10000, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 + 5000
+
+    def test_key_of_an_order_is_refused_in_the_transaction_route(self):
+        customer_key, account_key = investor()
+        key = str(uuid.uuid4())
+        apply(customer_key, CDB, 10000, key)
+
+        status, body = RequestGenerator.post_transaction(
+            customer_key, account_key, {"type": "DEPOSIT", "amount": 5000}, key
+        )
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 - 10000
+
+    def test_key_of_an_application_is_refused_in_a_redemption(self):
+        customer_key, account_key = investor()
+        key = str(uuid.uuid4())
+        apply(customer_key, CDB, 10000, key)
+
+        status, body = redeem(customer_key, CDB, 4000, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 - 10000
+
+    def test_key_used_by_another_customer_is_refused(self):
+        first_customer, _ = investor()
+        second_customer, second_account = investor()
+        key = str(uuid.uuid4())
+        apply(first_customer, CDB, 10000, key)
+
+        status, body = apply(second_customer, CDB, 10000, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert "order_key" not in body
+        assert balance_of(second_customer, second_account) == 1_000_000
+
+    def test_invalid_idempotency_key(self):
+        customer_key, _ = investor()
+        payload = {"product_key": product_key(CDB), "side": "APPLY", "amount": 10000}
+
+        status, body = RequestGenerator.post_investment_order(customer_key, payload, "nao-e-um-uuid")
+
+        assert status == 400
+        assert body["code"] == "PPP000003"
+
     def test_missing_idempotency_key(self):
         customer_key, _ = investor()
         payload = {"product_key": product_key(CDB), "side": "APPLY", "amount": 10000}
@@ -374,6 +443,30 @@ class TestRedeemIdempotency:
         assert status == 409
         assert body["code"] == "PPP000004"
         assert balance_of(customer_key, account_key) == 1_000_000 - 10000 + 4000
+
+    def test_partial_redeem_key_reused_in_redeem_all(self):
+        """O resgate total não manda valor: o que diferencia os dois pedidos é o redeem_all gravado."""
+        customer_key, account_key = investor()
+        apply(customer_key, CDB, 10000)
+        key = str(uuid.uuid4())
+        redeem(customer_key, CDB, 4000, key)
+
+        status, body = redeem(customer_key, CDB, None, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 - 10000 + 4000
+
+    def test_repeated_redeem_all_returns_original(self):
+        customer_key, account_key = investor()
+        apply(customer_key, CDB, 10000)
+        key = str(uuid.uuid4())
+        _, first = redeem(customer_key, CDB, None, key)
+
+        status, body = redeem(customer_key, CDB, None, key)
+
+        assert status == 200
+        assert body == first
 
 
 class TestRedeemRefusals:

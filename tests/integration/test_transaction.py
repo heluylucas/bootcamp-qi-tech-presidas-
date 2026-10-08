@@ -290,19 +290,23 @@ class TestIdempotency:
         assert body["balance"] == 10000
         assert balance_of(customer_key, account_key) == 15000
 
-    def test_field_order_does_not_matter(self):
-        customer_key, account_key = open_account()
+    def test_key_used_by_another_account_is_refused(self):
+        """A chave é única no banco inteiro; a de outra conta dá 409 sem mostrar nada dela."""
+        first_customer, first_account = open_account()
+        second_customer, second_account = open_account()
         key = str(uuid.uuid4())
-        RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000}, key)
+        payload = {"type": "DEPOSIT", "amount": 10000}
+        RequestGenerator.post_transaction(first_customer, first_account, payload, key)
 
-        status, _ = RequestGenerator.post_transaction(
-            customer_key, account_key, {"amount": 10000, "type": "DEPOSIT"}, key
-        )
+        status, body = RequestGenerator.post_transaction(second_customer, second_account, payload, key)
 
-        assert status == 200
-        assert balance_of(customer_key, account_key) == 10000
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert "transaction_key" not in body
+        assert balance_of(second_customer, second_account) == 0
 
     def test_same_key_with_different_body(self):
+        """Repetição é o MESMO pedido: mesma chave com outro valor é outro pedido (409)."""
         customer_key, account_key = open_account()
         key = str(uuid.uuid4())
         RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000}, key)
@@ -315,19 +319,47 @@ class TestIdempotency:
         assert body["code"] == "PPP000004"
         assert balance_of(customer_key, account_key) == 10000
 
-    def test_same_key_in_another_account_is_a_new_request(self):
-        """A chave vale por conta: UNIQUE(requester_account_id, idempotency_key)."""
-        first_customer, first_account = open_account()
-        second_customer, second_account = open_account()
+    def test_same_key_with_another_destination(self):
+        origin_customer, origin_account = open_account()
+        _, first_destination = open_account()
+        _, second_destination = open_account()
+        deposit(origin_customer, origin_account, 100000)
         key = str(uuid.uuid4())
-        payload = {"type": "DEPOSIT", "amount": 10000}
+        payload = {"type": "TRANSFER", "amount": 20000, "destination_account_key": first_destination}
+        RequestGenerator.post_transaction(origin_customer, origin_account, payload, key)
 
-        first_status, first = RequestGenerator.post_transaction(first_customer, first_account, payload, key)
-        second_status, second = RequestGenerator.post_transaction(second_customer, second_account, payload, key)
+        status, body = RequestGenerator.post_transaction(
+            origin_customer, origin_account, {**payload, "destination_account_key": second_destination}, key
+        )
 
-        assert (first_status, second_status) == (201, 201)
-        assert first["transaction_key"] != second["transaction_key"]
-        assert balance_of(second_customer, second_account) == 10000
+        assert status == 409
+        assert body["code"] == "PPP000004"
+
+    def test_field_order_does_not_matter(self):
+        customer_key, account_key = open_account()
+        key = str(uuid.uuid4())
+        RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000}, key)
+
+        status, _ = RequestGenerator.post_transaction(
+            customer_key, account_key, {"amount": 10000, "type": "DEPOSIT"}, key
+        )
+
+        assert status == 200
+        assert balance_of(customer_key, account_key) == 10000
+
+    def test_key_of_another_type_of_request_is_refused(self):
+        """Só é repetição se for o mesmo tipo de pedido: depósito e saque com a mesma chave dão 409."""
+        customer_key, account_key = open_account()
+        key = str(uuid.uuid4())
+        RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000}, key)
+
+        status, body = RequestGenerator.post_transaction(
+            customer_key, account_key, {"type": "WITHDRAWAL", "amount": 3000}, key
+        )
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 10000
 
     def test_refused_request_does_not_use_up_the_key(self):
         """Recusa não grava nada; a mesma chave pode ser usada depois que der para executar."""
@@ -356,7 +388,7 @@ class TestIdempotency:
         assert status == 200
         assert body == first
 
-    @pytest.mark.parametrize("key", ["", "a" * 37])
+    @pytest.mark.parametrize("key", ["", "a" * 37, "nao-e-um-uuid"])
     def test_invalid_idempotency_key(self, key):
         customer_key, account_key = open_account()
 
