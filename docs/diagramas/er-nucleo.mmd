@@ -49,6 +49,7 @@ erDiagram
         bigint fee_amount "tarifa cobrada"
         varchar description
         uuid idempotency_key UK "do cliente; nula na liquidação"
+        date business_date FK "o dia no calendário do banco"
         timestamptz created_at
     }
     ledger_entry {

@@ -65,9 +65,15 @@ CREATE TABLE transaction(
     -- Gerada por quem chama a API, única no banco inteiro. Nula quando o próprio
     -- banco cria a transação (liquidação no vencimento): não há pedido para repetir.
     idempotency_key                 UUID UNIQUE,
+    -- O dia em que a transação aconteceu, no calendário do banco (a data de movimento, que é a
+    -- data real simulada). O extrato e a tarifa da receita filtram por ela; o created_at fica
+    -- só como registro técnico de quando a linha foi gravada.
+    business_date                   DATE NOT NULL REFERENCES business_day(business_date),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK ((type = 'TRANSFER') = (destination_account_id IS NOT NULL))
 );
+
+CREATE INDEX transaction_business_date_idx ON transaction (business_date);
 
 CREATE TABLE ledger_entry(
     id                              SERIAL PRIMARY KEY,
@@ -358,4 +364,28 @@ CREATE TABLE position(
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(account_id, product_id)
+);
+
+-- =====================================================================
+-- Receita
+-- =====================================================================
+
+-- A provisão diária (RN-REC-05 a 07): o fechamento grava, para o dia que fecha, as bases
+-- (a foto do fim do dia) e o que o banco ganharia com elas. Uma linha por dia fechado, nunca
+-- alterada (R4). O relatório de receita só soma as linhas do período.
+-- As taxas usadas não são repetidas aqui: o CDI e a Selic do dia estão em reference_rate, e a
+-- taxa do fundo em product.
+CREATE TABLE revenue_accrual(
+    id                              SERIAL PRIMARY KEY,
+    business_date                   DATE NOT NULL UNIQUE REFERENCES business_day(business_date),
+    -- Dias corridos até o próximo dia de movimento: a provisão de sexta vale sexta, sábado e domingo.
+    calendar_days                   SMALLINT NOT NULL CHECK (calendar_days > 0),
+    customer_balance_amount         BIGINT NOT NULL CHECK (customer_balance_amount >= 0),
+    fund_equity_amount              BIGINT NOT NULL CHECK (fund_equity_amount >= 0),
+    own_issue_cost_amount           BIGINT NOT NULL CHECK (own_issue_cost_amount >= 0),
+    float_amount                    BIGINT NOT NULL CHECK (float_amount >= 0),
+    fund_administration_fee_amount  BIGINT NOT NULL CHECK (fund_administration_fee_amount >= 0),
+    -- Gravado, não recalculado: depende do percentual do CDI de cada título, que a base somada não guarda.
+    own_issue_spread_amount         BIGINT NOT NULL CHECK (own_issue_spread_amount >= 0),
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

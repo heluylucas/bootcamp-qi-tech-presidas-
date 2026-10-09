@@ -12,6 +12,8 @@ erDiagram
     investment_order |o--o| investment_order : "liquidação devolve"
     account ||--o{ position : "possui"
     product ||--o{ position : "em"
+    business_day ||--o{ transaction : "dia em que aconteceu"
+    business_day ||--o| revenue_accrual : "provisão gravada no fechamento"
 
     product {
         int id PK
@@ -69,4 +71,16 @@ erDiagram
         bigint acquisition_cost_amount "custo médio"
         timestamptz created_at
         timestamptz updated_at
+    }
+    revenue_accrual {
+        int id PK
+        date business_date FK "UK; o dia que fechou"
+        smallint calendar_days "até o próximo dia de movimento"
+        bigint customer_balance_amount "base do float"
+        bigint fund_equity_amount "base do fundo"
+        bigint own_issue_cost_amount "base do spread"
+        bigint float_amount
+        bigint fund_administration_fee_amount
+        bigint own_issue_spread_amount
+        timestamptz created_at
     }

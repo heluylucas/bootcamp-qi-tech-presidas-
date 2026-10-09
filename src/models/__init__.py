@@ -13,3 +13,4 @@ from models.product import Product, ProductPrice
 from models.investment_order import InvestmentOrder, Position
 from models.model_portfolio import ModelPortfolioItem
 from models.reference_rate import ReferenceRate
+from models.revenue_accrual import RevenueAccrual

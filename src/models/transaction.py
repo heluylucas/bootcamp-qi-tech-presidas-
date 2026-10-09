@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, CHAR, Column, DateTime, Enum, ForeignKey, Integer, String, Uuid, func
+from sqlalchemy import BigInteger, CHAR, Column, Date, DateTime, Enum, ForeignKey, Integer, String, Uuid, func
 from sqlalchemy.orm import relationship
 
 from models.base import Base
@@ -29,9 +29,11 @@ class Transaction(Base):
     description = Column(String(140))
     # Única no banco inteiro; nula quando o próprio banco cria a transação.
     idempotency_key = Column(Uuid(as_uuid=False), unique=True)
+    # O dia da transação no calendário do banco (a data de movimento).
+    business_date = Column(Date, ForeignKey("business_day.business_date"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    owner_account = relationship("Account", foreign_keys=[owner_account_id])
+    owner_account =relationship("Account", foreign_keys=[owner_account_id])
     destination_account = relationship("Account", foreign_keys=[destination_account_id])
 
 
