@@ -66,10 +66,15 @@ preço novo é o fechamento do dia:
         ↓
   7. grava os 6 preços e as 2 taxas
         ↓
-  8. devolve o dinheiro das aplicações da LCI que vencem em 06/10
-     (resgate automático ao preço novo, crédito na conta)
+  8. grava a provisão de receita de 05/10: a foto do fim do dia (saldos
+     de cliente, cotas do fundo, custo em CDB e LCI) e o que o banco
+     ganharia com ela até 06/10 (numa sexta, vale 3 dias)
         ↓
-  9. grava a nova data e dá um commit só: tudo ou nada
+  9. grava a nova data (06/10)
+        ↓
+ 10. devolve o dinheiro das aplicações da LCI que vencem em 06/10
+     (resgate automático ao preço novo, crédito na conta; a transação
+     já é do dia 06/10) e dá um commit só: tudo ou nada
         ↓
   201 {"business_date": "2026-10-06", "prices": [...], "rates": [...]}
 ```
@@ -89,8 +94,9 @@ sequenceDiagram
     Mock-->>API: respostas do novo dia
     API->>API: valida e calcula CDB/LCI
     API->>DB: grava preços e taxas
-    API->>DB: resgata as aplicações vencidas (trava conta e posição)
-    API->>DB: grava a nova data (1 commit para tudo)
+    API->>DB: grava a provisão de receita do dia que fecha (revenue_accrual)
+    API->>DB: grava a nova data
+    API->>DB: resgata as aplicações vencidas (trava conta e posição; 1 commit para tudo)
     API-->>Op: 201 nova data de movimento
 ```
 
@@ -627,6 +633,7 @@ Primeiro falhou (saldo parado em R$ 9.900), depois passou. `pytest -v`:
 | 09/10/2026 | —    | A consulta da conta passa a trazer `investments_amount` (posições ao preço do dia) e `net_worth_amount` (saldo + investimentos), calculados na leitura com a mesma função de preço da rota de posições. No total de posições, `current_amount` virou `investments_amount`. RFC: RN-CON-12, RN-POS-04 e RN-POS-06. |
 | 09/10/2026 | —    | Removidas `product.liquidity`, `product.maturity_date` e `product.updated_at`: "só resgata no vencimento" passa a ser "tem prazo" (`term_months`), o vencimento fixo do Tesouro não era usado por nenhuma regra e o catálogo nunca muda. O preço do dia não muda em nada. |
 | 09/10/2026 | —    | Removida a coluna `product.tax_exempt` e o `CHECK` de prazo mínimo das letras isentas: o banco não calcula imposto de renda, e o `rate_description` da LCI já diz "isento de IR". |
+| 09/10/2026 | —    | O fechamento passa a gravar a **provisão de receita** do dia que fecha (`revenue_accrual`: bases do fim do dia, `calendar_days` até o novo dia e os valores do fundo, do spread e do float), antes da liquidação; a nova linha de `business_day` vem antes da liquidação, porque as transações dela são do dia novo. Toda transação guarda o seu dia de movimento (`transaction.business_date`), que o extrato e a receita usam. O preço do dia não muda em nada. RFC: RN-GER-13, RN-MOV-12, RN-FEC-07, RN-FEC-08 e RN-REC. |
 | 05/10/2026 | —    | Banco renomeado de Quant Bank para **Triple P Bank**; códigos de erro de `PPP` para `PPP` (mesmo formato); serviço `triple-p-bank-api`. O fundo continua FGV Quant Capital.                                                                                                                         |
 
 ---

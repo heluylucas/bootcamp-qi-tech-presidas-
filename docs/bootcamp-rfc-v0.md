@@ -140,8 +140,22 @@ fundo, o CDB e a LCI), que é onde está a margem.
 | Tesouro Direto | Sem taxa: é o produto de atração. | Nenhuma |
 
 Só a tarifa move dinheiro de verdade. As outras três são o que o banco *ganharia* com o dinheiro sob
-sua guarda: o relatório `/internal/revenue` calcula, mas não grava nada nem mexe em saldo. Separar
-realizada de estimada é o que deixa o número defensável.
+sua guarda: nenhuma delas movimenta dinheiro nem mexe em saldo. Separar realizada de estimada é o
+que deixa o número defensável.
+
+A estimativa é uma **provisão diária, gravada no fechamento do dia**, como a contabilidade de um
+banco faz. Ao fechar o dia, o banco tira a foto do fim dele (o saldo das contas de cliente, as cotas
+do fundo ao preço do dia, o custo em CDB e LCI) e grava uma linha em `revenue_accrual` com essas
+bases e o que ganharia com elas até o próximo dia de movimento: base × taxa do dia × dias / 365. A
+provisão de sexta vale três dias, porque o dinheiro continua aplicado no fim de semana. O relatório
+`/internal/revenue` só soma as linhas do período (em datas de movimento) e mostra cada dia (`daily`)
+para ser conferido. O dia ainda aberto não tem provisão; a tarifa dele aparece.
+
+> **Limitação conhecida.** As operações de dinheiro não travam a data de movimento. Uma operação
+> feita no exato instante do fechamento pode ficar com o dia que fechou, mas fora da foto dele: entra
+> na provisão do dia seguinte. São alguns centavos de estimativa, só naquele instante; dinheiro,
+> extrato e tarifa continuam exatos. Em produção, a saída seria uma trava compartilhada na data de
+> movimento ou uma janela de corte durante o fechamento.
 
 **O capital do cliente.** O `balance` da conta é só o dinheiro parado nela; o que foi aplicado sai
 do saldo e vira posição. Por isso a consulta da conta (`GET /customer/{ck}/account/{ak}`) traz também
@@ -155,8 +169,10 @@ hora da leitura e não gravado, porque o valor dos investimentos muda a cada fec
 
 **A data de movimento.** O banco tem o próprio "hoje" (`business_day`), que só avança quando a
 operação chama `POST /internal/day_close`. Com o relógio real, o dia seguinte levaria 24 horas, e não
-daria para mostrar "aplica hoje, resgata daqui a um mês". Idade mínima e validade do perfil continuam
-no relógio real, porque são regras da lei.
+daria para mostrar "aplica hoje, resgata daqui a um mês". A data de movimento é a data real simulada
+(em produção as duas coincidem), então é ela o dia de cada transação: `transaction.business_date`,
+gravado na criação, que o extrato (`from`/`to`) e a receita usam. O `created_at` fica só como registro
+técnico. Idade mínima e validade do perfil continuam no relógio real, porque são regras da lei.
 
 **O preço do dia.** No fechamento, o banco busca o preço de cada produto nas fontes externas (Tesouro
 e administradora do fundo, simulados por um MockServer) e o grava em `product_price`. CDB e LCI são
@@ -232,7 +248,7 @@ devolve o dinheiro à conta. A ordem de resgate aponta para a aplicação que pa
 - **Tabelas de enumerador e colunas que repetem outras** (versão 1): descartadas por complexidade sem
   ganho. Listas fixas viraram tipos ENUM do Postgres, a ordem de investimento virou o anexo da sua
   transação, a posição passou a ser da conta, e o que pode ser calculado deixou de ser gravado. O banco
-  foi de 21 para 17 tabelas.
+  foi de 21 para 17 tabelas (18 depois, com a provisão diária de receita).
 - **Nomes curtos ou genéricos de coluna** (`profile_id`, `min_score`, `reference_date` em três
   tabelas), versão 1: descartados porque obrigavam a abrir o schema para saber o que a coluna guarda.
   Agora a chave estrangeira leva o nome completo da tabela de destino (`investor_profile_id`), com o
@@ -260,6 +276,19 @@ devolve o dinheiro à conta. A ordem de resgate aponta para a aplicação que pa
   descartada porque pedido, resposta e erros são outros (produto, cotas, preço, perfil, mínimo,
   prazo); o schema e o controller virariam um `if` por tipo. A ligação já existe: toda ordem gera
   uma `transaction`, que aparece no extrato e tem comprovante.
+- **Receita estimada como foto de agora × dias** (saldos, cotas e taxas do momento da consulta,
+  multiplicados pelos dias do período), primeira versão do módulo 8: descartada porque erra em
+  período passado, já que o relatório de janeiro pedido em outubro usaria os saldos de outubro.
+  Também descartados: projetar os dias futuros com a foto de hoje, que mistura histórico com
+  projeção; e recalcular cada dia pelo histórico a cada pedido (a segunda versão), cujo custo crescia
+  com a idade do banco. Ficamos com a provisão diária gravada no fechamento.
+- **Extrato e receita pelo relógio da máquina** (`created_at`): descartado porque a data de movimento
+  é a data real simulada; depois de alguns fechamentos, o extrato mostraria 09/10 para uma transação
+  feita no dia 14/10 do banco. Deduzir o dia pelo horário também foi descartado: o dia da transação
+  é um dado de primeira classe, gravado em `transaction.business_date`.
+- **Trava na data de movimento em toda operação de dinheiro:** descartada porque o custo (uma trava a
+  mais em cada operação e uma ordem de travas nova) não compensa corrigir centavos de estimativa no
+  instante do fechamento. Ganharia em produção, com volume alto.
 
 ## Implementação
 
@@ -286,7 +315,7 @@ conta ou com um pedido diferente, `409` (`PPP000004`). `ck` = `customer_key`, `a
 | `PATCH` | `/internal/account/{ak}/status` | O banco bloqueia, desbloqueia ou encerra, gerando evento. Exige `OPERATOR-TOKEN` | `status`, `reason` | `200`; `400` schema; `403` sem token de operador; `404`; `409` transição proibida ou conta não vazia; `422` sem motivo |
 | `GET` | `/customer/{ck}/account/{ak}/status_events` | Trilha de status, com quem fez cada mudança (`CUSTOMER` ou `BANK`) | — | `200`; `404` |
 | `POST` | `/customer/{ck}/account/{ak}/transaction` | Depósito, saque ou transferência (tarifa de R$ 2,00, creditada na conta do banco). **Idempotente** | `type`, `amount` (centavos), `destination_account_key` | `201` `transaction_key` e saldo; `200` repetição; `400` schema ou sem chave; `404` conta ou destino; `409` conta/destino não ativos, saldo insuficiente, chave reutilizada; `422` valor ≤ 0, acima do limite, origem = destino |
-| `GET` | `/customer/{ck}/account/{ak}/transactions` | Extrato paginado, do mais novo ao mais antigo | `page`, `limit`, `from`, `to`, `type` | `200` `{items, page, limit, total}`; `400` filtro inválido; `404` |
+| `GET` | `/customer/{ck}/account/{ak}/transactions` | Extrato paginado, do mais novo ao mais antigo; `from` e `to` são datas de movimento | `page`, `limit`, `from`, `to`, `type` | `200` `{items, page, limit, total}`; `400` filtro inválido; `404` |
 | `GET` | `/customer/{ck}/account/{ak}/transaction/{tk}` | Comprovante | — | `200`; `404` (inexistente ou não envolve a conta) |
 | `GET` | `/suitability_questions` | Perguntas e opções (o código da opção, de 1 a 4, é a pontuação dela) | — | `200` |
 | `POST` | `/customer/{ck}/suitability` | Responde o questionário e gera uma avaliação nova | `answers[{question_code, option_code}]` | `201` perfil, pontos, validade; `400` schema; `404`; `422` resposta faltando, repetida ou opção inválida |
@@ -301,8 +330,8 @@ conta ou com um pedido diferente, `409` (`PPP000004`). `ck` = `customer_key`, `a
 | `GET` | `/customer/{ck}/account/{ak}/investment_order/{ok}` | Detalhe da ordem | — | `200`; `404` |
 | `GET` | `/customer/{ck}/account/{ak}/positions` | Posição, valor do dia, rentabilidade e capital total na conta (caixa + investimentos, com a divisão em pontos-base) | `include_closed` | `200`; `400`; `404` |
 | `GET` | `/internal/business_date` | Data de movimento atual. Exige `OPERATOR-TOKEN` | — | `200`; `403` sem token de operador |
-| `POST` | `/internal/day_close` | Fecha o dia: busca preços e taxas lá fora, liquida o que venceu e abre o próximo dia útil. Clique duplo não fecha dois dias (trava + data conferida). Exige `OPERATOR-TOKEN` | `close_date` | `201` nova data, preços, taxas; `400`; `403` sem token de operador; `409` `close_date` não é a data atual; `502` fonte fora do ar ou resposta sem sentido (nada gravado) |
-| `GET` | `/internal/revenue` | Receita realizada (tarifas) e estimada (fundo, spread, float). Exige `OPERATOR-TOKEN` | `from`, `to` | `200`; `400` período invertido ou maior que 366 dias; `403` sem token de operador |
+| `POST` | `/internal/day_close` | Fecha o dia: busca preços e taxas lá fora, grava a provisão de receita do dia, liquida o que venceu e abre o próximo dia útil. Clique duplo não fecha dois dias (trava + data conferida). Exige `OPERATOR-TOKEN` | `close_date` | `201` nova data, preços, taxas; `400`; `403` sem token de operador; `409` `close_date` não é a data atual; `502` fonte fora do ar ou resposta sem sentido (nada gravado) |
+| `GET` | `/internal/revenue` | Receita realizada (tarifas) e estimada (as provisões dos dias fechados: fundo, spread, float), em datas de movimento. Exige `OPERATOR-TOKEN` | `from`, `to` | `200`; `400` período invertido ou maior que 366 dias; `403` sem token de operador |
 
 ### Banco de Dados (Somente diagrama)
 

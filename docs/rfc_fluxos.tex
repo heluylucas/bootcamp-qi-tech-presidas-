@@ -71,7 +71,8 @@ trava, conta uma conta ao ser liberado e recebe 409 (\tb{PPP002002}) sem ter esc
   \item Com as linhas travadas, confere as duas contas \tb{ACTIVE} e origem com
         \tb{balance} $\geq$ \tb{amount} + 200.
   \item Grava \tb{transaction} (\tb{TRANSFER}, \tb{owner_account_id} = origem,
-        \tb{destination_account_id}, \tb{fee_amount = 200}, \tb{idempotency_key}).
+        \tb{destination_account_id}, \tb{fee_amount = 200}, \tb{idempotency_key} e
+        \tb{business_date} = a data de movimento atual, o dia da transação no calendário do banco).
   \item Grava quatro \tb{ledger_entry}, cada uma com \tb{balance_after}:
         \tb{DEBIT/PRINCIPAL} e \tb{DEBIT/FEE} na origem, \tb{CREDIT/PRINCIPAL} no destino e
         \tb{CREDIT/FEE} na conta do banco.
@@ -167,7 +168,8 @@ disputam a mesma primeira trava: um passa e o outro espera.
   \item Confere a conta \tb{ACTIVE} e \tb{balance} $\geq$ \tb{amount}.
   \item Calcula \tb{quantity = amount / unit_price}, truncada em 8 casas, e cria a
         \tb{position} com \tb{quantity = 0} se ainda não existir.
-  \item Grava \tb{transaction} \tb{INVESTMENT_APPLY} (com a \tb{idempotency_key}) e um
+  \item Grava \tb{transaction} \tb{INVESTMENT_APPLY} (com a \tb{idempotency_key} e o
+        \tb{business_date} = data de movimento atual) e um
         \tb{ledger_entry} \tb{DEBIT}, e atualiza \tb{balance}.
   \item Grava \tb{investment_order} com \tb{transaction_id}, \tb{product_id}, \tb{quantity},
         \tb{unit_price} e \tb{acquisition_cost_amount} (= \tb{amount}). Se o produto tem prazo,
@@ -258,20 +260,30 @@ escrita. O cliente recebe 422 (\tb{PPP004002}).
         com $c = (1 + \text{CDI do dia que fecha})^{1/252} - 1$, lido de \tb{reference_rate}
         (o CDI do novo dia, que acabou de chegar, rende o fechamento seguinte).
   \item Grava os 6 \tb{product_price} e as 2 \tb{reference_rate}.
+  \item \textbf{Grava a provisão do dia que fecha} (RN-REC-05 a 07): soma os saldos das contas de
+        cliente, as cotas do fundo (ao preço do dia que fecha) e o custo em CDB e LCI --- a foto do
+        fim do dia, antes de a liquidação mexer nos saldos --- e grava uma linha em
+        \tb{revenue_accrual} com as bases, \tb{calendar_days} (até o novo dia; 3 numa sexta) e os
+        valores (base $\times$ taxa do dia $\times$ dias $/ 365$, truncados).
+  \item Grava o novo \tb{business_day}, antes da liquidação: as transações dela são do dia novo.
   \item \textbf{Liquida o que venceu} (RN-FEC-09): busca as aplicações com \tb{maturity_date}
         $\leq$ novo dia que nenhuma ordem aponta em \tb{matured_investment_order_id}, em ordem crescente de
         conta. Para cada uma, trava a conta e depois a posição e grava o resgate da quantidade
         inteira ao preço do novo dia: \tb{transaction} \tb{INVESTMENT_REDEEM} \textbf{sem chave
-        de idempotência} (não há pedido de cliente para repetir) com \tb{ledger_entry}
+        de idempotência} (não há pedido de cliente para repetir), com \tb{business_date} = novo
+        dia (o dinheiro volta antes de ele abrir), com \tb{ledger_entry}
         \tb{CREDIT} (mesmo com a conta bloqueada), \tb{investment_order} ligada a ela com
         \tb{matured_investment_order_id} = a aplicação (o \tb{UNIQUE} impede pagar duas vezes) e a posição
         reduzida.
-  \item Grava o novo \tb{business_day}.
   \item \tb{commit}; 201 com a nova data, os preços e as taxas.
 \end{enumerate}
 
 A trava da data faz dois fechamentos simultâneos virarem uma fila: o segundo encontra a data já
-avançada no passo 3 e recebe 409. Os passos 5 a 7 só leem; toda escrita fica nos passos 8 a 10.
+avançada no passo 3 e recebe 409. Os passos 5 a 7 só leem; toda escrita fica nos passos 8 a 11.
+As operações de dinheiro não travam a data de movimento: uma que começou antes do fechamento e
+termina depois da foto do passo 9 fica com o dia que fechou, mas fora da provisão dele (entra na do
+dia seguinte). É a limitação conhecida do Módulo 8 de \tb{regras_de_negocio.tex}: alguns centavos de
+estimativa, nunca dinheiro.
 A liquidação trava contas e posições na mesma ordem das ordens do cliente (conta, depois
 posição), então uma aplicação no mesmo instante espera em vez de causar \emph{deadlock}.
 

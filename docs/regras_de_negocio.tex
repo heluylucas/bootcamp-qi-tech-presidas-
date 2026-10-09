@@ -431,8 +431,8 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   \tb{..._key} UUID (gerado no repository, com \tb{uuid4}). Só a \tb{key} sai.
   \item[RN-GER-03 \dec] \textbf{Datas.} Tudo em \tb{TIMESTAMPTZ}, gravado em UTC e devolvido no
   formato ISO 8601. Exemplo: \tb{2026-10-01T13:02:11Z}. Datas sem hora (nascimento, data do
-  preço) em \tb{DATE}. Os \tb{created_at} guardam a hora \emph{real} (auditoria); as regras da
-  simulação que perguntam ``que dia é hoje?'' usam a data de movimento (RN-GER-13).
+  preço) em \tb{DATE}. Os \tb{created_at} guardam a hora \emph{real} da máquina, só como registro
+  técnico; o dia em que algo aconteceu é o do calendário do banco, a data de movimento (RN-GER-13).
   \item[RN-GER-04 \obr] \textbf{Nada é apagado.} Não existe rota \tb{DELETE}. Encerrar, bloquear e
   refazer perfil são mudanças de estado ou linhas novas.
   \item[RN-GER-05 \obr] \textbf{Formato de erro único.} Todo erro devolve
@@ -473,8 +473,11 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   em \tb{business_day} (uma linha por dia aberto, nunca alterada; a data atual é a maior
   \tb{business_date}). Ela nasce com a data real em que o banco é criado e \textbf{só avança} pelo
   fechamento do dia (\tb{POST /internal/day_close}, Seção~\ref{sec:fechamento}), que pula sábado e
-  domingo. É ela o ``hoje'' das regras da simulação: vencimento de título, preço do dia e taxas de
-  referência. Idade mínima (RN-CLI-05) e validade do perfil (RN-SUI-05) usam o relógio real,
+  domingo. A data de movimento é a \textbf{data real simulada}: em produção as duas coincidem; no
+  simulador, o fechamento a faz andar. Por isso é ela o ``hoje'' do banco: vencimento de título,
+  preço do dia, taxas de referência e o \textbf{dia de cada transação} (\tb{transaction.business_date},
+  gravado na criação com a data de movimento atual), que o extrato (RN-MOV-12) e a receita (RN-REC-02
+  e 09) usam. Idade mínima (RN-CLI-05) e validade do perfil (RN-SUI-05) usam o relógio real,
   porque são fatos regulatórios e a data de movimento pode estar à frente do calendário. É assim que um banco real trabalha (data contábil e
   virada de data), e é o que permite mostrar ``aplica no dia $t$, resgata no dia $t+n$'' em
   segundos, na frente da banca.
@@ -698,12 +701,14 @@ E o \tb{balance_after} do último lançamento é igual ao saldo atual. Ou seja: 
   lançamento \tb{FEE} --- se a tarifa mudar amanhã, o histórico não muda.
   \item[RN-MOV-11 \dec] Descrição opcional (\tb{description}, até 140 caracteres) aparece no extrato.
   \item[RN-MOV-12 \obr] \textbf{Extrato:} lista os lançamentos da conta, do mais novo para o mais
-  antigo, paginado, com filtros opcionais \tb{from}, \tb{to} (datas) e \tb{type}. Cada linha
-  mostra: \tb{transaction_key}, tipo, direção, categoria, valor, \tb{balance_after}, descrição,
-  contraparte (a \tb{account_key} da outra conta, quando houver) e data.
+  antigo, paginado, com filtros opcionais \tb{from}, \tb{to} e \tb{type}. As datas são do
+  calendário do banco: o \tb{business_date} da transação, com as duas pontas inclusas (RN-GER-13).
+  Cada linha mostra: \tb{transaction_key}, tipo, direção, categoria, valor, \tb{balance_after},
+  descrição, contraparte (a \tb{account_key} da outra conta, quando houver), o dia de movimento
+  (\tb{business_date}) e a hora real do registro (\tb{created_at}).
   \item[RN-MOV-13 \obr] \textbf{Comprovante:} \tb{GET .../transaction/\{transaction_key\}} devolve
-  uma transação da qual essa conta participa (origem ou destino). Transação que não envolve a
-  conta $\to$ 404 (R8).
+  uma transação da qual essa conta participa (origem ou destino), com o seu dia de movimento
+  (\tb{business_date}). Transação que não envolve a conta $\to$ 404 (R8).
   \item[RN-MOV-14 \obr] Nenhuma transação é apagada ou editada. Um estorno, se existir um dia, será
   uma transação nova no sentido contrário (\ext).
 \end{regras}
@@ -926,14 +931,18 @@ produção, mudando só o endereço.
   diferente da pedida, título ou fundo faltando, taxa ausente) $\to$ 502 (\tb{PPP005007}). Nos dois
   casos nada é gravado e a data de movimento não muda.
   \item[RN-FEC-07 \dec] \textbf{O que é gravado}, num \tb{commit} só: um preço por produto em
-  \tb{product_price}, o CDI e a Selic em \tb{reference_rate}, a liquidação do que venceu
-  (RN-FEC-09) e a nova linha de \tb{business_day}.
+  \tb{product_price}, o CDI e a Selic em \tb{reference_rate}, a provisão de receita do dia que fecha
+  em \tb{revenue_accrual} (RN-REC-05 a 07, gravada antes da liquidação, com a foto do fim do dia), a
+  nova linha de \tb{business_day} e a liquidação do que venceu (RN-FEC-09), cujas transações já são
+  do dia novo.
   Resposta 201: \tb{\{"business_date", "prices": [\{"product_key", "name", "unit_price"\}],
   "rates": [\{"code", "annual_rate_bps"\}]\}}.
   \item[RN-FEC-08 \dec] \textbf{Simplificações do MVP.} As chamadas externas acontecem com a trava
   da data segurada (no máximo 5 s por serviço), então fechamentos simultâneos ficam em fila. Ordens
-  não travam a data de movimento: uma ordem que começou antes do fechamento usa o preço do dia em
-  que começou.
+  e as movimentações não travam a data de movimento: uma operação que começou antes do fechamento
+  usa o preço e o dia de movimento de quando começou. Se ela terminar depois de o fechamento tirar a
+  foto do dia, fica fora da provisão desse dia e entra na do dia seguinte (ver a limitação conhecida
+  no Módulo 8).
   \item[RN-FEC-09 \dec] \textbf{Liquidação no vencimento.} No fechamento, depois de gravar os
   preços do novo dia e antes de abri-lo, na mesma transação (tudo ou nada, RN-FEC-06), o banco
   devolve o dinheiro de cada aplicação de produto com prazo cujo \tb{maturity_date} (gravado na
@@ -1189,7 +1198,7 @@ o cliente; a recomendação leva o dinheiro para onde o banco ganha.}
 Tarifa de transferência & \rs 2,00 por transferência, cobrados da conta de origem e creditados na conta do banco. & Lançamentos \tb{FEE} de crédito na conta do banco (\tb{ledger_entry}). & Realizada (valor exato) \\
 Taxa de administração do fundo & 1\% ao ano sobre o patrimônio do \fundo, descontada todo dia do valor da cota. & \tb{product.administration_fee_bps}; a cota publicada já é líquida. & Estimada \\
 Spread dos títulos próprios & O banco paga 95\% do CDI no CDB e 93\% na LCI e aplica o dinheiro captado em títulos públicos, que rendem cerca de 100\% do CDI. & Produtos sem \tb{price_source_code} (emissão própria) e \tb{product.cdi_percentage_bps}; CDI em \tb{reference_rate}. & Estimada \\
-Float & O saldo parado na conta corrente não rende nada para o cliente; o banco o aplica em títulos públicos. & Soma de \tb{account.balance} $\times$ Selic de \tb{reference_rate}. & Estimada \\
+Float & O saldo parado na conta corrente não rende nada para o cliente; o banco o aplica em títulos públicos. & Saldo das contas de cliente no fim de cada dia fechado, gravado na provisão (\tb{revenue_accrual}), $\times$ Selic do dia (\tb{reference_rate}). & Estimada \\
 Tesouro Direto & Sem taxa para o cliente: é o produto de atração. & --- & Nenhuma \\
 \bottomrule
 \end{longtable}
@@ -1203,12 +1212,14 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
 
 \begin{regras}
   \item[RN-REC-01 \dec] \textbf{Realizada vs.\ estimada.} O relatório de receita separa sempre o que
-  foi cobrado (tarifas) do que é estimativa (fundo, spread, float). Estimativas nunca gravam linhas
-  nem alteram saldos.
+  foi cobrado (tarifas) do que é estimativa (fundo, spread, float). Estimativas nunca movimentam
+  dinheiro nem alteram saldos: a provisão de cada dia (RN-REC-05) é só um registro, gravado uma vez
+  no fechamento e nunca alterado (R4).
   \item[RN-REC-02 \dec] \textbf{Tarifas.} A tarifa sai da conta de origem e \textbf{entra na conta do
   banco}: uma conta do seed, sem cliente (\tb{customer_id} nulo), que nenhuma rota de cliente
   alcança, que não pode ser destino de transferência nem ter o status mudado. Receita de tarifa no
-  período $=$ soma dos créditos \tb{FEE} na conta do banco com \tb{created_at} no período.
+  período $=$ soma dos créditos \tb{FEE} na conta do banco cujas transações têm o dia de movimento
+  (\tb{business_date}) no período, inclusive o dia ainda aberto.
   \item[RN-REC-03 \obr] \textbf{Conservação do dinheiro.} Para o sistema inteiro, com a conta do
   banco incluída: $\Sigma$ saldos $=\ \Sigma$ depósitos $-\ \Sigma$ saques $-\ \Sigma$ aplicações
   $+\ \Sigma$ resgates. A tarifa não aparece na conta porque não sai do sistema: só muda de conta.
@@ -1217,23 +1228,26 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   (\tb{100} = 1\% ao ano). A cota publicada é \emph{líquida}, como no mercado: a administradora
   (no simulador, o mock e o seed) já desconta a taxa, com o fator $(1 - \text{taxa})$ ao ano da
   fórmula da RN-PRO-06.
-  \item[RN-REC-05 \dec] \textbf{Estimativa da taxa de administração}, \textbf{dia a dia}: para cada
-  dia $d$ do período, patrimônio do fundo no fim de $d$ $\times$ taxa $/ 365$, truncado em centavos;
-  a estimativa é a soma dos dias. Patrimônio $=$ cotas que os clientes tinham no fim de $d$ (soma das
-  aplicações menos os resgates de \tb{investment_order} até $d$) $\times$ cota vigente em $d$. É uma
-  aproximação linear (juros simples sobre 365 dias), suficiente para o relatório. As estimativas
-  RN-REC-05 a 07 usam a base e a taxa \emph{de cada dia}, tiradas do histórico: a receita de um dia
-  passado não muda com o que acontece depois.
+  \item[RN-REC-05 \dec] \textbf{Provisão diária, gravada no fechamento.} Ao fechar o dia $D$
+  (RN-FEC-07), o banco grava em \tb{revenue_accrual} a foto do fim de $D$ (as três bases) e o que
+  ganharia com ela até o próximo dia de movimento: \tb{calendar_days} $=$ próximo dia $- D$ (a provisão
+  de sexta vale sexta, sábado e domingo, porque o dinheiro continua aplicado no fim de semana). Uma
+  linha por dia fechado, nunca alterada; o dia aberto ainda não tem. Cada valor é base $\times$ taxa
+  anual $\times$ \tb{calendar_days} $/ 365$, truncado em centavos: uma aproximação linear (juros
+  simples), suficiente para o relatório. As bases vêm do estado de agora (uma soma por tabela), não
+  do histórico. \textbf{Taxa de administração:} base $=$ patrimônio do fundo $=$ $\Sigma$
+  \tb{position.quantity} $\times$ cota de $D$, em centavos para baixo; taxa $=$
+  \tb{administration_fee_bps}.
   \item[RN-REC-06 \dec] \textbf{Títulos próprios.} CDB e LCI são emissão própria (sem
-  \tb{price_source_code}) e guardam o
-  percentual do CDI que pagam em \tb{cdi_percentage_bps} (\tb{9500} = 95\%). Spread de um dia $d$ $=
-  \Sigma$ por produto do custo de aquisição em carteira no fim de $d$ (aplicado menos o custo
-  resgatado) $\times$ CDI vigente em $d$ $\times$ (1 $-$ percentual pago) $/ 365$.
-  \item[RN-REC-07 \dec] \textbf{Float} de um dia $d$ $=$ soma dos saldos das contas de cliente (sem a
-  conta do banco) no fim de $d$ $\times$ Selic vigente em $d$ $/ 365$. O saldo no fim de $d$ sai do
-  extrato: créditos menos débitos de \tb{ledger_entry} até $d$ (RN-REC-03). Conta encerrada tem
-  saldo 0, então não precisa de filtro por status. Saldo em conta corrente não é remunerado para o
-  cliente.
+  \tb{price_source_code}) e guardam o percentual do CDI que pagam em \tb{cdi_percentage_bps}
+  (\tb{9500} = 95\%). Base $=$ $\Sigma$ \tb{position.acquisition_cost_amount} nesses produtos no fim de
+  $D$. Spread $=$ $\Sigma$ por produto do custo $\times$ CDI de $D$ $\times$ (1 $-$ percentual pago)
+  $\times$ \tb{calendar_days} $/ 365$. O valor fica gravado porque depende do percentual de cada
+  produto, que a base somada não guarda.
+  \item[RN-REC-07 \dec] \textbf{Float.} Base $=$ $\Sigma$ \tb{account.balance} das contas de cliente
+  (sem a conta do banco) no fim de $D$; conta encerrada tem saldo 0, então não há filtro por status.
+  Valor $=$ base $\times$ Selic de $D$ $\times$ \tb{calendar_days} $/ 365$. Saldo em conta corrente
+  não é remunerado para o cliente.
   \item[RN-REC-08 \dec] \textbf{Taxas de referência (histórico).} CDI e Selic anuais ficam em
   \tb{reference_rate}, \textbf{uma linha por taxa e por data}, nunca alterada (R4): o seed grava a
   primeira e cada fechamento do dia grava as do novo dia, vindas do Banco Central (RN-FEC-04).
@@ -1242,25 +1256,40 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   só: o CDB rende pelo mesmo número que o relatório usa, e cada preço de CDB pode ser refeito com
   o CDI gravado do dia.
   \item[RN-REC-09 \dec] \textbf{Relatório.} \tb{GET /internal/revenue?from=\&to=} devolve as
-  duas partes e o total, em centavos. Cada estimativa traz o valor e o detalhe por dia
-  (\tb{daily}: data, base, taxa e valor do dia); o valor é a soma dos dias. As estimativas contam
-  \textbf{só os dias que já aconteceram}: de \tb{from} até o menor entre \tb{to} e hoje, e
-  \tb{days} é quantos dias foram contados. Nenhum dia futuro é projetado. Os dias são de calendário
-  em UTC, e o período filtra pelo \tb{created_at} (hora real) dos lançamentos. Dia sem taxa
-  publicada ainda (antes de o banco existir) vale 0.
-  Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
+  duas partes e o total, em centavos. O período é em \textbf{datas de movimento}. A tarifa inclui o
+  dia aberto; as estimativas são as provisões dos dias \textbf{fechados} do período (RN-REC-05), e
+  \tb{days} é quantos foram contados. Cada estimativa traz o valor (a soma) e o detalhe por dia
+  (\tb{daily}: data, \tb{calendar_days}, base, taxa e valor do dia), para a conta ser conferida.
+  Sem datas, usa o mês da data de movimento atual. \tb{from} depois de \tb{to}, ou
   intervalo maior que 366 dias $\to$ 400 (\tb{PPP000005}). A rota é interna (não pertence a
   nenhum cliente) e fica protegida pelo \tb{OPERATOR-TOKEN} (RN-GER-14); num banco real ela
   exigiria login por funcionário com perfil de administrador, o que está fora do escopo.
   \item[RN-REC-10 \dec] Tesouro Direto não tem taxa para o cliente.
 \end{regras}
 
-\subsection{Exemplo: um mês de operação}
+\begin{aviso}{Limitação conhecida: operação no instante do fechamento}
+As operações de dinheiro não travam a data de movimento (RN-FEC-08). Uma operação que lê a data
+antes do fechamento e termina depois de ele tirar a foto do dia fica com o dia que fechou (no
+extrato e na tarifa), mas fora da provisão desse dia: entra na do dia seguinte. As somas do
+fechamento também podem pegar uma ordem pela metade (já no saldo, ainda não no fundo). O efeito são
+alguns centavos nas estimativas, só naquele instante. Dinheiro, extrato e tarifa continuam exatos,
+porque são protegidos pelas travas das contas.
 
-Premissas fictícias: 2.000 transferências no mês; \rs 5 milhões no fundo; \rs 3 milhões em CDB
+\textbf{Por que aceitamos.} Fechar a janela custaria uma trava a mais em toda operação de dinheiro
+e uma ordem de travas nova (RN-GER-12), para corrigir centavos de uma estimativa num instante que,
+no simulador, é um clique do operador. \textbf{Em produção}, a saída seria uma trava compartilhada
+na data de movimento (as operações seguram em modo compartilhado; o fechamento, em modo exclusivo,
+espera as que estão em andamento) ou uma janela de corte, em que o banco para de aceitar operações
+por alguns segundos enquanto fecha.
+\end{aviso}
+
+\subsection{Exemplo: quatro semanas de operação}
+
+Premissas fictícias: 2.000 transferências no período; \rs 5 milhões no fundo; \rs 3 milhões em CDB
 a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI de 14,9\% e Selic de 15\% ao ano
-(os mesmos do seed); 30 dias, todos já passados, com os mesmos saldos e taxas o mês inteiro. Cada
-dia é truncado em centavos, e o mês é a soma dos 30 dias.
+(os mesmos do seed); quatro semanas fechadas, de segunda a domingo (28 dias corridos, 20 dias de
+movimento), com os mesmos saldos e taxas o tempo todo. Cada provisão é truncada em centavos: as 16 de
+segunda a quinta valem 1 dia, e as 4 de sexta valem 3.
 
 \begin{center}
 \begin{tabular}{@{}llr@{}}
@@ -1268,14 +1297,17 @@ dia é truncado em centavos, e o mês é a soma dos 30 dias.
 \textbf{Fonte} & \textbf{Conta} & \textbf{Receita} \\
 \midrule
 Tarifas (realizada) & $2.000 \times \rs 2{,}00$ & \rs 4.000,00 \\
-Taxa de administração & $30 \times (5.000.000 \times 1\% / 365)$ & \rs 4.109,40 \\
-Spread do CDB & $30 \times (3.000.000 \times 14{,}9\% \times 5\% / 365)$ & \rs 1.836,90 \\
-Float & $30 \times (2.000.000 \times 15\% / 365)$ & \rs 24.657,30 \\
+Taxa de administração & $16 \times \rs 136{,}98 + 4 \times \rs 410{,}95$ & \rs 3.835,48 \\
+Spread do CDB & $16 \times \rs 61{,}23 + 4 \times \rs 183{,}69$ & \rs 1.714,44 \\
+Float & $16 \times \rs 821{,}91 + 4 \times \rs 2.465{,}75$ & \rs 23.013,56 \\
 \midrule
-\textbf{Total} & & \textbf{\rs 34.603,60} \\
+\textbf{Total} & & \textbf{\rs 32.563,48} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+Um dia de provisão do fundo, por exemplo: $5.000.000 \times 1\% / 365 = \rs 136{,}986$, truncado em
+\rs 136,98; na sexta, $\times\ 3$ antes de truncar, \rs 410,95.
 
 A lição do exemplo, boa para a apresentação: a maior receita não é a tarifa que o cliente vê, e sim
 o float, que ele não vê. E a taxa de administração cresce junto com o patrimônio que a carteira
@@ -1306,7 +1338,7 @@ Abaixo, as colunas e restrições; os diagramas ER (\tb{docs/diagramas/er-*.mmd}
 \tb{customer} & \tb{customer_key}; \tb{name TEXT NOT NULL}; \tb{document_number CHAR(14) NOT NULL UNIQUE}; \tb{birth_date DATE NOT NULL}; \tb{created_at}. \\
 \tb{account} & \tb{account_key}; \tb{customer_id} FK $\to$ customer (nulo só na conta do banco, RN-REC-02); \tb{status account_status NOT NULL}; \tb{balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0)}; \tb{created_at}, \tb{updated_at}. Índice único parcial \tb{UNIQUE(customer_id) WHERE status <> 'CLOSED'} para o banco também barrar a segunda conta (rede de segurança). O seed cria a conta do banco primeiro, com o menor \tb{id}. \\
 \tb{account_status_event} & \tb{account_id} FK; \tb{from_status account_status} (nulo no nascimento); \tb{to_status account_status NOT NULL}; \tb{reason VARCHAR(255)}; \tb{actor status_actor NOT NULL} (\tb{CUSTOMER}/\tb{BANK}, RN-CON-05); \tb{created_at}. \\
-\tb{transaction} & O \emph{pedido} que mexe em dinheiro. \tb{transaction_key}; \tb{type transaction_type NOT NULL}; \tb{owner_account_id} FK NOT NULL (a dona do pedido: quem pediu; no depósito e no resgate, a que recebe); \tb{destination_account_id} FK (só e sempre na transferência: \tb{CHECK ((type = 'TRANSFER') = (destination_account_id IS NOT NULL))} e \tb{CHECK (destination_account_id <> owner_account_id)}); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{fee_amount BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0)}; \tb{description VARCHAR(140)}; \tb{idempotency_key UUID UNIQUE} (do cliente, única no banco inteiro; nula nas transações que o banco cria, RN-GER-08); \tb{created_at}. \\
+\tb{transaction} & O \emph{pedido} que mexe em dinheiro. \tb{transaction_key}; \tb{type transaction_type NOT NULL}; \tb{owner_account_id} FK NOT NULL (a dona do pedido: quem pediu; no depósito e no resgate, a que recebe); \tb{destination_account_id} FK (só e sempre na transferência: \tb{CHECK ((type = 'TRANSFER') = (destination_account_id IS NOT NULL))} e \tb{CHECK (destination_account_id <> owner_account_id)}); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{fee_amount BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0)}; \tb{description VARCHAR(140)}; \tb{idempotency_key UUID UNIQUE} (do cliente, única no banco inteiro; nula nas transações que o banco cria, RN-GER-08); \tb{business_date DATE NOT NULL} FK $\to$ \tb{business_day(business_date)} (o dia de movimento em que a transação aconteceu, RN-GER-13; índice para o extrato e a receita); \tb{created_at}. \\
 \tb{ledger_entry} & O \emph{extrato}: um efeito em um saldo. \tb{transaction_id} FK NOT NULL; \tb{account_id} FK NOT NULL; \tb{direction entry_direction} (\tb{DEBIT}/\tb{CREDIT}); \tb{category entry_category} (\tb{PRINCIPAL}/\tb{FEE}); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{balance_after BIGINT NOT NULL CHECK (balance_after >= 0)}; \tb{created_at}. Índice em \tb{(account_id, created_at)} para o extrato. Sem \tb{key}: o lançamento nunca sai sozinho na API. \\
 \bottomrule
 \end{longtable}
@@ -1325,6 +1357,7 @@ Abaixo, as colunas e restrições; os diagramas ER (\tb{docs/diagramas/er-*.mmd}
 \tb{suitability_answer} & \tb{suitability_assessment_id} FK; \tb{suitability_option_id} FK (a pergunta vem da opção). \tb{UNIQUE(suitability_assessment_id, suitability_option_id)}. \\
 \tb{product} & \tb{product_key}; \tb{name}; \tb{type product_type}; \tb{issuer}; \tb{indexer product_indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{term_months SMALLINT CHECK (> 0)} (prazo de cada aplicação; nulo = resgate a qualquer dia, RN-PRO-09); \tb{minimum_application_amount BIGINT}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{administration_fee_bps SMALLINT} (só no fundo); \tb{price_source_code VARCHAR(50)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo é emissão própria, CDB e LCI). \\
 \tb{business_day} & \tb{business_date DATE NOT NULL UNIQUE}; \tb{created_at}. Uma linha por dia aberto, nunca alterada; a data de movimento é a maior \tb{business_date} (RN-GER-13). \\
+\tb{revenue_accrual} & A provisão diária (RN-REC-05 a 07). \tb{business_date DATE NOT NULL UNIQUE} FK $\to$ \tb{business_day(business_date)} (o dia que fechou); \tb{calendar_days SMALLINT CHECK (> 0)} (até o próximo dia de movimento); as bases \tb{customer_balance_amount}, \tb{fund_equity_amount} e \tb{own_issue_cost_amount}; os valores \tb{float_amount}, \tb{fund_administration_fee_amount} e \tb{own_issue_spread_amount} (todos \tb{BIGINT CHECK (>= 0)}); \tb{created_at}. Uma linha por dia fechado, nunca alterada; sem \tb{key}, porque nunca sai sozinha na API. As taxas não se repetem aqui: estão em \tb{reference_rate} e \tb{product}. \\
 \tb{reference_rate} & \tb{code reference_rate_code} (\tb{CDI}, \tb{SELIC}); \tb{rate_date DATE NOT NULL}; \tb{annual_rate_bps INTEGER CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(code, rate_date)}. Histórico das taxas (RN-REC-08). \\
 \tb{product_price} & \tb{product_id} FK; \tb{price_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, price_date)}. \\
 \tb{model_portfolio_item} & A carteira-modelo de cada perfil. \tb{investor_profile_id} FK $\to$ investor_profile; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(investor_profile_id, product_id)}. A soma de 10.000 é conferida por um teste. \\
@@ -1394,7 +1427,7 @@ PATCH & \rota|/internal/account/{ak}/status| & Banco bloqueia, desbloqueia ou en
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Movimentações}} \\
 POST & \rota|/customer/{ck}/account/{ak}/transaction| & Depósito, saque ou transferência. \tb{type}, \tb{amount}, \tb{destination_account_key} (só transferência), \tb{description}. \textbf{Idem.} & 201 \tb{transaction_key} e saldo; 200 repetição idempotente; 400 schema/sem chave; 404 conta ou destino; 409 conta/destino não ativos, saldo insuficiente, chave reutilizada; 422 valor inválido, acima do limite, origem = destino. \\
-GET & \rota|/customer/{ck}/account/{ak}/transactions| & Extrato. Query: \tb{page}, \tb{limit}, \tb{from}, \tb{to}, \tb{type}. & 200 lista paginada; 400 filtro inválido; 404. \\
+GET & \rota|/customer/{ck}/account/{ak}/transactions| & Extrato. Query: \tb{page}, \tb{limit}, \tb{from}, \tb{to} (datas de movimento), \tb{type}. & 200 lista paginada; 400 filtro inválido; 404. \\
 GET & \rota|/customer/{ck}/account/{ak}/transaction/{transaction_key}| & Comprovante. & 200; 404 (inexistente ou não envolve a conta). \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Suitability}} \\
@@ -1410,7 +1443,7 @@ GET & \rota|/product/{product_key}/prices| & Histórico de preços. Query: \tb{f
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Data de movimento e fechamento do dia}} \\
 GET & \rota|/internal/business_date| & Data de movimento atual. Exige \tb{OPERATOR-TOKEN}. & 200 \tb{\{business_date\}}; 403 sem token de operador. \\
-POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, buscando preços e taxas lá fora. \tb{close_date}. Exige \tb{OPERATOR-TOKEN}. & 201 nova data, preços e taxas; 400 schema; 403 sem token de operador; 409 \tb{close_date} não é a data atual; 502 fonte externa fora do ar ou com resposta inválida (nada gravado). \\
+POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, buscando preços e taxas lá fora e gravando a provisão de receita do dia. \tb{close_date}. Exige \tb{OPERATOR-TOKEN}. & 201 nova data, preços e taxas; 400 schema; 403 sem token de operador; 409 \tb{close_date} não é a data atual; 502 fonte externa fora do ar ou com resposta inválida (nada gravado). \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Carteira sugerida}} \\
 GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 400 \tb{amount} ausente ou inválido; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
@@ -1422,7 +1455,7 @@ GET & \rota|/customer/{ck}/account/{ak}/investment_order/{order_key}| & Detalhe 
 GET & \rota|/customer/{ck}/account/{ak}/positions| & Posição da conta, rentabilidade e capital total, com a divisão entre caixa e investimentos (RN-POS-04, RN-POS-06). Query: \tb{include_closed}. & 200; 400 query inválida; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Receita}} \\
-GET & \rota|/internal/revenue| & Receita realizada e estimada. Query: \tb{from}, \tb{to}. Exige \tb{OPERATOR-TOKEN}. & 200; 400 período inválido; 403 sem token de operador. \\
+GET & \rota|/internal/revenue| & Receita realizada e estimada (as provisões dos dias fechados), em datas de movimento. Query: \tb{from}, \tb{to}. Exige \tb{OPERATOR-TOKEN}. & 200; 400 período inválido; 403 sem token de operador. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Incrementos (\ext)}} \\
 POST & \rota|/customer/{ck}/portfolio_application| & Aplica a carteira sugerida inteira numa só transação. \tb{amount}. \textbf{Idem.} & 201 lista de ordens; mesmos erros da ordem. \\
@@ -1657,7 +1690,7 @@ Produtos & lista catálogo; filtra por risco e por tipo; detalhe traz o preço d
 Fechamento do dia & devolve a data de movimento; data de movimento e fechamento sem token de operador dão 403 (o fechamento não muda a data); fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova; \textbf{liquidação no vencimento}: aplica na LCI, fecha um dia por vez até o vencimento (cerca de 262 fechamentos), o dinheiro volta com rendimento, existe a ordem \tb{MATURITY}, a posição zera sem sumir e um fechamento a mais não paga de novo. \\
 Carteira & soma dos pesos de cada carteira-modelo é 10.000; sugestão soma exatamente o valor pedido (inclusive com centavos quebrados); recusa sem perfil; recusa valor abaixo do mínimo. \\
 Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate devolve custo, resultado e rentabilidade (inclusive na repetição idempotente); resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate sem perfil válido (não dá para vencer um perfil pela API: garantido porque o resgate não consulta o perfil); mesmo Idempotency-Key não aplica nem resgata duas vezes; ordem de outro cliente dá 404; \tb{GET} da ordem devolve o mesmo corpo da criação; histórico da mais nova para a mais antiga, paginado e filtrado por produto (produto inexistente: lista vazia); posição com valor atual, resultado, rentabilidade e total; posição zerada só com \tb{include_closed}; query inválida dá 400. \\
-Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. \\
+Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. A tarifa conta no dia de movimento da transferência, mesmo depois do fechamento. Estimada: o dia aberto não tem provisão; fechar um dia grava uma provisão com \tb{calendar_days} até o próximo dia e valores pela fórmula; a de sexta vale 3 dias; um dia fechado nunca muda; entre dois fechamentos, o depósito sobe a base do float no valor exato, a tarifa da transferência sai dela, a aplicação no CDB sobe a base do spread e a aplicação no fundo sobe a base do fundo; período sem dia fechado sai zerado; o período padrão é o mês da data de movimento. Extrato: filtra pelo dia de movimento, e um lançamento feito antes do fechamento fica no dia antigo. \\
 Concorrência \ext & dispara N transferências em paralelo (threads) de uma conta e confere que o saldo final nunca fica negativo e bate com o extrato. \\
 \bottomrule
 \end{longtable}
@@ -1768,11 +1801,24 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \item \textbf{Estimativa como foto de agora $\times$ dias} (saldos, cotas e taxas do momento da
   consulta, multiplicados pelos dias do período) --- foi a primeira versão do módulo 8; descartada
   porque erra em período passado: o relatório de janeiro pedido em outubro usaria os saldos de
-  outubro. \emph{Também descartado:} projetar os dias futuros do período com a foto de hoje, porque
-  mistura histórico com projeção num número só. \emph{Escolhido:} dia a dia pelo histórico
-  (\tb{ledger_entry}, \tb{investment_order}, \tb{product_price}, \tb{reference_rate}), só até hoje,
-  com o detalhe por dia na resposta (RN-REC-05 a 07 e 09). \emph{Preço aceito:} a resposta de um
-  ano tem cerca de 1.100 linhas de detalhe, e truncar cada dia perde até 1 centavo por dia.
+  outubro. \emph{Também descartados:} projetar os dias futuros com a foto de hoje, porque mistura
+  histórico com projeção; e calcular cada dia \emph{pelo histórico} a cada pedido (acumulando
+  \tb{ledger_entry} e \tb{investment_order} desde o primeiro dia), que foi a segunda versão: o custo
+  crescia com a idade do banco, não com o período. \emph{Escolhido:} a provisão diária gravada no
+  fechamento (RN-REC-05 a 07), como a contabilidade de um banco faz; o relatório só soma as linhas do
+  período. \emph{Preço aceito:} uma tabela a mais, o dia aberto sem estimativa até fechar, e a
+  limitação da operação no instante do fechamento (Módulo 8).
+  \item \textbf{Extrato e receita pelo relógio da máquina} (\tb{created_at}) --- descartado porque a
+  data de movimento é a data real simulada: depois de alguns fechamentos, o extrato mostraria 09/10
+  para uma transação feita no dia 14/10 do banco. \emph{Também descartado:} deduzir o dia de movimento
+  de cada transação pelo horário (o intervalo entre a abertura de um dia e a do seguinte), porque o
+  dia da transação é um dado de primeira classe, não algo a calcular por fora. \emph{Escolhido:}
+  \tb{transaction.business_date}, gravado na criação (RN-GER-13). Idade mínima e validade do perfil
+  continuam no relógio real, por serem fatos regulatórios.
+  \item \textbf{Trava na data de movimento em toda operação de dinheiro} (para a foto do fechamento
+  ser sempre exata) --- descartada porque o custo (um passo e uma trava a mais em cada operação, e
+  uma ordem de travas nova) não compensa corrigir centavos de estimativa no instante do fechamento.
+  Ganharia em produção, com volume alto (ver a limitação conhecida no Módulo 8).
   \item \textbf{Não fazer o módulo de investimentos} (``não fazer nada'') --- é a opção mais
   barata e deixaria todo o tempo para o núcleo. Descartada porque perderíamos o diferencial e a
   conexão com a vertical de fundos da QI Tech. \textbf{Vira o plano de corte:} se o núcleo atrasar,
@@ -2323,43 +2369,50 @@ HTTP/1.1 200 OK
 
 \subsection*{Relatório de receita}
 \begin{lstlisting}
-GET /internal/revenue?from=2026-10-01&to=2026-10-30
+GET /internal/revenue?from=2026-10-05&to=2026-11-01
 
 HTTP/1.1 200 OK
 {
-  "from": "2026-10-01",
-  "to": "2026-10-30",
-  "days": 30,
+  "from": "2026-10-05",
+  "to": "2026-11-01",
+  "days": 20,
   "realized": {
     "fee_amount": 400000
   },
   "estimated": {
     "fund_administration_fee": {
-      "amount": 410940,
+      "amount": 383548,
       "daily": [
-        {"date": "2026-10-01", "base_amount": 500000000,
-         "annual_rate_bps": 100, "amount": 13698},
+        {"date": "2026-10-05", "calendar_days": 1,
+         "base_amount": 500000000, "annual_rate_bps": 100,
+         "amount": 13698},
+        ...
+        {"date": "2026-10-09", "calendar_days": 3,
+         "base_amount": 500000000, "annual_rate_bps": 100,
+         "amount": 41095},
         ...
       ]
     },
     "own_issue_spread": {
-      "amount": 183690,
+      "amount": 171444,
       "daily": [
-        {"date": "2026-10-01", "base_amount": 300000000,
-         "cdi_annual_rate_bps": 1490, "amount": 6123},
+        {"date": "2026-10-05", "calendar_days": 1,
+         "base_amount": 300000000, "cdi_annual_rate_bps": 1490,
+         "amount": 6123},
         ...
       ]
     },
     "float": {
-      "amount": 2465730,
+      "amount": 2301356,
       "daily": [
-        {"date": "2026-10-01", "base_amount": 200000000,
-         "annual_rate_bps": 1500, "amount": 82191},
+        {"date": "2026-10-05", "calendar_days": 1,
+         "base_amount": 200000000, "annual_rate_bps": 1500,
+         "amount": 82191},
         ...
       ]
     }
   },
-  "total_amount": 3460360
+  "total_amount": 3256348
 }
 \end{lstlisting}
 
