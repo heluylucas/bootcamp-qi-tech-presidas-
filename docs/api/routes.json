@@ -91,7 +91,7 @@
           "method": "GET",
           "path": "/customer/{customer_key}/account/{account_key}/transactions",
           "title": "Extrato",
-          "description": "Os lançamentos da conta, do mais novo para o mais antigo, em páginas. Cada linha é um efeito no saldo: débito ou crédito, valor, saldo logo depois e a outra conta envolvida, quando há. Uma transferência aparece como dois lançamentos na origem (valor e tarifa) e um no destino. Conta bloqueada ou encerrada continua podendo consultar.",
+          "description": "Os lançamentos da conta, do mais novo para o mais antigo, em páginas. Cada linha é um efeito no saldo: débito ou crédito, valor, saldo logo depois e a outra conta envolvida, quando há. Uma transferência aparece como dois lançamentos na origem (valor e tarifa) e um no destino. `from` e `to` são datas de movimento (o calendário do banco): cada lançamento fica no dia de movimento em que a transação aconteceu (`business_date`), mesmo depois de o dia fechar. Conta bloqueada ou encerrada continua podendo consultar.",
           "query": "get_transactions.json",
           "responses": [{"status": 200, "description": "Uma página do extrato."}],
           "errors": ["PPP001001", "PPP002001", "PPP000005"]
@@ -101,7 +101,7 @@
           "method": "GET",
           "path": "/customer/{customer_key}/account/{account_key}/transaction/{transaction_key}",
           "title": "Comprovante",
-          "description": "O comprovante de uma movimentação, para a conta de origem ou de destino. Não mostra saldo: o destino não pode ver o saldo da origem. Transação que não envolve a conta responde 404.",
+          "description": "O comprovante de uma movimentação, para a conta de origem ou de destino. Não mostra saldo: o destino não pode ver o saldo da origem. Mostra o dia de movimento da transação (`business_date`). Transação que não envolve a conta responde 404.",
           "responses": [{"status": 200, "description": "Comprovante."}],
           "errors": ["PPP001001", "PPP002001", "PPP003001"]
         }
@@ -278,7 +278,7 @@
           "method": "POST",
           "path": "/internal/day_close",
           "title": "Fechar o dia",
-          "description": "Busca os preços do dia (Tesouro e administradora do fundo) e as taxas CDI e Selic nas fontes externas, calcula o preço do CDB e da LCI, paga as aplicações da LCI que vencem e abre o próximo dia útil. É tudo ou nada: se uma fonte falhar, nada é gravado e a data não anda. `close_date` precisa ser a data de movimento atual, então um clique duplo não fecha dois dias.",
+          "description": "Busca os preços do dia (Tesouro e administradora do fundo) e as taxas CDI e Selic nas fontes externas, calcula o preço do CDB e da LCI, grava a provisão de receita do dia que fecha (a foto do fim do dia e o que o banco ganharia com ela até o próximo dia; a de sexta vale 3 dias), paga as aplicações da LCI que vencem (transações do dia novo) e abre o próximo dia útil. É tudo ou nada: se uma fonte falhar, nada é gravado e a data não anda. `close_date` precisa ser a data de movimento atual, então um clique duplo não fecha dois dias.",
           "body": "post_day_close.json",
           "responses": [{"status": 201, "description": "Dia fechado; a resposta traz a nova data, os preços e as taxas."}],
           "errors": ["PPP000006", "PPP005006", "PPP005007"]
@@ -288,7 +288,7 @@
           "method": "GET",
           "path": "/internal/revenue",
           "title": "Receita do banco",
-          "description": "Quanto o banco recebeu de tarifas no período (a parte realizada, pela hora real dos lançamentos) e quanto estima ter ganho com a taxa do fundo, o spread do CDB e da LCI e o float. As estimativas são calculadas dia a dia pelo histórico: a base no fim de cada dia × a taxa vigente naquele dia / 365, truncado em centavos; o valor é a soma dos dias, e cada dia aparece em `daily`. Só contam os dias que já aconteceram (até hoje, em UTC): a receita de um dia passado não muda depois. As estimativas só calculam, não gravam nada. Sem datas, usa o mês corrente (até hoje).",
+          "description": "Quanto o banco recebeu de tarifas no período (a parte realizada, inclusive no dia ainda aberto) e quanto estima ter ganho com a taxa do fundo, o spread do CDB e da LCI e o float. O período é em datas de movimento. As estimativas são as provisões que o fechamento gravou para cada dia fechado: base do fim do dia × taxa do dia × dias corridos até o próximo dia de movimento / 365, truncado em centavos (a de sexta vale 3 dias). O dia aberto ainda não tem provisão. Cada dia aparece em `daily`, e o valor é a soma deles. Nada disso movimenta dinheiro. Sem datas, usa o mês da data de movimento atual.",
           "query": "get_revenue.json",
           "responses": [{"status": 200, "description": "Receita no período."}],
           "errors": ["PPP000005"]
