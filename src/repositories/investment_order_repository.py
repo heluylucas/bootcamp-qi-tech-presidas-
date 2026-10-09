@@ -1,9 +1,9 @@
 import uuid
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import List, Optional, Tuple
 
-from sqlalchemy import Date, case, cast, func
+from sqlalchemy import func
 from sqlalchemy.orm import aliased
 
 from database import Context
@@ -92,31 +92,6 @@ class InvestmentOrderRepository:
             .scalar()
         )
 
-    @staticmethod
-    def daily_position_changes(context: Context, end: datetime) -> List[Tuple[int, date, Decimal, int]]:
-        """Por produto e por dia (UTC), a variação de cotas e de custo de todas as contas antes de `end`.
-
-        Aplicação soma, resgate subtrai (no resgate o custo gravado é o que saiu da posição).
-        """
-        day = cast(func.timezone("UTC", InvestmentOrder.created_at), Date)
-        applied = Transaction.type == "INVESTMENT_APPLY"
-        rows = (
-            context.db_session.query(
-                InvestmentOrder.product_id,
-                day,
-                func.sum(case((applied, InvestmentOrder.quantity), else_=-InvestmentOrder.quantity)),
-                func.sum(
-                    case((applied, InvestmentOrder.acquisition_cost_amount), else_=-InvestmentOrder.acquisition_cost_amount)
-                ),
-            )
-            .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
-            .filter(InvestmentOrder.created_at < end)
-            .group_by(InvestmentOrder.product_id, day)
-            .order_by(day)
-            .all()
-        )
-        return [(product_id, row_day, quantity, int(cost)) for product_id, row_day, quantity, cost in rows]
-
 
 class PositionRepository:
     @staticmethod
@@ -156,6 +131,18 @@ class PositionRepository:
             query = query.filter(Position.quantity > 0)
 
         return query.order_by(Position.product_id).all()
+
+    @staticmethod
+    def sum_by_product(context: Context) -> List[Tuple[int, Decimal, int]]:
+        """Por produto, as cotas e o custo somados de todas as contas: a foto do fechamento (RN-REC-05 e 06)."""
+        rows = (
+            context.db_session.query(
+                Position.product_id, func.sum(Position.quantity), func.sum(Position.acquisition_cost_amount)
+            )
+            .group_by(Position.product_id)
+            .all()
+        )
+        return [(product_id, quantity, int(cost)) for product_id, quantity, cost in rows]
 
     @staticmethod
     def has_open_position(context: Context, account_id: int) -> bool:

@@ -1,12 +1,12 @@
 import uuid
-from datetime import date, datetime
+from datetime import date
 from typing import List, Optional, Tuple
 
-from sqlalchemy import Date, case, cast, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 
 from database import Context
-from models import Account, LedgerEntry, Transaction
+from models import LedgerEntry, Transaction
 
 
 class TransactionRepository:
@@ -32,27 +32,29 @@ class TransactionRepository:
         context: Context,
         account_id: int,
         transaction_type: Optional[str],
-        start: Optional[datetime],
-        end: Optional[datetime],
+        from_date: Optional[date],
+        to_date: Optional[date],
         offset: int,
         limit: int,
     ) -> Tuple[List[LedgerEntry], int]:
         """Uma página do extrato e o total de lançamentos que passam pelos filtros.
 
-        `start` entra e `end` não: o dia inteiro de `to` cabe com end = to + 1 dia.
+        As datas são do calendário do banco (o business_date da transação), com as duas pontas inclusas.
         """
-        query = context.db_session.query(LedgerEntry).filter(LedgerEntry.account_id == account_id)
+        query = (
+            context.db_session.query(LedgerEntry)
+            .join(Transaction, LedgerEntry.transaction_id == Transaction.id)
+            .filter(LedgerEntry.account_id == account_id)
+        )
 
         if transaction_type is not None:
-            query = query.join(Transaction, LedgerEntry.transaction_id == Transaction.id).filter(
-                Transaction.type == transaction_type
-            )
+            query = query.filter(Transaction.type == transaction_type)
 
-        if start is not None:
-            query = query.filter(LedgerEntry.created_at >= start)
+        if from_date is not None:
+            query = query.filter(Transaction.business_date >= from_date)
 
-        if end is not None:
-            query = query.filter(LedgerEntry.created_at < end)
+        if to_date is not None:
+            query = query.filter(Transaction.business_date <= to_date)
 
         total = query.count()
         # Os lançamentos de uma transação nascem com o mesmo NOW(); o id desempata.
@@ -67,40 +69,22 @@ class TransactionRepository:
         return entries, total
 
     @staticmethod
-    def sum_credits(context: Context, account_id: int, category: str, start: datetime, end: datetime) -> int:
-        """Soma dos créditos da categoria na conta, com `start` dentro e `end` fora do período."""
+    def sum_credits(context: Context, account_id: int, category: str, from_date: date, to_date: date) -> int:
+        """Soma dos créditos da categoria na conta, nos dias de movimento do período (as duas pontas)."""
         total = (
             context.db_session.query(func.sum(LedgerEntry.amount))
+            .join(Transaction, LedgerEntry.transaction_id == Transaction.id)
             .filter(
                 LedgerEntry.account_id == account_id,
                 LedgerEntry.direction == "CREDIT",
                 LedgerEntry.category == category,
-                LedgerEntry.created_at >= start,
-                LedgerEntry.created_at < end,
+                Transaction.business_date >= from_date,
+                Transaction.business_date <= to_date,
             )
             .scalar()
         )
 
         return int(total or 0)
-
-    @staticmethod
-    def daily_customer_balance_changes(context: Context, end: datetime) -> List[Tuple[date, int]]:
-        """Por dia (UTC), a variação somada dos saldos das contas de cliente antes de `end`.
-
-        Crédito soma, débito subtrai: acumulando os dias, sai o saldo total no fim de cada dia.
-        A conta do banco (sem cliente) fica de fora.
-        """
-        day = cast(func.timezone("UTC", LedgerEntry.created_at), Date)
-        signed = case((LedgerEntry.direction == "CREDIT", LedgerEntry.amount), else_=-LedgerEntry.amount)
-        rows = (
-            context.db_session.query(day, func.sum(signed))
-            .join(Account, LedgerEntry.account_id == Account.id)
-            .filter(Account.customer_id.isnot(None), LedgerEntry.created_at < end)
-            .group_by(day)
-            .order_by(day)
-            .all()
-        )
-        return [(row_day, int(change)) for row_day, change in rows]
 
     @staticmethod
     def get_by_key_for_account(context: Context, transaction_key: str, account_id: int) -> Optional[Transaction]:
@@ -124,6 +108,7 @@ class TransactionRepository:
         fee_amount: int,
         description: Optional[str],
         idempotency_key: Optional[str],
+        business_date: date,
     ) -> Transaction:
         transaction = Transaction(
             transaction_key=str(uuid.uuid4()),
@@ -134,6 +119,7 @@ class TransactionRepository:
             fee_amount=fee_amount,
             description=description,
             idempotency_key=idempotency_key,
+            business_date=business_date,
         )
         context.db_session.add(transaction)
         context.db_session.flush()
