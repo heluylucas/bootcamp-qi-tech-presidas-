@@ -1,14 +1,14 @@
 import calendar
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+from typing import List, Optional, Tuple
 
 from controllers.base_controller import BaseController
 from controllers.transaction_controller import start_of_day
 from errors import InvalidParameter
 from repositories import (
     AccountRepository,
-    BusinessDayRepository,
-    PositionRepository,
+    InvestmentOrderRepository,
     ProductRepository,
     ReferenceRateRepository,
     TransactionRepository,
@@ -18,6 +18,8 @@ from utils.dates import parse_date
 
 # Maior período aceito no relatório, em dias, contando as duas pontas (RN-REC-09).
 MAX_PERIOD_DAYS = 366
+
+ESTIMATES = ("fund_administration_fee", "own_issue_spread", "float")
 
 
 class RevenueController(BaseController):
@@ -45,61 +47,104 @@ class RevenueController(BaseController):
             self.context, bank.id, "FEE", start_of_day(from_date), start_of_day(to_date + timedelta(days=1))
         )
 
-        # Estimada (RN-REC-01): só calcula, não grava nada. Taxas e cotas da data de movimento.
-        days = (to_date - from_date).days + 1
-        business_date = BusinessDayRepository.get_current(self.context).business_date
-        products = ProductRepository.list(self.context, None, None)
-        held = {product.id: (quantity, cost) for product, quantity, cost in PositionRepository.sum_by_product(self.context)}
-        estimated = {
-            "fund_administration_fee": self.fund_administration_fee(products, held, business_date, days),
-            "own_issue_spread": self.own_issue_spread(products, held, business_date, days),
-            "float": self.float_estimate(business_date, days),
-        }
+        # Estimada (RN-REC-01): só calcula, não grava nada. Só os dias que já aconteceram (até hoje).
+        last_day = min(to_date, today)
+        days = [from_date + timedelta(days=offset) for offset in range((last_day - from_date).days + 1)]
+        estimated = self.estimate(days) if days else {name: {"amount": 0, "daily": []} for name in ESTIMATES}
 
         return {
             "from": from_date.isoformat(),
             "to": to_date.isoformat(),
-            "days": days,
+            "days": len(days),
             "realized": {"fee_amount": fee_amount},
             "estimated": estimated,
             "total_amount": fee_amount + sum(estimate["amount"] for estimate in estimated.values()),
         }
 
-    def fund_administration_fee(self, products: list, held: dict, business_date: date, days: int) -> dict:
-        """RN-REC-05: patrimônio do fundo ao preço do dia × taxa × dias / 365."""
+    def estimate(self, days: List[date]) -> dict:
+        """RN-REC-05 a 07, dia a dia: a base no fim de cada dia × a taxa vigente naquele dia / 365.
+
+        As bases saem do histórico (lançamentos e ordens acumulados até o dia), não da foto de agora:
+        a receita de um dia passado não muda com o que acontece depois.
+        """
+        end = start_of_day(days[-1] + timedelta(days=1))
+        products = ProductRepository.list(self.context, None, None)
         fund = next(product for product in products if product.administration_fee_bps)
-        quantity, _ = held.get(fund.id, (Decimal(0), 0))
-        unit_price = ProductRepository.get_price_on(self.context, fund.id, business_date).unit_price
-        # Centavos para baixo, como o valor atual da posição (RN-POS-01).
-        base_amount = int(quantity * unit_price * 100)
+        own_issues = [product for product in products if product.price_source_code is None]
+
+        changes = InvestmentOrderRepository.daily_position_changes(self.context, end)
+        quantities = {
+            product.id: running_totals(days, [(day, quantity) for pid, day, quantity, _ in changes if pid == product.id])
+            for product in products
+        }
+        costs = {
+            product.id: running_totals(days, [(day, cost) for pid, day, _, cost in changes if pid == product.id])
+            for product in products
+        }
+        balances = running_totals(days, TransactionRepository.daily_customer_balance_changes(self.context, end))
+        fund_prices = [
+            (price.price_date, price.unit_price)
+            for price in ProductRepository.list_prices(self.context, fund.id, None, days[-1])
+        ]
+        cdi = [(rate.rate_date, rate.annual_rate_bps) for rate in ReferenceRateRepository.list_until(self.context, "CDI", days[-1])]
+        selic = [
+            (rate.rate_date, rate.annual_rate_bps) for rate in ReferenceRateRepository.list_until(self.context, "SELIC", days[-1])
+        ]
+
+        fund_daily, spread_daily, float_daily = [], [], []
+        for index, day in enumerate(days):
+            # Fundo: patrimônio ao preço do dia, em centavos para baixo, como a posição (RN-POS-01).
+            unit_price = last_on(fund_prices, day)
+            fund_base = int(quantities[fund.id][index] * unit_price * 100) if unit_price is not None else 0
+            fund_daily.append(daily_entry(day, fund_base, fund.administration_fee_bps))
+
+            # Spread: cada título paga um percentual do CDI, então a conta é por produto.
+            cdi_bps = last_on(cdi, day)
+            spread_base = sum(costs[product.id][index] for product in own_issues)
+            spread = sum(
+                Decimal(costs[product.id][index]) * (cdi_bps or 0) * (10000 - product.cdi_percentage_bps)
+                for product in own_issues
+            )
+            spread_daily.append(
+                {
+                    "date": day.isoformat(),
+                    "base_amount": spread_base,
+                    "cdi_annual_rate_bps": cdi_bps,
+                    "amount": int(spread / (10000 * 10000 * 365)),
+                }
+            )
+
+            # Float: saldo parado nas contas de cliente no fim do dia × Selic.
+            float_daily.append(daily_entry(day, balances[index], last_on(selic, day)))
+
         return {
-            "base_amount": base_amount,
-            "annual_rate_bps": fund.administration_fee_bps,
-            "amount": estimate(base_amount, fund.administration_fee_bps, days),
+            name: {"amount": sum(entry["amount"] for entry in daily), "daily": daily}
+            for name, daily in zip(ESTIMATES, (fund_daily, spread_daily, float_daily))
         }
 
-    def own_issue_spread(self, products: list, held: dict, business_date: date, days: int) -> dict:
-        """RN-REC-06: custo aplicado em CDB e LCI × CDI × (1 − percentual pago) × dias / 365.
 
-        Cada título paga um percentual do CDI, então a conta é por produto, somada no fim.
-        """
-        cdi_bps = ReferenceRateRepository.get_on(self.context, "CDI", business_date).annual_rate_bps
-        base_amount = 0
-        spread = Decimal(0)
-        for product in products:
-            if product.price_source_code is None:
-                _, cost = held.get(product.id, (Decimal(0), 0))
-                base_amount += cost
-                spread += Decimal(cost) * cdi_bps * (10000 - product.cdi_percentage_bps) / 10000
-        return {"base_amount": base_amount, "amount": int(spread * days / (10000 * 365))}
-
-    def float_estimate(self, business_date: date, days: int) -> dict:
-        """RN-REC-07: saldo parado nas contas de cliente × Selic × dias / 365 (sem a conta do banco)."""
-        selic_bps = ReferenceRateRepository.get_on(self.context, "SELIC", business_date).annual_rate_bps
-        base_amount = AccountRepository.sum_customer_balances(self.context, ["ACTIVE", "BLOCKED"])
-        return {"base_amount": base_amount, "annual_rate_bps": selic_bps, "amount": estimate(base_amount, selic_bps, days)}
+def daily_entry(day: date, base_amount: int, annual_rate_bps: Optional[int]) -> dict:
+    """Um dia da estimativa: base × taxa anual / 365, em centavos para baixo. Sem taxa publicada, 0."""
+    amount = int(Decimal(base_amount) * annual_rate_bps / (10000 * 365)) if annual_rate_bps is not None else 0
+    return {"date": day.isoformat(), "base_amount": base_amount, "annual_rate_bps": annual_rate_bps, "amount": amount}
 
 
-def estimate(base_amount: int, annual_rate_bps: int, days: int) -> int:
-    """Base × taxa anual × dias / 365, em centavos para baixo. Aproximação linear (RN-REC-05)."""
-    return int(Decimal(base_amount) * annual_rate_bps * days / (10000 * 365))
+def running_totals(days: List[date], changes: List[Tuple[date, int]]) -> list:
+    """O total acumulado no fim de cada dia, somando as variações (em ordem de dia) até ele."""
+    totals, total, index = [], 0, 0
+    for day in days:
+        while index < len(changes) and changes[index][0] <= day:
+            total += changes[index][1]
+            index += 1
+        totals.append(total)
+    return totals
+
+
+def last_on(published: list, day: date):
+    """O último valor publicado até o dia (RN-PRO-04 e RN-REC-08); None se nada foi publicado ainda."""
+    value = None
+    for published_day, published_value in published:
+        if published_day > day:
+            break
+        value = published_value
+    return value
