@@ -288,7 +288,7 @@
           "method": "GET",
           "path": "/internal/revenue",
           "title": "Receita do banco",
-          "description": "Quanto o banco recebeu de tarifas no período (a parte realizada, pela hora real dos lançamentos) e quanto estima ganhar com a taxa do fundo, o spread do CDB e da LCI e o float. Cada estimativa vem com a base e a taxa usadas: valor = base × taxa anual × dias / 365, em centavos para baixo. As estimativas só calculam, não gravam nada. Sem datas, usa o mês corrente.",
+          "description": "Quanto o banco recebeu de tarifas no período (a parte realizada, pela hora real dos lançamentos) e quanto estima ter ganho com a taxa do fundo, o spread do CDB e da LCI e o float. As estimativas são calculadas dia a dia pelo histórico: a base no fim de cada dia × a taxa vigente naquele dia / 365, truncado em centavos; o valor é a soma dos dias, e cada dia aparece em `daily`. Só contam os dias que já aconteceram (até hoje, em UTC): a receita de um dia passado não muda depois. As estimativas só calculam, não gravam nada. Sem datas, usa o mês corrente (até hoje).",
           "query": "get_revenue.json",
           "responses": [{"status": 200, "description": "Receita no período."}],
           "errors": ["PPP000005"]
