@@ -1,9 +1,11 @@
 import calendar
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import pytest
 
+from tests.integration.test_investment_order import CDB, FUND, apply, investor
 from tests.utils import INTERNAL_TOKEN, RandomGenerator, RequestGenerator
 from tests.utils.requisition import ClientRequisition
 
@@ -77,6 +79,81 @@ class TestFeeRevenue:
         RequestGenerator.post_transaction(origin_customer, origin_account, payload, key)
 
         assert fee_revenue_today() == before + TRANSFER_FEE
+
+
+def estimated(period: dict = None) -> dict:
+    _, body = RequestGenerator.get_revenue(period or {"from": "2026-10-01", "to": "2026-10-30"})
+    return body["estimated"]
+
+
+def by_formula(estimate: dict, days: int) -> int:
+    """RN-REC-05 e 07: base × taxa anual × dias / 365, em centavos para baixo."""
+    return int(Decimal(estimate["base_amount"]) * estimate["annual_rate_bps"] * days / (10000 * 365))
+
+
+class TestEstimatedRevenue:
+    def test_estimates_follow_the_formula(self):
+        status, body = RequestGenerator.get_revenue({"from": "2026-10-01", "to": "2026-10-30"})
+
+        assert status == 200
+        assert body["days"] == 30
+        assert body["estimated"]["float"]["amount"] == by_formula(body["estimated"]["float"], 30)
+        fund_fee = body["estimated"]["fund_administration_fee"]
+        assert fund_fee["annual_rate_bps"] == 100
+        assert fund_fee["amount"] == by_formula(fund_fee, 30)
+        assert body["total_amount"] == body["realized"]["fee_amount"] + sum(
+            estimate["amount"] for estimate in body["estimated"].values()
+        )
+
+    def test_deposit_raises_the_float_base(self):
+        customer_key, account_key = open_account()
+        before = estimated()["float"]["base_amount"]
+
+        send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000})
+
+        assert estimated()["float"]["base_amount"] == before + 10000
+
+    def test_transfer_fee_leaves_the_float(self):
+        """A tarifa vai para a conta do banco, que não entra no float (RN-REC-07)."""
+        origin_customer, origin_account = open_account()
+        _, destination_account = open_account()
+        send(origin_customer, origin_account, {"type": "DEPOSIT", "amount": 100000})
+        before = estimated()["float"]["base_amount"]
+
+        send(
+            origin_customer,
+            origin_account,
+            {"type": "TRANSFER", "amount": 20000, "destination_account_key": destination_account},
+        )
+
+        assert estimated()["float"]["base_amount"] == before - TRANSFER_FEE
+
+    def test_own_issue_application_raises_the_spread_base(self):
+        customer_key, account_key = investor()
+        before = estimated()
+
+        apply(customer_key, account_key, CDB, 50000)
+
+        after = estimated()
+        assert after["own_issue_spread"]["base_amount"] == before["own_issue_spread"]["base_amount"] + 50000
+        assert after["float"]["base_amount"] == before["float"]["base_amount"] - 50000
+
+    def test_fund_application_raises_the_fund_base(self):
+        customer_key, account_key = investor()
+        before = estimated()["fund_administration_fee"]["base_amount"]
+
+        apply(customer_key, account_key, FUND, 50000)
+
+        # As cotas são truncadas em 8 casas: o patrimônio ao preço do dia pode ficar 1 centavo abaixo.
+        assert before + 49999 <= estimated()["fund_administration_fee"]["base_amount"] <= before + 50000
+
+    def test_report_does_not_move_money(self):
+        customer_key, account_key = open_account()
+        send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000})
+
+        estimated()
+
+        assert balance_of(customer_key, account_key) == 10000
 
 
 class TestRevenuePeriod:
