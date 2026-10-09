@@ -1,8 +1,9 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 
+from tests.integration.test_day_close import business_date, close_day
 from tests.utils import RandomGenerator, RequestGenerator
 
 
@@ -629,16 +630,31 @@ class TestStatement:
         assert [(item["type"], item["amount"]) for item in items] == [("WITHDRAWAL", 1000)]
 
     def test_filter_by_date(self):
-        """Datas reais do lançamento (created_at), em UTC, com as duas pontas inclusas."""
+        """Datas de movimento (o calendário do banco), com as duas pontas inclusas."""
         customer_key, account_key = open_account()
         deposit(customer_key, account_key, 1000)
-        today = datetime.now(timezone.utc).date()
+        today = business_date()
         tomorrow = (today + timedelta(days=1)).isoformat()
         yesterday = (today - timedelta(days=1)).isoformat()
 
-        assert len(statement(customer_key, account_key, **{"from": today.isoformat(), "to": today.isoformat()})) == 1
+        items = statement(customer_key, account_key, **{"from": today.isoformat(), "to": today.isoformat()})
+        assert [item["business_date"] for item in items] == [today.isoformat()]
         assert statement(customer_key, account_key, **{"from": tomorrow}) == []
         assert statement(customer_key, account_key, to=yesterday) == []
+
+    def test_statement_follows_the_business_day(self):
+        """O lançamento fica no dia de movimento em que aconteceu, mesmo depois do fechamento."""
+        customer_key, account_key = open_account()
+        deposit(customer_key, account_key, 1000)
+        first_day = business_date()
+        close_day()
+        second_day = business_date()
+        deposit(customer_key, account_key, 2000)
+
+        first = statement(customer_key, account_key, **{"from": first_day.isoformat(), "to": first_day.isoformat()})
+        second = statement(customer_key, account_key, **{"from": second_day.isoformat()})
+        assert [(item["amount"], item["business_date"]) for item in first] == [(1000, first_day.isoformat())]
+        assert [(item["amount"], item["business_date"]) for item in second] == [(2000, second_day.isoformat())]
 
     def test_blocked_account_still_sees_statement(self):
         """RN-CON-09: conta bloqueada não movimenta, mas consulta."""
@@ -688,6 +704,7 @@ class TestReceipt:
             "description": "aluguel",
             "origin_account_key": origin_account,
             "destination_account_key": destination_account,
+            "business_date": business_date().isoformat(),
             "created_at": created["created_at"],
         }
 

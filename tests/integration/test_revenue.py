@@ -1,10 +1,11 @@
 import calendar
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
 
+from tests.integration.test_day_close import business_date, close_day
 from tests.integration.test_investment_order import CDB, FUND, apply, investor
 from tests.utils import INTERNAL_TOKEN, RandomGenerator, RequestGenerator
 from tests.utils.requisition import ClientRequisition
@@ -14,14 +15,15 @@ from tests.utils.requisition import ClientRequisition
 TRANSFER_FEE = 200
 
 
-def today() -> str:
-    # O período filtra pela hora real do lançamento, em UTC (RN-REC-09).
-    return datetime.now(timezone.utc).date().isoformat()
+def revenue(from_date: date, to_date: date) -> dict:
+    """O relatório de um período em datas de movimento (RN-REC-09)."""
+    _, body = RequestGenerator.get_revenue({"from": from_date.isoformat(), "to": to_date.isoformat()})
+    return body
 
 
 def fee_revenue_today() -> int:
-    _, body = RequestGenerator.get_revenue({"from": today(), "to": today()})
-    return body["realized"]["fee_amount"]
+    today = business_date()
+    return revenue(today, today)["realized"]["fee_amount"]
 
 
 def open_account() -> tuple:
@@ -80,87 +82,111 @@ class TestFeeRevenue:
 
         assert fee_revenue_today() == before + TRANSFER_FEE
 
+    def test_fee_belongs_to_the_business_day_of_the_transfer(self):
+        """A tarifa conta no dia de movimento em que a transferência aconteceu, não no dia seguinte."""
+        origin_customer, origin_account = open_account()
+        _, destination_account = open_account()
+        send(origin_customer, origin_account, {"type": "DEPOSIT", "amount": 100000})
+        day = business_date()
+        send(
+            origin_customer,
+            origin_account,
+            {"type": "TRANSFER", "amount": 20000, "destination_account_key": destination_account},
+        )
+        fee_of_day = revenue(day, day)["realized"]["fee_amount"]
 
-def day_offset(days: int) -> str:
-    """Hoje (UTC) mais `days` dias, em AAAA-MM-DD."""
-    return (datetime.now(timezone.utc).date() + timedelta(days=days)).isoformat()
+        close_day()
+
+        assert revenue(day, day)["realized"]["fee_amount"] == fee_of_day
+        assert fee_revenue_today() == 0
 
 
-def estimated(period: dict = None) -> dict:
-    """As estimativas do período; sem período, só o dia de hoje."""
-    _, body = RequestGenerator.get_revenue(period or {"from": today(), "to": today()})
-    return body["estimated"]
+def accrual_of(day: date) -> dict:
+    """As estimativas de um único dia de movimento."""
+    return revenue(day, day)["estimated"]
 
 
-def base_today(name: str) -> int:
-    return estimated()[name]["daily"][0]["base_amount"]
+def close_and_accrual() -> dict:
+    """Fecha o dia atual e devolve a provisão que o fechamento gravou para ele."""
+    day = business_date()
+    close_day()
+    return accrual_of(day)
+
+
+def base_of(accrual: dict, name: str) -> int:
+    return accrual[name]["daily"][0]["base_amount"]
 
 
 def by_formula(day: dict) -> int:
-    """RN-REC-05 e 07: base do dia × taxa anual do dia / 365, em centavos para baixo.
-
-    Dia anterior à primeira taxa publicada (o banco ainda não existia) vale 0.
-    """
-    if day["annual_rate_bps"] is None:
-        return 0
-    return int(Decimal(day["base_amount"]) * day["annual_rate_bps"] / (10000 * 365))
+    """RN-REC-05 e 07: base × taxa anual × dias corridos / 365, em centavos para baixo."""
+    return int(Decimal(day["base_amount"]) * day["annual_rate_bps"] * day["calendar_days"] / (10000 * 365))
 
 
 class TestEstimatedRevenue:
-    def test_each_estimate_is_the_sum_of_its_days(self):
-        status, body = RequestGenerator.get_revenue({"from": day_offset(-6), "to": today()})
+    def test_open_day_has_no_accrual(self):
+        """Só dia fechado tem provisão: o dia aberto ainda não tem a foto do fim do dia."""
+        today = business_date()
 
-        assert status == 200
-        assert body["days"] == 7
-        for name, estimate in body["estimated"].items():
-            assert [day["date"] for day in estimate["daily"]] == [day_offset(offset) for offset in range(-6, 1)]
-            assert estimate["amount"] == sum(day["amount"] for day in estimate["daily"]), name
-        for name in ("fund_administration_fee", "float"):
-            for day in body["estimated"][name]["daily"]:
-                assert day["amount"] == by_formula(day), name
-        assert body["total_amount"] == body["realized"]["fee_amount"] + sum(
-            estimate["amount"] for estimate in body["estimated"].values()
-        )
+        body = revenue(today, today)
 
-    def test_deposit_today_does_not_change_a_past_period(self):
-        """Cada dia usa a base daquele dia: o dinheiro de hoje não entra na receita de ontem."""
-        customer_key, account_key = open_account()
-        yesterday = {"from": day_offset(-1), "to": day_offset(-1)}
-        before = estimated(yesterday)
-
-        send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000})
-
-        assert estimated(yesterday) == before
-
-    def test_days_after_today_are_not_counted(self):
-        status, body = RequestGenerator.get_revenue({"from": today(), "to": day_offset(10)})
-
-        assert status == 200
-        assert body["days"] == 1
-        assert all(len(estimate["daily"]) == 1 for estimate in body["estimated"].values())
-
-    def test_period_in_the_future_has_no_estimate(self):
-        status, body = RequestGenerator.get_revenue({"from": day_offset(1), "to": day_offset(5)})
-
-        assert status == 200
         assert body["days"] == 0
         for estimate in body["estimated"].values():
             assert estimate == {"amount": 0, "daily": []}
 
-    def test_deposit_raises_the_float_base(self):
+    def test_closing_a_day_records_its_accrual(self):
+        day = business_date()
+
+        close_day()
+
+        next_day = business_date()
+        body = revenue(day, day)
+        assert body["days"] == 1
+        for name, estimate in body["estimated"].items():
+            assert len(estimate["daily"]) == 1, name
+            assert estimate["daily"][0]["date"] == day.isoformat()
+            assert estimate["daily"][0]["calendar_days"] == (next_day - day).days
+            assert estimate["amount"] == estimate["daily"][0]["amount"]
+        for name in ("fund_administration_fee", "float"):
+            assert body["estimated"][name]["daily"][0]["amount"] == by_formula(body["estimated"][name]["daily"][0])
+        assert body["estimated"]["fund_administration_fee"]["daily"][0]["annual_rate_bps"] == 100
+        assert body["total_amount"] == body["realized"]["fee_amount"] + sum(
+            estimate["amount"] for estimate in body["estimated"].values()
+        )
+
+    def test_friday_accrual_covers_the_weekend(self):
+        """O dinheiro parado no fim de semana continua aplicado: a provisão de sexta vale 3 dias."""
+        while business_date().weekday() != 4:
+            close_day()
+
+        accrual = close_and_accrual()
+
+        assert accrual["float"]["daily"][0]["calendar_days"] == 3
+
+    def test_closed_day_never_changes(self):
+        """A provisão é gravada no fechamento e nunca alterada (R4)."""
         customer_key, account_key = open_account()
-        before = base_today("float")
+        day = business_date()
+        close_day()
+        before = accrual_of(day)
 
         send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000})
 
-        assert base_today("float") == before + 10000
+        assert accrual_of(day) == before
+
+    def test_deposit_raises_the_float_base(self):
+        customer_key, account_key = open_account()
+        before = close_and_accrual()
+
+        send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000})
+
+        assert base_of(close_and_accrual(), "float") == base_of(before, "float") + 10000
 
     def test_transfer_fee_leaves_the_float(self):
         """A tarifa vai para a conta do banco, que não entra no float (RN-REC-07)."""
         origin_customer, origin_account = open_account()
         _, destination_account = open_account()
         send(origin_customer, origin_account, {"type": "DEPOSIT", "amount": 100000})
-        before = base_today("float")
+        before = close_and_accrual()
 
         send(
             origin_customer,
@@ -168,44 +194,59 @@ class TestEstimatedRevenue:
             {"type": "TRANSFER", "amount": 20000, "destination_account_key": destination_account},
         )
 
-        assert base_today("float") == before - TRANSFER_FEE
+        assert base_of(close_and_accrual(), "float") == base_of(before, "float") - TRANSFER_FEE
 
     def test_own_issue_application_raises_the_spread_base(self):
         customer_key, account_key = investor()
-        spread_before, float_before = base_today("own_issue_spread"), base_today("float")
+        before = close_and_accrual()
 
         apply(customer_key, account_key, CDB, 50000)
 
-        assert base_today("own_issue_spread") == spread_before + 50000
-        assert base_today("float") == float_before - 50000
+        after = close_and_accrual()
+        assert base_of(after, "own_issue_spread") == base_of(before, "own_issue_spread") + 50000
+        assert base_of(after, "float") == base_of(before, "float") - 50000
 
     def test_fund_application_raises_the_fund_base(self):
         customer_key, account_key = investor()
-        before = base_today("fund_administration_fee")
+        # Um fechamento antes: os dois dias comparados ficam com a mesma cota (a padrão do mock).
+        close_day()
+        before = close_and_accrual()
 
         apply(customer_key, account_key, FUND, 50000)
 
+        after = base_of(close_and_accrual(), "fund_administration_fee")
         # As cotas são truncadas em 8 casas: o patrimônio ao preço do dia pode ficar 1 centavo abaixo.
-        assert before + 49999 <= base_today("fund_administration_fee") <= before + 50000
+        assert base_of(before, "fund_administration_fee") + 49999 <= after
+        assert after <= base_of(before, "fund_administration_fee") + 50000
+
+    def test_period_without_closed_day_has_no_estimate(self):
+        later = business_date() + timedelta(days=10)
+
+        body = revenue(later, later + timedelta(days=5))
+
+        assert body["days"] == 0
+        for estimate in body["estimated"].values():
+            assert estimate == {"amount": 0, "daily": []}
 
     def test_report_does_not_move_money(self):
         customer_key, account_key = open_account()
         send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000})
+        today = business_date()
 
-        estimated()
+        revenue(today - timedelta(days=30), today)
 
         assert balance_of(customer_key, account_key) == 10000
 
 
 class TestRevenuePeriod:
-    def test_default_period_is_the_current_month(self):
+    def test_default_period_is_the_current_business_month(self):
         status, body = RequestGenerator.get_revenue()
 
-        now = datetime.now(timezone.utc).date()
-        last_day = calendar.monthrange(now.year, now.month)[1]
+        today = business_date()
+        last_day = calendar.monthrange(today.year, today.month)[1]
         assert status == 200
-        assert body["from"] == now.replace(day=1).isoformat()
-        assert body["to"] == now.replace(day=last_day).isoformat()
+        assert body["from"] == today.replace(day=1).isoformat()
+        assert body["to"] == today.replace(day=last_day).isoformat()
         assert isinstance(body["realized"]["fee_amount"], int)
 
     def test_from_after_to(self):
