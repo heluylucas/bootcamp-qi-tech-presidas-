@@ -3,11 +3,15 @@ from datetime import datetime, timezone
 from models import Account, AccountStatusEvent
 
 
-def account_to_dict(account: Account) -> dict:
+def account_to_dict(account: Account, investments_amount: int) -> dict:
+    """`balance` é só o dinheiro na conta; `investments_amount`, as posições dela ao preço do dia."""
     return {
         "account_key": account.account_key,
         "status": account.status,
         "balance": account.balance,
+        "investments_amount": investments_amount,
+        # O capital total do cliente nesta conta. Calculado, não gravado: o preço muda todo dia.
+        "net_worth_amount": account.balance + investments_amount,
         "created_at": to_utc_text(account.created_at),
         "updated_at": to_utc_text(account.updated_at),
     }

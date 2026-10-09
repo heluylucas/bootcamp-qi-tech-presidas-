@@ -38,9 +38,9 @@ INCOMING_TYPES = ("DEPOSIT", "INVESTMENT_REDEEM")
 def receipt_to_dict(transaction: Transaction) -> dict:
     """O comprovante (RN-MOV-13). Sem saldo: o destino não pode ver o saldo da origem."""
     if transaction.type in INCOMING_TYPES:
-        origin, destination = None, transaction.account
+        origin, destination = None, transaction.owner_account
     else:
-        origin, destination = transaction.account, transaction.destination_account
+        origin, destination = transaction.owner_account, transaction.destination_account
 
     return {
         "transaction_key": transaction.transaction_key,
@@ -56,10 +56,10 @@ def receipt_to_dict(transaction: Transaction) -> dict:
 
 def counterparty_key(transaction: Transaction, account_id: int):
     """A OUTRA conta da transação; None quando o dinheiro veio ou foi para fora (depósito, saque)."""
-    if transaction.account_id == account_id:
+    if transaction.owner_account_id == account_id:
         return account_key_or_none(transaction.destination_account)
 
-    return account_key_or_none(transaction.account)
+    return account_key_or_none(transaction.owner_account)
 
 
 def account_key_or_none(account):
