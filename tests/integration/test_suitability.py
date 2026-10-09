@@ -61,7 +61,7 @@ class TestListQuestions:
 
 class TestSubmitSuitability:
     @pytest.mark.parametrize(
-        "option, expected_score, expected_profile, expected_max_risk",
+        "option, expected_score, expected_profile, expected_maximum_risk",
         [
             (1, 7, "CONSERVATIVE", 2),
             (2, 14, "MODERATE", 3),
@@ -69,7 +69,7 @@ class TestSubmitSuitability:
             (4, 28, "AGGRESSIVE", 5),
         ],
     )
-    def test_profile_by_score(self, option, expected_score, expected_profile, expected_max_risk):
+    def test_profile_by_score(self, option, expected_score, expected_profile, expected_maximum_risk):
         customer_key = create_customer()
 
         status, body = RequestGenerator.post_suitability(customer_key, answers(option))
@@ -77,7 +77,7 @@ class TestSubmitSuitability:
         assert status == 201
         assert body["score"] == expected_score
         assert body["profile"] == expected_profile
-        assert body["max_risk_level"] == expected_max_risk
+        assert body["maximum_risk_level"] == expected_maximum_risk
         assert body["forced_by_rule"] is False
 
     def test_upper_limit_of_conservative(self):
@@ -111,7 +111,7 @@ class TestSubmitSuitability:
         assert body["score"] == 25
         assert body["profile"] == "CONSERVATIVE"
         # O risco máximo segue o perfil final, não os pontos (que dariam Arrojado, 5).
-        assert body["max_risk_level"] == 2
+        assert body["maximum_risk_level"] == 2
         assert body["forced_by_rule"] is True
 
     def test_response_format(self):

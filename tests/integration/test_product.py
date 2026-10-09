@@ -30,8 +30,8 @@ class TestListProducts:
             assert "id" not in product
             assert product["type"] in PRODUCT_TYPES
 
-    def test_filter_by_max_risk(self):
-        status, body = RequestGenerator.get_products({"max_risk": "2"})
+    def test_filter_by_maximum_risk_level(self):
+        status, body = RequestGenerator.get_products({"maximum_risk_level": "2"})
 
         assert status == 200
         assert len(body["items"]) == 4
@@ -45,7 +45,7 @@ class TestListProducts:
 
     @pytest.mark.parametrize(
         "query_params",
-        [{"max_risk": "0"}, {"max_risk": "abc"}, {"type": "STOCK"}, {"color": "blue"}],
+        [{"maximum_risk_level": "0"}, {"maximum_risk_level": "abc"}, {"type": "STOCK"}, {"color": "blue"}],
     )
     def test_invalid_filter(self, query_params):
         status, body = RequestGenerator.get_products(query_params)
@@ -62,8 +62,10 @@ class TestGetProduct:
 
         assert status == 200
         assert body["name"] == "Tesouro Selic 2031"
+        # Aplicação mínima em centavos: R$ 50,00.
+        assert body["minimum_application_amount"] == 5000
         # O preço do dia é o da data de movimento (RN-PRO-04), em texto (R6).
-        assert body["price"]["reference_date"] == business_date().isoformat()
+        assert body["price"]["price_date"] == business_date().isoformat()
         assert float(body["price"]["unit_price"]) > 0
         assert len(body["price"]["unit_price"].split(".")[1]) == 8
 
@@ -75,18 +77,20 @@ class TestGetProduct:
 
         assert status == 200
         assert body["term_months"] == 12
-        assert body["maturity_date"] is None
-        assert body["tax_exempt"] is True
+        # O prazo diz tudo: com prazo, só resgata no vencimento. Não há liquidez nem data fixa à parte.
+        assert "liquidity" not in body
+        assert "maturity_date" not in body
+        # Imposto de renda está fora do escopo: o produto não diz se é isento.
+        assert "tax_exempt" not in body
 
-    def test_public_bond_has_fixed_maturity(self):
+    def test_public_bond_has_no_term(self):
+        # Sem prazo: o resgate pode ser a qualquer dia.
         product = product_named("Tesouro Selic 2031")
 
         status, body = RequestGenerator.get_product(product["product_key"])
 
         assert status == 200
         assert body["term_months"] is None
-        assert body["maturity_date"] == "2031-03-01"
-        assert body["tax_exempt"] is False
 
     def test_product_not_found(self):
         status, body = RequestGenerator.get_product(str(uuid.uuid4()))
@@ -106,7 +110,7 @@ class TestProductPrices:
         )
 
         assert status == 200
-        dates = [price["reference_date"] for price in body["items"]]
+        dates = [price["price_date"] for price in body["items"]]
         assert dates == sorted(dates)
         assert all(from_date.isoformat() <= day <= to_date.isoformat() for day in dates)
         # Sempre existe o preço da data de movimento (seed ou fechamento do dia).

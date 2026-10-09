@@ -116,7 +116,7 @@ class TestPortfolioSuggestion:
 
         for item in body["items"]:
             _, product = RequestGenerator.get_product(item["product_key"])
-            assert product["risk_level"] <= assessment["max_risk_level"]
+            assert product["risk_level"] <= assessment["maximum_risk_level"]
 
     def test_response_format(self):
         customer_key, _ = customer_with_profile(MODERATE)

@@ -48,6 +48,9 @@ class TestOpenAccount:
         assert "id" not in body
         assert body["status"] == "ACTIVE"
         assert body["balance"] == 0
+        # Conta nova: nada investido, o capital total é o próprio saldo.
+        assert body["investments_amount"] == 0
+        assert body["net_worth_amount"] == 0
         assert "created_at" in body
         assert "updated_at" in body
 

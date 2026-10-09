@@ -137,9 +137,9 @@ class RequestGenerator:
         return response.response_status, response.response_json
 
     @staticmethod
-    def post_investment_order(customer_key: str, payload: dict, idempotency_key):
+    def post_investment_order(customer_key: str, account_key: str, payload: dict, idempotency_key):
         """idempotency_key=None não manda o cabeçalho: é assim que se testa a falta dele."""
-        endpoint = f"/customer/{customer_key}/investment_order"
+        endpoint = f"/customer/{customer_key}/account/{account_key}/investment_order"
         headers = dict(HEADERS)
         if idempotency_key is not None:
             headers["Idempotency-Key"] = idempotency_key
@@ -147,20 +147,20 @@ class RequestGenerator:
         return response.response_status, response.response_json
 
     @staticmethod
-    def get_investment_order(customer_key: str, order_key: str):
-        endpoint = f"/customer/{customer_key}/investment_order/{order_key}"
+    def get_investment_order(customer_key: str, account_key: str, order_key: str):
+        endpoint = f"/customer/{customer_key}/account/{account_key}/investment_order/{order_key}"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
         return response.response_status, response.response_json
 
     @staticmethod
-    def get_investment_orders(customer_key: str, query_params: dict = None):
-        endpoint = f"/customer/{customer_key}/investment_orders"
+    def get_investment_orders(customer_key: str, account_key: str, query_params: dict = None):
+        endpoint = f"/customer/{customer_key}/account/{account_key}/investment_orders"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS, query_params=query_params)
         return response.response_status, response.response_json
 
     @staticmethod
-    def get_positions(customer_key: str, query_params: dict = None):
-        endpoint = f"/customer/{customer_key}/positions"
+    def get_positions(customer_key: str, account_key: str, query_params: dict = None):
+        endpoint = f"/customer/{customer_key}/account/{account_key}/positions"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS, query_params=query_params)
         return response.response_status, response.response_json
 

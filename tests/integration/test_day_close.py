@@ -70,7 +70,7 @@ class TestDayClose:
         assert status == 201
         fund = product_named("FGV Quant Capital FIM")
         selic = product_named("Tesouro Selic 2031")
-        assert fund["price"] == {"reference_date": body["business_date"], "unit_price": "102.00000000"}
+        assert fund["price"] == {"price_date": body["business_date"], "unit_price": "102.00000000"}
         assert selic["price"]["unit_price"] == "123.45000000"
 
     def test_own_issue_grows_by_cdi_of_the_closing_day(self):
