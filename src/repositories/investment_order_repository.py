@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import aliased
 
 from database import Context
-from models import Account, InvestmentOrder, Position, Transaction
+from models import InvestmentOrder, Position, Transaction
 
 
 class InvestmentOrderRepository:
@@ -20,20 +20,19 @@ class InvestmentOrderRepository:
         return order
 
     @staticmethod
-    def of_customer(context: Context, customer_id: int):
-        """As ordens das contas do cliente: o dono da ordem é a conta da transação dela."""
+    def of_account(context: Context, account_id: int):
+        """As ordens da conta: o dono da ordem é a conta da transação dela."""
         return (
             context.db_session.query(InvestmentOrder)
             .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
-            .join(Account, Transaction.account_id == Account.id)
-            .filter(Account.customer_id == customer_id)
+            .filter(Transaction.owner_account_id == account_id)
         )
 
     @staticmethod
-    def get_by_key(context: Context, customer_id: int, order_key: str) -> Optional[InvestmentOrder]:
-        # Filtrar pelo dono na própria query: a ordem de outro cliente volta None (R8).
+    def get_by_key(context: Context, account_id: int, order_key: str) -> Optional[InvestmentOrder]:
+        # Filtrar pelo dono na própria query: a ordem de outra conta volta None (R8).
         return (
-            InvestmentOrderRepository.of_customer(context, customer_id)
+            InvestmentOrderRepository.of_account(context, account_id)
             .filter(InvestmentOrder.order_key == order_key)
             .first()
         )
@@ -45,10 +44,10 @@ class InvestmentOrderRepository:
         )
 
     @staticmethod
-    def list_by_customer(
-        context: Context, customer_id: int, product_id: Optional[int], page: int, limit: int
+    def list_by_account(
+        context: Context, account_id: int, product_id: Optional[int], page: int, limit: int
     ) -> Tuple[List[InvestmentOrder], int]:
-        query = InvestmentOrderRepository.of_customer(context, customer_id)
+        query = InvestmentOrderRepository.of_account(context, account_id)
 
         if product_id is not None:
             query = query.filter(InvestmentOrder.product_id == product_id)
@@ -65,13 +64,13 @@ class InvestmentOrderRepository:
         """
         settlement = aliased(InvestmentOrder)
         already_settled = context.db_session.query(settlement.id).filter(
-            settlement.settled_order_id == InvestmentOrder.id
+            settlement.matured_investment_order_id == InvestmentOrder.id
         )
         return (
             context.db_session.query(InvestmentOrder)
             .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
             .filter(InvestmentOrder.maturity_date <= day, ~already_settled.exists())
-            .order_by(Transaction.account_id, InvestmentOrder.id)
+            .order_by(Transaction.owner_account_id, InvestmentOrder.id)
             .all()
         )
 
@@ -80,13 +79,13 @@ class InvestmentOrderRepository:
         """O vencimento mais distante entre as aplicações deste produto ainda não liquidadas."""
         settlement = aliased(InvestmentOrder)
         already_settled = context.db_session.query(settlement.id).filter(
-            settlement.settled_order_id == InvestmentOrder.id
+            settlement.matured_investment_order_id == InvestmentOrder.id
         )
         return (
             context.db_session.query(func.max(InvestmentOrder.maturity_date))
             .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
             .filter(
-                Transaction.account_id == account_id,
+                Transaction.owner_account_id == account_id,
                 InvestmentOrder.product_id == product_id,
                 ~already_settled.exists(),
             )
@@ -108,28 +107,25 @@ class PositionRepository:
 
     @staticmethod
     def create(context: Context, account_id: int, product_id: int) -> Position:
-        position = Position(account_id=account_id, product_id=product_id, quantity=Decimal(0), invested_amount=0)
+        position = Position(account_id=account_id, product_id=product_id, quantity=Decimal(0), acquisition_cost_amount=0)
         context.db_session.add(position)
         context.db_session.flush()
 
         return position
 
     @staticmethod
-    def update(context: Context, position: Position, quantity: Decimal, invested_amount: int) -> Position:
+    def update(context: Context, position: Position, quantity: Decimal, acquisition_cost_amount: int) -> Position:
         position.quantity = quantity
-        position.invested_amount = invested_amount
+        position.acquisition_cost_amount = acquisition_cost_amount
         position.updated_at = func.now()
         context.db_session.flush()
 
         return position
 
     @staticmethod
-    def list_by_customer(context: Context, customer_id: int, include_closed: bool) -> List[Position]:
-        query = (
-            context.db_session.query(Position)
-            .join(Account, Position.account_id == Account.id)
-            .filter(Account.customer_id == customer_id)
-        )
+    def list_by_account(context: Context, account_id: int, include_closed: bool = False) -> List[Position]:
+        """As posições da conta; as zeradas só com include_closed."""
+        query = context.db_session.query(Position).filter(Position.account_id == account_id)
 
         if not include_closed:
             query = query.filter(Position.quantity > 0)

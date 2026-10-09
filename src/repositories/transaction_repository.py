@@ -90,7 +90,7 @@ class TransactionRepository:
             context.db_session.query(Transaction)
             .filter(
                 Transaction.transaction_key == transaction_key,
-                or_(Transaction.account_id == account_id, Transaction.destination_account_id == account_id),
+                or_(Transaction.owner_account_id == account_id, Transaction.destination_account_id == account_id),
             )
             .first()
         )
@@ -99,7 +99,7 @@ class TransactionRepository:
     def create(
         context: Context,
         transaction_type: str,
-        account_id: int,
+        owner_account_id: int,
         destination_account_id: Optional[int],
         amount: int,
         fee_amount: int,
@@ -109,7 +109,7 @@ class TransactionRepository:
         transaction = Transaction(
             transaction_key=str(uuid.uuid4()),
             type=transaction_type,
-            account_id=account_id,
+            owner_account_id=owner_account_id,
             destination_account_id=destination_account_id,
             amount=amount,
             fee_amount=fee_amount,
