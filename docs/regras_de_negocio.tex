@@ -1217,18 +1217,23 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   (\tb{100} = 1\% ao ano). A cota publicada é \emph{líquida}, como no mercado: a administradora
   (no simulador, o mock e o seed) já desconta a taxa, com o fator $(1 - \text{taxa})$ ao ano da
   fórmula da RN-PRO-06.
-  \item[RN-REC-05 \dec] \textbf{Estimativa da taxa de administração} no período $=$ patrimônio do
-  fundo na data de movimento $\times$ taxa $\times$ dias corridos $/ 365$, com patrimônio $=
-  \Sigma$ \tb{position.quantity} $\times$ cota do dia. É uma aproximação linear, suficiente para o
-  relatório.
+  \item[RN-REC-05 \dec] \textbf{Estimativa da taxa de administração}, \textbf{dia a dia}: para cada
+  dia $d$ do período, patrimônio do fundo no fim de $d$ $\times$ taxa $/ 365$, truncado em centavos;
+  a estimativa é a soma dos dias. Patrimônio $=$ cotas que os clientes tinham no fim de $d$ (soma das
+  aplicações menos os resgates de \tb{investment_order} até $d$) $\times$ cota vigente em $d$. É uma
+  aproximação linear (juros simples sobre 365 dias), suficiente para o relatório. As estimativas
+  RN-REC-05 a 07 usam a base e a taxa \emph{de cada dia}, tiradas do histórico: a receita de um dia
+  passado não muda com o que acontece depois.
   \item[RN-REC-06 \dec] \textbf{Títulos próprios.} CDB e LCI são emissão própria (sem
   \tb{price_source_code}) e guardam o
-  percentual do CDI que pagam em \tb{cdi_percentage_bps} (\tb{9500} = 95\%). Spread estimado $=
-  \Sigma$ \tb{position.acquisition_cost_amount} nesses produtos $\times$ CDI $\times$ (1 $-$ percentual
-  pago) $\times$ dias $/ 365$.
-  \item[RN-REC-07 \dec] \textbf{Float} estimado $= \Sigma$ \tb{account.balance} das contas de
-  cliente (sem a conta do banco) \tb{ACTIVE} e \tb{BLOCKED} agora $\times$ Selic $\times$ dias $/ 365$. Saldo em conta corrente não
-  é remunerado para o cliente.
+  percentual do CDI que pagam em \tb{cdi_percentage_bps} (\tb{9500} = 95\%). Spread de um dia $d$ $=
+  \Sigma$ por produto do custo de aquisição em carteira no fim de $d$ (aplicado menos o custo
+  resgatado) $\times$ CDI vigente em $d$ $\times$ (1 $-$ percentual pago) $/ 365$.
+  \item[RN-REC-07 \dec] \textbf{Float} de um dia $d$ $=$ soma dos saldos das contas de cliente (sem a
+  conta do banco) no fim de $d$ $\times$ Selic vigente em $d$ $/ 365$. O saldo no fim de $d$ sai do
+  extrato: créditos menos débitos de \tb{ledger_entry} até $d$ (RN-REC-03). Conta encerrada tem
+  saldo 0, então não precisa de filtro por status. Saldo em conta corrente não é remunerado para o
+  cliente.
   \item[RN-REC-08 \dec] \textbf{Taxas de referência (histórico).} CDI e Selic anuais ficam em
   \tb{reference_rate}, \textbf{uma linha por taxa e por data}, nunca alterada (R4): o seed grava a
   primeira e cada fechamento do dia grava as do novo dia, vindas do Banco Central (RN-FEC-04).
@@ -1237,9 +1242,12 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   só: o CDB rende pelo mesmo número que o relatório usa, e cada preço de CDB pode ser refeito com
   o CDI gravado do dia.
   \item[RN-REC-09 \dec] \textbf{Relatório.} \tb{GET /internal/revenue?from=\&to=} devolve as
-  duas partes e o total, em centavos. Cada estimativa traz a base (\tb{base_amount}) e a taxa
-  anual usadas, e o valor é truncado para baixo; \tb{days} são os dias corridos do período,
-  contando as duas pontas. O período filtra pelo \tb{created_at} (hora real) dos lançamentos.
+  duas partes e o total, em centavos. Cada estimativa traz o valor e o detalhe por dia
+  (\tb{daily}: data, base, taxa e valor do dia); o valor é a soma dos dias. As estimativas contam
+  \textbf{só os dias que já aconteceram}: de \tb{from} até o menor entre \tb{to} e hoje, e
+  \tb{days} é quantos dias foram contados. Nenhum dia futuro é projetado. Os dias são de calendário
+  em UTC, e o período filtra pelo \tb{created_at} (hora real) dos lançamentos. Dia sem taxa
+  publicada ainda (antes de o banco existir) vale 0.
   Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
   intervalo maior que 366 dias $\to$ 400 (\tb{PPP000005}). A rota é interna (não pertence a
   nenhum cliente) e fica protegida pelo \tb{OPERATOR-TOKEN} (RN-GER-14); num banco real ela
@@ -1251,7 +1259,8 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
 
 Premissas fictícias: 2.000 transferências no mês; \rs 5 milhões no fundo; \rs 3 milhões em CDB
 a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI de 14,9\% e Selic de 15\% ao ano
-(os mesmos do seed); 30 dias.
+(os mesmos do seed); 30 dias, todos já passados, com os mesmos saldos e taxas o mês inteiro. Cada
+dia é truncado em centavos, e o mês é a soma dos 30 dias.
 
 \begin{center}
 \begin{tabular}{@{}llr@{}}
@@ -1259,11 +1268,11 @@ a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI de 14,9\% e Selic d
 \textbf{Fonte} & \textbf{Conta} & \textbf{Receita} \\
 \midrule
 Tarifas (realizada) & $2.000 \times \rs 2{,}00$ & \rs 4.000,00 \\
-Taxa de administração & $5.000.000 \times 1\% \times 30/365$ & \rs 4.109,58 \\
-Spread do CDB & $3.000.000 \times 14{,}9\% \times 5\% \times 30/365$ & \rs 1.836,98 \\
-Float & $2.000.000 \times 15\% \times 30/365$ & \rs 24.657,53 \\
+Taxa de administração & $30 \times (5.000.000 \times 1\% / 365)$ & \rs 4.109,40 \\
+Spread do CDB & $30 \times (3.000.000 \times 14{,}9\% \times 5\% / 365)$ & \rs 1.836,90 \\
+Float & $30 \times (2.000.000 \times 15\% / 365)$ & \rs 24.657,30 \\
 \midrule
-\textbf{Total} & & \textbf{\rs 34.604,09} \\
+\textbf{Total} & & \textbf{\rs 34.603,60} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1756,6 +1765,14 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   resposta, e o teste black box não consegue conferir a fórmula com outros testes mexendo nos saldos.
   \emph{Escolhido:} cada estimativa traz a base e a taxa usadas (RN-REC-09). Ganharia se a resposta
   fosse para um painel que só mostra totais.
+  \item \textbf{Estimativa como foto de agora $\times$ dias} (saldos, cotas e taxas do momento da
+  consulta, multiplicados pelos dias do período) --- foi a primeira versão do módulo 8; descartada
+  porque erra em período passado: o relatório de janeiro pedido em outubro usaria os saldos de
+  outubro. \emph{Também descartado:} projetar os dias futuros do período com a foto de hoje, porque
+  mistura histórico com projeção num número só. \emph{Escolhido:} dia a dia pelo histórico
+  (\tb{ledger_entry}, \tb{investment_order}, \tb{product_price}, \tb{reference_rate}), só até hoje,
+  com o detalhe por dia na resposta (RN-REC-05 a 07 e 09). \emph{Preço aceito:} a resposta de um
+  ano tem cerca de 1.100 linhas de detalhe, e truncar cada dia perde até 1 centavo por dia.
   \item \textbf{Não fazer o módulo de investimentos} (``não fazer nada'') --- é a opção mais
   barata e deixaria todo o tempo para o núcleo. Descartada porque perderíamos o diferencial e a
   conexão com a vertical de fundos da QI Tech. \textbf{Vira o plano de corte:} se o núcleo atrasar,
@@ -2318,21 +2335,31 @@ HTTP/1.1 200 OK
   },
   "estimated": {
     "fund_administration_fee": {
-      "base_amount": 500000000,
-      "annual_rate_bps": 100,
-      "amount": 410958
+      "amount": 410940,
+      "daily": [
+        {"date": "2026-10-01", "base_amount": 500000000,
+         "annual_rate_bps": 100, "amount": 13698},
+        ...
+      ]
     },
     "own_issue_spread": {
-      "base_amount": 300000000,
-      "amount": 183698
+      "amount": 183690,
+      "daily": [
+        {"date": "2026-10-01", "base_amount": 300000000,
+         "cdi_annual_rate_bps": 1490, "amount": 6123},
+        ...
+      ]
     },
     "float": {
-      "base_amount": 200000000,
-      "annual_rate_bps": 1500,
-      "amount": 2465753
+      "amount": 2465730,
+      "daily": [
+        {"date": "2026-10-01", "base_amount": 200000000,
+         "annual_rate_bps": 1500, "amount": 82191},
+        ...
+      ]
     }
   },
-  "total_amount": 3460409
+  "total_amount": 3460360
 }
 \end{lstlisting}
 
