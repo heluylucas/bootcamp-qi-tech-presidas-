@@ -1,5 +1,7 @@
 from controllers.base_controller import BaseController
+from controllers.investment_order_controller import InvestmentOrderController
 from dtos.account_dto import account_to_dict, status_event_to_dict
+from dtos.investment_order_dto import current_amount
 from errors import (
     AccountAlreadyExists,
     AccountNotEmpty,
@@ -50,11 +52,11 @@ class AccountController(BaseController):
         AccountRepository.create_status_event(self.context, account.id, None, "ACTIVE", None, ACTOR_CUSTOMER)
 
         self.session.commit()
-        return account_to_dict(account)
+        return self.account_response(account)
 
     def get(self, customer_key: str, account_key: str) -> dict:
         account = self.get_owned_account(customer_key, account_key)
-        return account_to_dict(account)
+        return self.account_response(account)
 
     def change_status(self, customer_key: str, account_key: str, payload: dict) -> dict:
         """Rota do cliente (RN-CON-11): ele só encerra a própria conta."""
@@ -100,7 +102,13 @@ class AccountController(BaseController):
         AccountRepository.create_status_event(self.context, account.id, current, target, reason, actor)
 
         self.session.commit()
-        return account_to_dict(account)
+        return self.account_response(account)
+
+    def account_response(self, account: Account) -> dict:
+        """A conta com o valor dos investimentos dela ao preço do dia (calculado, não gravado)."""
+        priced = InvestmentOrderController().priced_positions(PositionRepository.list_by_account(self.context, account.id))
+        investments_amount = sum(current_amount(position, unit_price) for position, unit_price in priced)
+        return account_to_dict(account, investments_amount)
 
     def list_status_events(self, customer_key: str, account_key: str) -> dict:
         account = self.get_owned_account(customer_key, account_key)

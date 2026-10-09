@@ -214,7 +214,7 @@ class TransactionController(BaseController):
         """
         previous = TransactionRepository.get_by_idempotency_key(self.context, idempotency_key)
 
-        if previous is not None and previous.account_id != account.id:
+        if previous is not None and previous.owner_account_id != account.id:
             raise IdempotencyKeyReused()
 
         return previous
@@ -235,7 +235,7 @@ class TransactionController(BaseController):
             return TransactionRepository.create(
                 self.context,
                 transaction_type=transaction_type,
-                account_id=account.id,
+                owner_account_id=account.id,
                 destination_account_id=destination.id if destination else None,
                 amount=amount,
                 fee_amount=fee,

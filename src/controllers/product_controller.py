@@ -10,15 +10,15 @@ class ProductController(BaseController):
         super().__init__(__name__)
 
     def list(self, query_params: dict) -> dict:
-        max_risk = query_params.get("max_risk")
+        maximum_risk_level = query_params.get("maximum_risk_level")
         products = ProductRepository.list(
-            self.context, query_params.get("type"), int(max_risk) if max_risk else None
+            self.context, query_params.get("type"), int(maximum_risk_level) if maximum_risk_level else None
         )
         return {"items": [product_to_dict(product) for product in products]}
 
     def get(self, product_key: str) -> dict:
         product = self._get_product(product_key)
-        business_date = BusinessDayRepository.get_current(self.context).reference_date
+        business_date = BusinessDayRepository.get_current(self.context).business_date
         price = ProductRepository.get_price_on(self.context, product.id, business_date)
 
         return product_with_price_to_dict(product, price)

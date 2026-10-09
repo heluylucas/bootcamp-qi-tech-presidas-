@@ -36,10 +36,10 @@ class PortfolioController(BaseController):
             raise SuggestionAmountTooLow()
 
         # O seed grava uma carteira para cada perfil, então ela sempre tem itens.
-        items = PortfolioRepository.list_items(self.context, assessment.profile_id)
+        items = PortfolioRepository.list_items(self.context, assessment.investor_profile_id)
 
         allocations = split_amount(amount, items)
-        return suggestion_to_dict(assessment.profile.enumerator, amount, allocations)
+        return suggestion_to_dict(assessment.investor_profile.code, amount, allocations)
 
 
 def split_amount(amount: int, items: List[ModelPortfolioItem]) -> List[Tuple[ModelPortfolioItem, int]]:

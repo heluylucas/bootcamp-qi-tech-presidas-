@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import ROUND_DOWN, Decimal
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from controllers.base_controller import BaseController
 from controllers.suitability_controller import SuitabilityController
@@ -9,22 +9,19 @@ from dtos.investment_order_dto import order_to_dict, position_to_dict, total_to_
 from errors import (
     AccountNotActive,
     BelowMinimumApplication,
-    CustomerNotFound,
     IdempotencyKeyReused,
     InsufficientBalance,
     InsufficientPosition,
     InvalidAmount,
-    NoActiveAccount,
     OrderNotFound,
     ProductNotFound,
     ProductNotSuitable,
     RedemptionNotAllowed,
 )
-from models import Account, Customer, InvestmentOrder, Position, Product
+from models import Account, InvestmentOrder, Position, Product
 from repositories import (
     AccountRepository,
     BusinessDayRepository,
-    CustomerRepository,
     InvestmentOrderRepository,
     PositionRepository,
     ProductRepository,
@@ -42,32 +39,33 @@ class InvestmentOrderController(BaseController):
     def __init__(self) -> None:
         super().__init__(__name__)
 
-    def create(self, customer_key: str, payload: dict, idempotency_key: Optional[str]) -> Tuple[dict, bool]:
+    def create(
+        self, customer_key: str, account_key: str, payload: dict, idempotency_key: Optional[str]
+    ) -> Tuple[dict, bool]:
         """Devolve (ordem, criada). criada=False é a repetição idempotente: o resource responde 200."""
         idempotency_key = parse_idempotency_key(idempotency_key)
 
         if payload["side"] == "REDEEM":
-            return self.redeem_order(customer_key, payload, idempotency_key)
+            return self.redeem_order(customer_key, account_key, payload, idempotency_key)
 
-        return self.apply(customer_key, payload, idempotency_key)
+        return self.apply(customer_key, account_key, payload, idempotency_key)
 
-    def apply(self, customer_key: str, payload: dict, idempotency_key: str) -> Tuple[dict, bool]:
+    def apply(self, customer_key: str, account_key: str, payload: dict, idempotency_key: str) -> Tuple[dict, bool]:
         """Aplicação: toda recusa antes de qualquer escrita (RN-ORD-01 a 08 e 17)."""
         amount = payload["amount"]
 
         if amount <= 0:
             raise InvalidAmount()
 
-        customer = self.get_customer(customer_key)
-        account = self.get_open_account(customer)
-        assessment = SuitabilityController().get_valid_assessment(customer.id)
+        account = self.get_active_account(customer_key, account_key)
+        assessment = SuitabilityController().get_valid_assessment(account.customer_id)
         product = self.get_product(payload["product_key"])
-        business_date = BusinessDayRepository.get_current(self.context).reference_date
+        business_date = BusinessDayRepository.get_current(self.context).business_date
 
-        if product.risk_level > assessment.profile.max_risk_level:
+        if product.risk_level > assessment.investor_profile.maximum_risk_level:
             raise ProductNotSuitable()
 
-        if amount < product.min_application:
+        if amount < product.minimum_application_amount:
             raise BelowMinimumApplication()
 
         # Sempre existe: o seed grava o preço do primeiro dia e o fechamento só abre
@@ -108,28 +106,29 @@ class InvestmentOrderController(BaseController):
             product_id=product.id,
             quantity=quantity,
             unit_price=price.unit_price,
-            cost_amount=amount,
+            acquisition_cost_amount=amount,
             maturity_date=maturity_date,
         )
         PositionRepository.update(
-            self.context, position, position.quantity + quantity, position.invested_amount + amount
+            self.context, position, position.quantity + quantity, position.acquisition_cost_amount + amount
         )
 
         response = order_to_dict(order)
         self.session.commit()
         return response, True
 
-    def redeem_order(self, customer_key: str, payload: dict, idempotency_key: str) -> Tuple[dict, bool]:
+    def redeem_order(
+        self, customer_key: str, account_key: str, payload: dict, idempotency_key: str
+    ) -> Tuple[dict, bool]:
         """Resgate pedido pelo cliente: igual à aplicação, sem olhar o perfil (RN-ORD-09 a 16)."""
         amount = payload.get("amount")
 
         if amount is not None and amount <= 0:
             raise InvalidAmount()
 
-        customer = self.get_customer(customer_key)
-        account = self.get_open_account(customer)
+        account = self.get_active_account(customer_key, account_key)
         product = self.get_product(payload["product_key"])
-        business_date = BusinessDayRepository.get_current(self.context).reference_date
+        business_date = BusinessDayRepository.get_current(self.context).business_date
         price = ProductRepository.get_price_on(self.context, product.id, business_date)
 
         # Mesma ordem de travas da aplicação: conta, depois posição (RN-GER-12).
@@ -158,7 +157,8 @@ class InvestmentOrderController(BaseController):
         if quantity <= 0 or quantity > held:
             raise InsufficientPosition()
 
-        if product.liquidity == "AT_MATURITY" and not self.has_matured(account.id, product, business_date):
+        # Produto com prazo só é resgatado no vencimento da aplicação (RN-ORD-11).
+        if product.term_months and not self.has_matured(account.id, product, business_date):
             raise RedemptionNotAllowed()
 
         order = self.redeem(
@@ -184,14 +184,14 @@ class InvestmentOrderController(BaseController):
         amount: int,
         idempotency_key: Optional[str],
         redeem_all: bool = False,
-        settled_order_id: Optional[int] = None,
+        matured_investment_order_id: Optional[int] = None,
     ) -> InvestmentOrder:
         """As escritas do resgate, com conta e posição já travadas. Não decide nada: só grava."""
         # RN-ORD-13: custo médio. Sai a fração do custo igual à fração das cotas; no total, tudo.
         if quantity == position.quantity:
-            cost_amount = position.invested_amount
+            acquisition_cost_amount = position.acquisition_cost_amount
         else:
-            cost_amount = int(position.invested_amount * quantity // position.quantity)
+            acquisition_cost_amount = int(position.acquisition_cost_amount * quantity // position.quantity)
 
         transaction = self.money_transaction("INVESTMENT_REDEEM", account, amount, idempotency_key)
         TransactionController().add_entry(transaction, account, "CREDIT", "PRINCIPAL", amount, account.balance + amount)
@@ -201,13 +201,13 @@ class InvestmentOrderController(BaseController):
             product_id=position.product_id,
             quantity=quantity,
             unit_price=unit_price,
-            cost_amount=cost_amount,
+            acquisition_cost_amount=acquisition_cost_amount,
             redeem_all=redeem_all,
-            settled_order_id=settled_order_id,
+            matured_investment_order_id=matured_investment_order_id,
         )
         # RN-ORD-14: a posição zerada fica com quantidade 0, não é apagada.
         PositionRepository.update(
-            self.context, position, position.quantity - quantity, position.invested_amount - cost_amount
+            self.context, position, position.quantity - quantity, position.acquisition_cost_amount - acquisition_cost_amount
         )
         return order
 
@@ -219,13 +219,13 @@ class InvestmentOrderController(BaseController):
         # Em ordem crescente de conta, e em cada uma conta depois posição: a mesma
         # ordem de travas das ordens do cliente, então ninguém espera ninguém em círculo.
         for application in InvestmentOrderRepository.list_due_applications(self.context, day):
-            account = AccountRepository.get_by_id_for_update(self.context, application.transaction.account_id)
+            account = AccountRepository.get_by_id_for_update(self.context, application.transaction.owner_account_id)
             position = PositionRepository.get_for_update(self.context, account.id, application.product_id)
             unit_price = prices[application.product_id]
             quantity = application.quantity
 
             # Sem chave de idempotência: não há pedido de cliente para repetir. O que impede
-            # pagar duas vezes é o UNIQUE de settled_order_id.
+            # pagar duas vezes é o UNIQUE de matured_investment_order_id.
             # O crédito vale mesmo com a conta bloqueada: o banco devolver não é o cliente movimentar.
             self.redeem(
                 account,
@@ -234,31 +234,29 @@ class InvestmentOrderController(BaseController):
                 quantity,
                 int(quantity * unit_price * 100),
                 None,
-                settled_order_id=application.id,
+                matured_investment_order_id=application.id,
             )
 
     def has_matured(self, account_id: int, product: Product, business_date: date) -> bool:
-        """RN-ORD-11: com prazo, vale o vencimento da aplicação mais recente ainda não liquidada."""
-        if product.term_months:
-            maturity = InvestmentOrderRepository.latest_open_maturity(self.context, account_id, product.id)
-        else:
-            maturity = product.maturity_date
-
+        """RN-ORD-11: vale o vencimento da aplicação mais recente ainda não liquidada."""
+        maturity = InvestmentOrderRepository.latest_open_maturity(self.context, account_id, product.id)
         return maturity is not None and maturity <= business_date
 
-    def get(self, customer_key: str, order_key: str) -> dict:
-        customer = self.get_customer(customer_key)
-        # A busca já filtra pelo dono: ordem de outro cliente dá o mesmo 404 (R8).
-        order = InvestmentOrderRepository.get_by_key(self.context, customer.id, order_key)
+    def get(self, customer_key: str, account_key: str, order_key: str) -> dict:
+        account = TransactionController().get_owned_account(customer_key, account_key)
+        # A busca já filtra pelo dono: ordem de outra conta dá o mesmo 404 (R8).
+        order = InvestmentOrderRepository.get_by_key(self.context, account.id, order_key)
 
         if order is None:
             raise OrderNotFound()
 
         return order_to_dict(order)
 
-    def list_orders(self, customer_key: str, page: int, limit: int, product_key: Optional[str]) -> dict:
+    def list_orders(
+        self, customer_key: str, account_key: str, page: int, limit: int, product_key: Optional[str]
+    ) -> dict:
         """RN-GER-11: a mais nova primeiro, em páginas."""
-        customer = self.get_customer(customer_key)
+        account = TransactionController().get_owned_account(customer_key, account_key)
         empty = {"items": [], "page": page, "limit": limit, "total": 0}
         product_id = None
 
@@ -269,26 +267,31 @@ class InvestmentOrderController(BaseController):
                 return empty
             product_id = product.id
 
-        orders, total = InvestmentOrderRepository.list_by_customer(self.context, customer.id, product_id, page, limit)
+        orders, total = InvestmentOrderRepository.list_by_account(self.context, account.id, product_id, page, limit)
         return {**empty, "items": [order_to_dict(order) for order in orders], "total": total}
 
-    def positions(self, customer_key: str, include_closed: bool) -> dict:
-        """RN-POS-01 a 03: cada posição ao preço do dia, e o total consolidado com o caixa.
+    def positions(self, customer_key: str, account_key: str, include_closed: bool) -> dict:
+        """RN-POS-01 a 03: cada posição da conta ao preço do dia, e o total com o caixa (o saldo dela).
 
         Calculado na leitura, não gravado: o valor dos investimentos muda a cada fechamento do dia.
         """
-        customer = self.get_customer(customer_key)
-        business_date = BusinessDayRepository.get_current(self.context).reference_date
-        items = [
-            position_to_dict(
-                position, ProductRepository.get_price_on(self.context, position.product_id, business_date).unit_price
-            )
-            for position in PositionRepository.list_by_customer(self.context, customer.id, include_closed)
+        account = TransactionController().get_owned_account(customer_key, account_key)
+        positions = PositionRepository.list_by_account(self.context, account.id, include_closed)
+        items = [position_to_dict(position, unit_price) for position, unit_price in self.priced_positions(positions)]
+        return {"items": items, "total": total_to_dict(items, account.balance)}
+
+    def priced_positions(self, positions: List[Position]) -> List[Tuple[Position, Decimal]]:
+        """Cada posição com o preço do dia (o último publicado até a data de movimento).
+
+        A rota de posições e a consulta da conta usam este mesmo cálculo, para nunca divergirem.
+        """
+        if not positions:
+            return []
+        business_date = BusinessDayRepository.get_current(self.context).business_date
+        return [
+            (position, ProductRepository.get_price_on(self.context, position.product_id, business_date).unit_price)
+            for position in positions
         ]
-        # O caixa é o saldo da conta não encerrada; sem conta, nada em caixa.
-        account = AccountRepository.get_not_closed_by_customer(self.context, customer.id)
-        cash_amount = account.balance if account is not None else 0
-        return {"items": items, "total": total_to_dict(items, cash_amount)}
 
     def find_original(self, idempotency_key: str, account: Account) -> Optional[InvestmentOrder]:
         """A ordem já feita com esta chave nesta conta; None se a chave é nova."""
@@ -310,20 +313,9 @@ class InvestmentOrderController(BaseController):
         """O pedido de dinheiro da ordem: o dono é a conta, o tipo diz se é aplicação ou resgate."""
         return TransactionController().create_transaction(transaction_type, account, None, amount, 0, None, idempotency_key)
 
-    def get_customer(self, customer_key: str) -> Customer:
-        customer = CustomerRepository.get_by_key(self.context, customer_key)
-
-        if customer is None:
-            raise CustomerNotFound()
-
-        return customer
-
-    def get_open_account(self, customer: Customer) -> Account:
-        """A conta que paga e recebe: a não encerrada do cliente (RN-ORD-01)."""
-        account = AccountRepository.get_not_closed_by_customer(self.context, customer.id)
-
-        if account is None:
-            raise NoActiveAccount()
+    def get_active_account(self, customer_key: str, account_key: str) -> Account:
+        """A conta que paga e recebe (RN-ORD-01): do cliente (senão 404, R8) e ativa."""
+        account = TransactionController().get_owned_account(customer_key, account_key)
 
         if account.status != "ACTIVE":
             raise AccountNotActive()

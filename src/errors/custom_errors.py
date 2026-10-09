@@ -362,14 +362,3 @@ class RedemptionNotAllowed(QIException):
         description = "This product can only be redeemed at maturity."
         translation = "Este produto só pode ser resgatado no vencimento."
         super().__init__(title, self.code, http_status, description, translation)
-
-
-class NoActiveAccount(QIException):
-    code = "PPP007006"
-
-    def __init__(self) -> None:
-        title = "No Active Account"
-        http_status = 409
-        description = "The customer has no open account to settle the order."
-        translation = "O cliente não tem uma conta aberta para movimentar a ordem."
-        super().__init__(title, self.code, http_status, description, translation)

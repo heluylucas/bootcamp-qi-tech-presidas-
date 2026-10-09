@@ -28,7 +28,7 @@ class BusinessDayController(BaseController):
     def get(self) -> dict:
         # O seed sempre grava a primeira linha (R2), então nunca vem None.
         business_day = BusinessDayRepository.get_current(self.context)
-        return {"business_date": business_day.reference_date.isoformat()}
+        return {"business_date": business_day.business_date.isoformat()}
 
     def close(self, payload: dict) -> dict:
         """Fecha a data de movimento e abre o próximo dia útil (RN-FEC-01 a 08)."""
@@ -39,7 +39,7 @@ class BusinessDayController(BaseController):
         # então a data atual é relida DEPOIS da trava: é aí que o segundo
         # clique descobre que o dia já foi fechado (RN-FEC-02).
         BusinessDayRepository.get_current_for_update(self.context)
-        if BusinessDayRepository.get_current(self.context).reference_date != close_date:
+        if BusinessDayRepository.get_current(self.context).business_date != close_date:
             raise BusinessDateMismatch()
 
         new_day = next_business_day(close_date)
@@ -84,10 +84,10 @@ class BusinessDayController(BaseController):
             if product.type != "FUND":
                 continue
 
-            cnpj_digits = "".join(character for character in product.external_code if character.isdigit())
+            cnpj_digits = "".join(character for character in product.price_source_code if character.isdigit())
             body = answer_of(FundAdminConnector().get_quote(cnpj_digits, day))
 
-            if field(body, "CNPJ_FUNDO") != product.external_code or field(body, "DT_COMPTC") != day.isoformat():
+            if field(body, "CNPJ_FUNDO") != product.price_source_code or field(body, "DT_COMPTC") != day.isoformat():
                 raise InvalidPriceSourceResponse()
 
             quotes[product.id] = positive_price(field(body, "VL_QUOTA"))
@@ -95,7 +95,7 @@ class BusinessDayController(BaseController):
         return quotes
 
     def _fetch_treasury_prices(self, products: List[Product], day: date) -> Dict[int, Decimal]:
-        """Tesouro: uma chamada traz todos os títulos; cada produto acha o seu pelo external_code."""
+        """Tesouro: uma chamada traz todos os títulos; cada produto acha o seu pelo price_source_code."""
         body = answer_of(TreasuryConnector().get_prices(day))
 
         if field(body, "date") != day.isoformat() or not isinstance(field(body, "bonds"), list):
@@ -106,10 +106,10 @@ class BusinessDayController(BaseController):
         for product in products:
             if product.type != "PUBLIC_BOND":
                 continue
-            if product.external_code not in published:
+            if product.price_source_code not in published:
                 raise InvalidPriceSourceResponse()
 
-            prices[product.id] = positive_price(published[product.external_code])
+            prices[product.id] = positive_price(published[product.price_source_code])
 
         return prices
 
@@ -133,8 +133,8 @@ class BusinessDayController(BaseController):
         daily_cdi = (1 + Decimal(cdi_bps) / 10000) ** (Decimal(1) / 252) - 1
         prices = {}
         for product in products:
-            # Emissão própria é o produto que nenhuma fonte externa publica: sem external_code.
-            if product.external_code is not None:
+            # Emissão própria é o produto que nenhuma fonte externa publica: sem price_source_code.
+            if product.price_source_code is not None:
                 continue
 
             # Sempre existe: o seed grava o preço do dia em que o banco nasce.
