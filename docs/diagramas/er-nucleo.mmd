@@ -10,7 +10,7 @@ erDiagram
     account ||--o{ account_status_event : "trilha de estados"
     account ||--o{ transaction : "dona do pedido"
     account |o--o{ transaction : "destino (só transferência)"
-    transaction ||--|{ ledger_entry : "gera 1 a 4"
+    transaction ||--|{ ledger_entry : "1 lançamento (4 na transferência)"
     account ||--o{ ledger_entry : "lançamentos"
 
     customer {
@@ -43,7 +43,7 @@ erDiagram
         int id PK
         char transaction_key UK
         transaction_type type "DEPOSIT, WITHDRAWAL, TRANSFER, INVESTMENT_APPLY, INVESTMENT_REDEEM"
-        int account_id FK "dona do pedido"
+        int owner_account_id FK "dona do pedido"
         int destination_account_id FK "só e sempre na TRANSFER"
         bigint amount "centavos, > 0"
         bigint fee_amount "tarifa cobrada"

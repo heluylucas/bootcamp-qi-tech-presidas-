@@ -22,33 +22,29 @@ erDiagram
         product_indexer indexer "SELIC, CDI, PREFIXED, IPCA, QUOTA"
         varchar rate_description
         smallint risk_level "1 a 5"
-        product_liquidity liquidity "DAILY ou AT_MATURITY"
-        date maturity_date "vencimento fixo ou nulo"
         smallint term_months "prazo por aplicação ou nulo"
-        boolean tax_exempt "CHECK prazo >= 9 meses"
-        bigint min_application
+        bigint minimum_application_amount
         smallint cdi_percentage_bps
-        smallint admin_fee_bps
-        varchar external_code "nome na fonte externa; nulo = emissão própria"
+        smallint administration_fee_bps
+        varchar price_source_code "nome na fonte externa; nulo = emissão própria"
         timestamptz created_at
-        timestamptz updated_at
     }
     product_price {
         int id PK
-        int product_id FK "UK com reference_date"
-        date reference_date
+        int product_id FK "UK com price_date"
+        date price_date
         numeric unit_price "NUMERIC(20,8)"
         timestamptz created_at
     }
     business_day {
         int id PK
-        date reference_date UK "maior = data de movimento"
+        date business_date UK "maior = data de movimento"
         timestamptz created_at
     }
     reference_rate {
         int id PK
         reference_rate_code code "CDI ou SELIC, UK com data"
-        date reference_date
+        date rate_date
         int annual_rate_bps
         timestamptz created_at
     }
@@ -59,10 +55,10 @@ erDiagram
         int product_id FK
         numeric quantity "NUMERIC(24,8)"
         numeric unit_price "NUMERIC(20,8)"
-        bigint cost_amount
+        bigint acquisition_cost_amount
         boolean redeem_all "o cliente pediu resgate total"
         date maturity_date "só aplicação com prazo"
-        int settled_order_id FK "UK; só na liquidação do vencimento"
+        int matured_investment_order_id FK "UK; só na liquidação do vencimento"
         timestamptz created_at
     }
     position {
@@ -70,7 +66,7 @@ erDiagram
         int account_id FK "UK com product_id"
         int product_id FK
         numeric quantity ">= 0, zerada não some"
-        bigint invested_amount "custo médio"
+        bigint acquisition_cost_amount "custo médio"
         timestamptz created_at
         timestamptz updated_at
     }

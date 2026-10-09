@@ -70,7 +70,7 @@ trava, conta uma conta ao ser liberado e recebe 409 (\tb{PPP002002}) sem ter esc
         encontra.
   \item Com as linhas travadas, confere as duas contas \tb{ACTIVE} e origem com
         \tb{balance} $\geq$ \tb{amount} + 200.
-  \item Grava \tb{transaction} (\tb{TRANSFER}, \tb{account_id} = origem,
+  \item Grava \tb{transaction} (\tb{TRANSFER}, \tb{owner_account_id} = origem,
         \tb{destination_account_id}, \tb{fee_amount = 200}, \tb{idempotency_key}).
   \item Grava quatro \tb{ledger_entry}, cada uma com \tb{balance_after}:
         \tb{DEBIT/PRINCIPAL} e \tb{DEBIT/FEE} na origem, \tb{CREDIT/PRINCIPAL} no destino e
@@ -148,15 +148,17 @@ disputam a mesma primeira trava: um passa e o outro espera.
 \subsubsection*{Aplicação --- caminho feliz}
 \begin{enumerate}
   \item O schema exige \tb{product_key}, \tb{side = APPLY}, \tb{amount} e \tb{Idempotency-Key}.
-  \item Busca o cliente e a sua conta não encerrada. Se não tiver, 409 (\tb{PPP007006}).
+  \item Busca o cliente e a conta do caminho, que precisa ser dele: cliente ou conta inexistente
+        (ou de outro cliente), 404 (\tb{PPP001001} ou \tb{PPP002001}); conta bloqueada ou
+        encerrada, 409 (\tb{PPP002005}).
   \item Busca \tb{product}; não existe, 404 (\tb{PPP005001}). O catálogo do MVP não tem produto
         inativo nem vencido. Produto com prazo (LCI) não vence como um todo: o vencimento é
         calculado no passo 11.
   \item Busca a \tb{suitability_assessment} mais recente. Confere a validade (\tb{created_at} +
         24 meses) $\geq$ hora real,
-        \tb{risk_level} $\leq$ \tb{max_risk_level} do perfil e \tb{amount} $\geq$
-        \tb{min_application}.
-  \item Busca o preço do dia: o \tb{product_price} de maior \tb{reference_date} $\leq$ data de
+        \tb{risk_level} $\leq$ \tb{maximum_risk_level} do perfil e \tb{amount} $\geq$
+        \tb{minimum_application_amount}.
+  \item Busca o preço do dia: o \tb{product_price} de maior \tb{price_date} $\leq$ data de
         movimento. Ele sempre existe: o fechamento só abre um dia depois de gravar todos os preços.
   \item Trava a conta. Depois trava a \tb{position} (conta, produto), se já existir.
   \item Procura \tb{transaction} pela \tb{idempotency_key} e não encontra. (Se achar: da mesma
@@ -168,10 +170,10 @@ disputam a mesma primeira trava: um passa e o outro espera.
   \item Grava \tb{transaction} \tb{INVESTMENT_APPLY} (com a \tb{idempotency_key}) e um
         \tb{ledger_entry} \tb{DEBIT}, e atualiza \tb{balance}.
   \item Grava \tb{investment_order} com \tb{transaction_id}, \tb{product_id}, \tb{quantity},
-        \tb{unit_price} e \tb{cost_amount} (= \tb{amount}). Se o produto tem prazo,
+        \tb{unit_price} e \tb{acquisition_cost_amount} (= \tb{amount}). Se o produto tem prazo,
         grava também \tb{maturity_date} = data de movimento + \tb{term_months} (RN-ORD-17).
   \item Soma \tb{quantity} e \tb{amount} em \tb{position.quantity} e
-        \tb{position.invested_amount}.
+        \tb{position.acquisition_cost_amount}.
   \item \tb{commit}; 201 com \tb{order_key}, \tb{quantity} e \tb{unit_price}.
 \end{enumerate}
 
@@ -192,8 +194,8 @@ nunca sai da conta sem virar posição}.
 \subsubsection*{Resgate --- o que muda em relação à aplicação}
 \begin{itemize}
   \item \textbf{Sem checagem de perfil no passo 4.} O cliente sempre pode tirar o dinheiro, mesmo
-        com perfil vencido. No lugar dela: produto com \tb{liquidity = AT_MATURITY} e data de movimento $<$
-        \tb{maturity_date} dá 422 (\tb{PPP007005}). Na LCI, o vencimento é o de cada aplicação
+        com perfil vencido. No lugar dela: produto com prazo (\tb{term_months}) e data de movimento $<$
+        vencimento da aplicação dá 422 (\tb{PPP007005}). Na LCI, o vencimento é o de cada aplicação
         (RN-ORD-17): vale o da aplicação mais recente ainda não liquidada. Quem devolve o
         dinheiro no vencimento é o fechamento do dia (RN-FEC-09), então o cliente não precisa
         pedir.
@@ -201,11 +203,11 @@ nunca sai da conta sem virar posição}.
         \tb{position.quantity} $\geq$ quantidade a resgatar, sendo essa quantidade
         \tb{amount / unit_price} ou toda a posição se \tb{redeem_all}.
   \item \textbf{Passos 10 a 12 invertidos:} \tb{INVESTMENT_REDEEM} com \tb{ledger_entry}
-        \tb{CREDIT}. A posição perde a quantidade resgatada, e \tb{invested_amount} cai na mesma
+        \tb{CREDIT}. A posição perde a quantidade resgatada, e \tb{acquisition_cost_amount} cai na mesma
         proporção. Uma posição zerada fica com \tb{quantity = 0} e não é apagada.
-  \item \textbf{No passo 11,} a ordem guarda em \tb{cost_amount} o custo que saiu da posição
-        (\tb{floor} proporcional; no resgate total, o \tb{invested_amount} inteiro). A resposta
-        201 traz também \tb{cost_amount}, \tb{result_amount} = \tb{amount} $-$ \tb{cost_amount} e
+  \item \textbf{No passo 11,} a ordem guarda em \tb{acquisition_cost_amount} o custo que saiu da posição
+        (\tb{floor} proporcional; no resgate total, o \tb{acquisition_cost_amount} inteiro). A resposta
+        201 traz também \tb{acquisition_cost_amount}, \tb{result_amount} = \tb{amount} $-$ \tb{acquisition_cost_amount} e
         \tb{return_bps} (RN-ORD-16).
 \end{itemize}
 
@@ -242,7 +244,7 @@ escrita. O cliente recebe 422 (\tb{PPP004002}).
 \subsubsection*{Fechamento do dia --- caminho feliz}
 \begin{enumerate}
   \item O schema exige \tb{close_date} (data \tb{AAAA-MM-DD}) e nada mais.
-  \item Trava a linha atual de \tb{business_day} (a de maior \tb{reference_date}) com
+  \item Trava a linha atual de \tb{business_day} (a de maior \tb{business_date}) com
         \tb{FOR UPDATE}.
   \item Confere \tb{close_date} = data de movimento atual, \textbf{relida depois da trava}: quem
         esperou a trava de outro fechamento ainda tem nas mãos a linha antiga (ela continua
@@ -251,18 +253,18 @@ escrita. O cliente recebe 422 (\tb{PPP004002}).
   \item Pergunta lá fora, para o novo dia: a cota do fundo (administradora), o preço dos três
         títulos (Tesouro), o CDI e a Selic (Banco Central). Cada chamada tem timeout de 5 s.
   \item Confere cada resposta: data igual à pedida, preço e taxa $> 0$, todos os produtos com
-        \tb{external_code} presentes.
+        \tb{price_source_code} presentes.
   \item Calcula CDB e LCI: preço anterior $\times (1 + c \times$ \tb{cdi_percentage_bps}$/10000)$,
         com $c = (1 + \text{CDI do dia que fecha})^{1/252} - 1$, lido de \tb{reference_rate}
         (o CDI do novo dia, que acabou de chegar, rende o fechamento seguinte).
   \item Grava os 6 \tb{product_price} e as 2 \tb{reference_rate}.
   \item \textbf{Liquida o que venceu} (RN-FEC-09): busca as aplicações com \tb{maturity_date}
-        $\leq$ novo dia que nenhuma ordem aponta em \tb{settled_order_id}, em ordem crescente de
+        $\leq$ novo dia que nenhuma ordem aponta em \tb{matured_investment_order_id}, em ordem crescente de
         conta. Para cada uma, trava a conta e depois a posição e grava o resgate da quantidade
         inteira ao preço do novo dia: \tb{transaction} \tb{INVESTMENT_REDEEM} \textbf{sem chave
         de idempotência} (não há pedido de cliente para repetir) com \tb{ledger_entry}
         \tb{CREDIT} (mesmo com a conta bloqueada), \tb{investment_order} ligada a ela com
-        \tb{settled_order_id} = a aplicação (o \tb{UNIQUE} impede pagar duas vezes) e a posição
+        \tb{matured_investment_order_id} = a aplicação (o \tb{UNIQUE} impede pagar duas vezes) e a posição
         reduzida.
   \item Grava o novo \tb{business_day}.
   \item \tb{commit}; 201 com a nova data, os preços e as taxas.
@@ -277,7 +279,7 @@ posição), então uma aplicação no mesmo instante espera em vez de causar \em
 aplicação já paga, mas a próxima falha. Como tudo está no mesmo \tb{commit}, o \tb{rollback}
 desfaz preços, taxas e créditos juntos: a data não anda e ninguém recebe pela metade. Chamar de
 novo refaz o dia inteiro. Uma aplicação nunca é paga duas vezes: depois de paga, já existe a ordem
-que aponta para ela, e o \tb{UNIQUE} de \tb{settled_order_id} barraria a segunda.
+que aponta para ela, e o \tb{UNIQUE} de \tb{matured_investment_order_id} barraria a segunda.
 
 \textbf{Fechamento --- falha: serviço externo fora do ar (a mais provável).} O passo 5 recebe
 erro, timeout ou conexão derrubada. O banco devolve 502 (\tb{PPP005006}). Nada foi escrito: a data
