@@ -124,6 +124,16 @@ class AccountRepository:
         return context.db_session.query(Account).filter(Account.customer_id.is_(None)).one()
 
     @staticmethod
+    def sum_customer_balances(context: Context, statuses: List[str]) -> int:
+        """Soma dos saldos das contas de cliente (sem a conta do banco) nos status pedidos."""
+        total = (
+            context.db_session.query(func.sum(Account.balance))
+            .filter(Account.customer_id.isnot(None), Account.status.in_(statuses))
+            .scalar()
+        )
+        return int(total or 0)
+
+    @staticmethod
     def update_balance(context: Context, account: Account, balance: int) -> Account:
         account.balance = balance
         account.updated_at = func.now()

@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import aliased
 
 from database import Context
-from models import InvestmentOrder, Position, Transaction
+from models import InvestmentOrder, Position, Product, Transaction
 
 
 class InvestmentOrderRepository:
@@ -131,6 +131,19 @@ class PositionRepository:
             query = query.filter(Position.quantity > 0)
 
         return query.order_by(Position.product_id).all()
+
+    @staticmethod
+    def sum_by_product(context: Context) -> List[Tuple[Product, Decimal, int]]:
+        """Por produto, as cotas e o custo de aquisição somados de todas as contas (só posições abertas)."""
+        rows = (
+            context.db_session.query(Product, func.sum(Position.quantity), func.sum(Position.acquisition_cost_amount))
+            .join(Position, Position.product_id == Product.id)
+            .filter(Position.quantity > 0)
+            .group_by(Product.id)
+            .order_by(Product.id)
+            .all()
+        )
+        return [(product, quantity, int(cost)) for product, quantity, cost in rows]
 
     @staticmethod
     def has_open_position(context: Context, account_id: int) -> bool:
