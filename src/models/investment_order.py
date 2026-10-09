@@ -19,12 +19,12 @@ class InvestmentOrder(Base):
     # NUMERIC volta como Decimal, nunca float (R6).
     quantity = Column(Numeric(24, 8), nullable=False)
     unit_price = Column(Numeric(20, 8), nullable=False)
-    cost_amount = Column(BigInteger, nullable=False)
+    acquisition_cost_amount = Column(BigInteger, nullable=False)
     # O cliente pediu resgate total: o pedido não traz valor para comparar na repetição.
     redeem_all = Column(Boolean, nullable=False, server_default="false")
     maturity_date = Column(Date)
     # Só na liquidação do vencimento: a aplicação que ela devolveu.
-    settled_order_id = Column(Integer, ForeignKey("investment_order.id"), unique=True)
+    matured_investment_order_id = Column(Integer, ForeignKey("investment_order.id"), unique=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     product = relationship("Product")
@@ -40,7 +40,7 @@ class Position(Base):
     account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("product.id"), nullable=False)
     quantity = Column(Numeric(24, 8), nullable=False, server_default="0")
-    invested_amount = Column(BigInteger, nullable=False, server_default="0")
+    acquisition_cost_amount = Column(BigInteger, nullable=False, server_default="0")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

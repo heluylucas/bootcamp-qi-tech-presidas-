@@ -21,7 +21,7 @@ class Transaction(Base):
     transaction_key = Column(CHAR(36), nullable=False, unique=True)
     type = Column(TransactionType, nullable=False)
     # A dona do pedido: a conta que pediu (no depósito e no resgate, a que recebe).
-    account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
+    owner_account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
     # Só na transferência, e nela sempre: a conta que recebe.
     destination_account_id = Column(Integer, ForeignKey("account.id"))
     amount = Column(BigInteger, nullable=False)
@@ -31,7 +31,7 @@ class Transaction(Base):
     idempotency_key = Column(Uuid(as_uuid=False), unique=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    account = relationship("Account", foreign_keys=[account_id])
+    owner_account = relationship("Account", foreign_keys=[owner_account_id])
     destination_account = relationship("Account", foreign_keys=[destination_account_id])
 
 

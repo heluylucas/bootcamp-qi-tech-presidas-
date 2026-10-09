@@ -14,6 +14,6 @@ class ReferenceRate(Base):
 
     id = Column(Integer, primary_key=True)
     code = Column(ReferenceRateCode, nullable=False)
-    reference_date = Column(Date, nullable=False)
+    rate_date = Column(Date, nullable=False)
     annual_rate_bps = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

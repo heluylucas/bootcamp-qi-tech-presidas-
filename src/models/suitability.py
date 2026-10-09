@@ -17,10 +17,10 @@ class InvestorProfile(Base):
     __tablename__ = "investor_profile"
 
     id = Column(Integer, primary_key=True)
-    enumerator = Column(String(50), nullable=False, unique=True)
-    min_score = Column(SmallInteger, nullable=False)
-    max_score = Column(SmallInteger, nullable=False)
-    max_risk_level = Column(SmallInteger, nullable=False)
+    code = Column(String(50), nullable=False, unique=True)
+    minimum_score = Column(SmallInteger, nullable=False)
+    maximum_score = Column(SmallInteger, nullable=False)
+    maximum_risk_level = Column(SmallInteger, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
@@ -28,13 +28,13 @@ class SuitabilityOption(Base):
     __tablename__ = "suitability_option"
 
     id = Column(Integer, primary_key=True)
-    question_id = Column(Integer, ForeignKey("suitability_question.id"), nullable=False)
+    suitability_question_id = Column(Integer, ForeignKey("suitability_question.id"), nullable=False)
     # O código é também a pontuação: a opção N vale N pontos.
     code = Column(SmallInteger, nullable=False)
     text = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    question = relationship("SuitabilityQuestion", back_populates="options")
+    suitability_question = relationship("SuitabilityQuestion", back_populates="options")
 
 
 class SuitabilityQuestion(Base):
@@ -46,7 +46,7 @@ class SuitabilityQuestion(Base):
     dimension = Column(String(30), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    options = relationship(SuitabilityOption, order_by=SuitabilityOption.code, back_populates="question")
+    options = relationship(SuitabilityOption, order_by=SuitabilityOption.code, back_populates="suitability_question")
 
 
 class SuitabilityAssessment(Base):
@@ -57,11 +57,11 @@ class SuitabilityAssessment(Base):
     id = Column(Integer, primary_key=True)
     assessment_key = Column(CHAR(36), nullable=False, unique=True)
     customer_id = Column(Integer, ForeignKey("customer.id"), nullable=False)
-    profile_id = Column(Integer, ForeignKey("investor_profile.id"), nullable=False)
+    investor_profile_id = Column(Integer, ForeignKey("investor_profile.id"), nullable=False)
     score = Column(SmallInteger, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    profile = relationship(InvestorProfile)
+    investor_profile = relationship(InvestorProfile)
     answers = relationship("SuitabilityAnswer", order_by="SuitabilityAnswer.id")
 
     # Calculados a partir das colunas, não gravados: guardar seria repetir informação.
@@ -73,7 +73,7 @@ class SuitabilityAssessment(Base):
     @property
     def forced_by_rule(self) -> bool:
         """A trava da Q3/Q5 forçou Conservador (RN-SUI-04): o perfil gravado não é o da faixa do score."""
-        return not self.profile.min_score <= self.score <= self.profile.max_score
+        return not self.investor_profile.minimum_score <= self.score <= self.investor_profile.maximum_score
 
 
 class SuitabilityAnswer(Base):
@@ -82,8 +82,8 @@ class SuitabilityAnswer(Base):
     __tablename__ = "suitability_answer"
 
     id = Column(Integer, primary_key=True)
-    assessment_id = Column(Integer, ForeignKey("suitability_assessment.id"), nullable=False)
-    option_id = Column(Integer, ForeignKey("suitability_option.id"), nullable=False)
+    suitability_assessment_id = Column(Integer, ForeignKey("suitability_assessment.id"), nullable=False)
+    suitability_option_id = Column(Integer, ForeignKey("suitability_option.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    option = relationship(SuitabilityOption)
+    suitability_option = relationship(SuitabilityOption)
