@@ -22,6 +22,9 @@ desenvolvimento: explique em português simples o que mudou e por quê.
   Depois, atualize os diagramas ER (`docs/diagramas/er-*.mmd`, regerando o PNG com
   `npx -p @mermaid-js/mermaid-cli mmdc -b white -s 2 -i X.mmd -o X.png`) e rode
   `python scripts/check_er.py` até ele dizer "ok".
+- Mudou rota, schema, erro ou resposta? Atualize `docs/api/routes.json` e `docs/api/fields.json`, rode
+  `python scripts/build_api_docs.py --check`, depois `--capture` (com a API no ar) e `--build`. O site da
+  API (`docs/api/index.html`) é gerado; não edite o HTML à mão.
 - A banca roda em Linux: arquivos com fim de linha LF.
 
 ## Restrições obrigatórias (nunca violar)

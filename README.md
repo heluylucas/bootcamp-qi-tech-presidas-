@@ -10,7 +10,9 @@ nenhum dos dois na sua máquina. Os **testes** rodam no seu Python (seção 2).
 
 As regras de negócio, as rotas e o catálogo de erros completos estão em
 [`docs/regras_de_negocio.tex`](docs/regras_de_negocio.tex). Os fluxos passo
-a passo estão em [`docs/rfc_fluxos.tex`](docs/rfc_fluxos.tex).
+a passo estão em [`docs/rfc_fluxos.tex`](docs/rfc_fluxos.tex). A documentação
+da API, com todas as rotas, exemplos de requisição e resposta e os erros, está
+em [`docs/api/index.html`](docs/api/index.html): abra o arquivo no navegador.
 
 ---
 
@@ -71,8 +73,15 @@ docker compose logs api | grep <o seu x-request-id>
 | `GET /` | diz qual serviço é este | `200` |
 | `GET /health_check` | diz se a API está de pé | `204` |
 
-As rotas do banco entram nesta tabela conforme cada módulo fica pronto. A
-lista planejada está na seção "Rotas da API" de `docs/regras_de_negocio.tex`.
+As rotas do banco estão todas em [`docs/api/index.html`](docs/api/index.html),
+com parâmetros, exemplos reais e erros. O site é gerado do código por
+`scripts/build_api_docs.py`:
+
+```bash
+python scripts/build_api_docs.py --check     # rotas, erros e campos batem com o código?
+python scripts/build_api_docs.py --capture   # exemplos novos (precisa da API no ar)
+python scripts/build_api_docs.py --build     # monta o docs/api/index.html
+```
 
 Para desligar tudo: `Ctrl+C` no terminal da API e depois
 `docker compose down`.
