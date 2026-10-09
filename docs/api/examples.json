@@ -1,0 +1,1665 @@
+{
+  "raiz": [
+    {
+      "label": "Serviço no ar",
+      "request": {
+        "method": "GET",
+        "path": "/",
+        "query": null,
+        "headers": {},
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "service": "bootcamp-library-api",
+        "id": "8"
+      }
+    }
+  ],
+  "health-check": [
+    {
+      "label": "Tudo no ar",
+      "request": {
+        "method": "GET",
+        "path": "/health_check",
+        "query": null,
+        "headers": {},
+        "body": null
+      },
+      "status": 204,
+      "response": null
+    }
+  ],
+  "criar-cliente": [
+    {
+      "label": "Cliente cadastrado",
+      "request": {
+        "method": "POST",
+        "path": "/customer",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "name": "Ana Souza",
+          "document_number": "529.982.247-25",
+          "birth_date": "1992-04-17"
+        }
+      },
+      "status": 201,
+      "response": {
+        "customer_key": "932279ce-d073-4fc1-bdc2-38a596bd21e8",
+        "name": "Ana Souza",
+        "document_number": "***.982.247-**",
+        "birth_date": "1992-04-17",
+        "created_at": "2026-10-09T13:12:47Z"
+      }
+    },
+    {
+      "label": "CPF já cadastrado",
+      "request": {
+        "method": "POST",
+        "path": "/customer",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "name": "Ana Souza",
+          "document_number": "52998224725",
+          "birth_date": "1992-04-17"
+        }
+      },
+      "status": 409,
+      "response": {
+        "title": "Document Already Registered",
+        "description": "There is already a customer with this document_number.",
+        "translation": "Já existe um cliente cadastrado com este CPF.",
+        "code": "PPP001002"
+      }
+    }
+  ],
+  "consultar-cliente": [
+    {
+      "label": "Dados do cliente",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "customer_key": "932279ce-d073-4fc1-bdc2-38a596bd21e8",
+        "name": "Ana Souza",
+        "document_number": "***.982.247-**",
+        "birth_date": "1992-04-17",
+        "created_at": "2026-10-09T13:12:47Z"
+      }
+    }
+  ],
+  "abrir-conta": [
+    {
+      "label": "Conta aberta",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 201,
+      "response": {
+        "account_key": "bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "status": "ACTIVE",
+        "balance": 0,
+        "investments_amount": 0,
+        "net_worth_amount": 0,
+        "created_at": "2026-10-09T13:12:48Z",
+        "updated_at": "2026-10-09T13:12:48Z"
+      }
+    }
+  ],
+  "consultar-conta": [
+    {
+      "label": "Dados da conta",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "account_key": "bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "status": "ACTIVE",
+        "balance": 0,
+        "investments_amount": 0,
+        "net_worth_amount": 0,
+        "created_at": "2026-10-09T13:12:48Z",
+        "updated_at": "2026-10-09T13:12:48Z"
+      }
+    },
+    {
+      "label": "Conta com investimentos",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "account_key": "bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "status": "ACTIVE",
+        "balance": 99800,
+        "investments_amount": 79999,
+        "net_worth_amount": 179799,
+        "created_at": "2026-10-09T13:12:48Z",
+        "updated_at": "2026-10-09T13:12:48Z"
+      }
+    }
+  ],
+  "movimentar": [
+    {
+      "label": "Depósito de R$ 2.000,00",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "bc40769b-0051-48fb-8e1b-5d13a51f5df8",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "type": "DEPOSIT",
+          "amount": 200000,
+          "description": "Salário"
+        }
+      },
+      "status": 201,
+      "response": {
+        "transaction_key": "35da1460-542f-453e-ae9d-22b401003e03",
+        "type": "DEPOSIT",
+        "amount": 200000,
+        "fee_amount": 0,
+        "description": "Salário",
+        "balance": 200000,
+        "created_at": "2026-10-09T13:12:48Z"
+      }
+    },
+    {
+      "label": "Transferência de R$ 200,00 (tarifa de R$ 2,00)",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "8a21e777-5bd1-4de2-b356-238952ba64dd",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "type": "TRANSFER",
+          "amount": 20000,
+          "destination_account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+          "description": "Aluguel"
+        }
+      },
+      "status": 201,
+      "response": {
+        "transaction_key": "94312a44-57a7-4447-adfb-6aa62e9b37a6",
+        "type": "TRANSFER",
+        "amount": 20000,
+        "fee_amount": 200,
+        "description": "Aluguel",
+        "balance": 179800,
+        "created_at": "2026-10-09T13:12:48Z"
+      }
+    },
+    {
+      "label": "Reenvio do mesmo depósito (mesma chave)",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "bc40769b-0051-48fb-8e1b-5d13a51f5df8",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "type": "DEPOSIT",
+          "amount": 200000,
+          "description": "Salário"
+        }
+      },
+      "status": 200,
+      "response": {
+        "transaction_key": "35da1460-542f-453e-ae9d-22b401003e03",
+        "type": "DEPOSIT",
+        "amount": 200000,
+        "fee_amount": 0,
+        "description": "Salário",
+        "balance": 200000,
+        "created_at": "2026-10-09T13:12:48Z"
+      }
+    },
+    {
+      "label": "Mesma chave com outro valor",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "bc40769b-0051-48fb-8e1b-5d13a51f5df8",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "type": "DEPOSIT",
+          "amount": 300000,
+          "description": "Salário"
+        }
+      },
+      "status": 409,
+      "response": {
+        "title": "Idempotency Key Reused",
+        "description": "This Idempotency-Key was already used by another request.",
+        "translation": "Esta Idempotency-Key já foi usada em outro pedido.",
+        "code": "PPP000004"
+      }
+    },
+    {
+      "label": "Saldo insuficiente",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "21f91107-ea3f-451a-90e1-c1d245347c1e",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "type": "WITHDRAWAL",
+          "amount": 450000
+        }
+      },
+      "status": 409,
+      "response": {
+        "title": "Insufficient Balance",
+        "description": "The account does not have enough balance for amount plus fee.",
+        "translation": "Saldo insuficiente para o valor mais a tarifa.",
+        "code": "PPP003003"
+      }
+    }
+  ],
+  "extrato": [
+    {
+      "label": "Últimos lançamentos",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transactions",
+        "query": {
+          "limit": "5"
+        },
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "transaction_key": "94312a44-57a7-4447-adfb-6aa62e9b37a6",
+            "type": "TRANSFER",
+            "direction": "DEBIT",
+            "category": "FEE",
+            "amount": 200,
+            "balance_after": 179800,
+            "description": "Aluguel",
+            "counterparty_account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+            "created_at": "2026-10-09T13:12:48Z"
+          },
+          {
+            "transaction_key": "94312a44-57a7-4447-adfb-6aa62e9b37a6",
+            "type": "TRANSFER",
+            "direction": "DEBIT",
+            "category": "PRINCIPAL",
+            "amount": 20000,
+            "balance_after": 180000,
+            "description": "Aluguel",
+            "counterparty_account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+            "created_at": "2026-10-09T13:12:48Z"
+          },
+          {
+            "transaction_key": "35da1460-542f-453e-ae9d-22b401003e03",
+            "type": "DEPOSIT",
+            "direction": "CREDIT",
+            "category": "PRINCIPAL",
+            "amount": 200000,
+            "balance_after": 200000,
+            "description": "Salário",
+            "counterparty_account_key": null,
+            "created_at": "2026-10-09T13:12:48Z"
+          }
+        ],
+        "page": 1,
+        "limit": 5,
+        "total": 3
+      }
+    }
+  ],
+  "comprovante": [
+    {
+      "label": "Comprovante da transferência",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction/94312a44-57a7-4447-adfb-6aa62e9b37a6",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "transaction_key": "94312a44-57a7-4447-adfb-6aa62e9b37a6",
+        "type": "TRANSFER",
+        "amount": 20000,
+        "fee_amount": 200,
+        "description": "Aluguel",
+        "origin_account_key": "bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "destination_account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+        "created_at": "2026-10-09T13:12:48Z"
+      }
+    }
+  ],
+  "perguntas": [
+    {
+      "label": "Questionário",
+      "request": {
+        "method": "GET",
+        "path": "/suitability_questions",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "code": "Q1",
+            "text": "Por quanto tempo pretende deixar o dinheiro investido?",
+            "dimension": "objetivo",
+            "options": [
+              {
+                "code": 1,
+                "text": "Menos de 1 ano"
+              },
+              {
+                "code": 2,
+                "text": "1 a 3 anos"
+              },
+              {
+                "code": 3,
+                "text": "3 a 5 anos"
+              },
+              {
+                "code": 4,
+                "text": "Mais de 5 anos"
+              }
+            ]
+          },
+          {
+            "code": "Q2",
+            "text": "Qual o principal objetivo?",
+            "dimension": "objetivo",
+            "options": [
+              {
+                "code": 1,
+                "text": "Preservar o dinheiro"
+              },
+              {
+                "code": 2,
+                "text": "Reserva com algum ganho"
+              },
+              {
+                "code": 3,
+                "text": "Crescer o patrimônio"
+              },
+              {
+                "code": 4,
+                "text": "Maximizar o retorno aceitando oscilações"
+              }
+            ]
+          },
+          {
+            "code": "Q3",
+            "text": "Se seus investimentos caíssem 10% em um mês, você...",
+            "dimension": "tolerância",
+            "options": [
+              {
+                "code": 1,
+                "text": "Resgataria tudo"
+              },
+              {
+                "code": 2,
+                "text": "Resgataria uma parte"
+              },
+              {
+                "code": 3,
+                "text": "Manteria"
+              },
+              {
+                "code": 4,
+                "text": "Aplicaria mais"
+              }
+            ]
+          },
+          {
+            "code": "Q4",
+            "text": "Quanto da sua renda mensal sobra para investir?",
+            "dimension": "situação financeira",
+            "options": [
+              {
+                "code": 1,
+                "text": "Quase nada"
+              },
+              {
+                "code": 2,
+                "text": "Até 10%"
+              },
+              {
+                "code": 3,
+                "text": "10% a 30%"
+              },
+              {
+                "code": 4,
+                "text": "Mais de 30%"
+              }
+            ]
+          },
+          {
+            "code": "Q5",
+            "text": "Você pode precisar deste dinheiro de repente?",
+            "dimension": "liquidez",
+            "options": [
+              {
+                "code": 1,
+                "text": "Sim, a qualquer momento"
+              },
+              {
+                "code": 2,
+                "text": "Provavelmente em até 1 ano"
+              },
+              {
+                "code": 3,
+                "text": "Dificilmente"
+              },
+              {
+                "code": 4,
+                "text": "Não"
+              }
+            ]
+          },
+          {
+            "code": "Q6",
+            "text": "Em quais produtos você já investiu?",
+            "dimension": "experiência",
+            "options": [
+              {
+                "code": 1,
+                "text": "Nenhum ou só poupança"
+              },
+              {
+                "code": 2,
+                "text": "Tesouro/CDB"
+              },
+              {
+                "code": 3,
+                "text": "Fundos multimercado ou de ações"
+              },
+              {
+                "code": 4,
+                "text": "Ações, derivativos ou cripto"
+              }
+            ]
+          },
+          {
+            "code": "Q7",
+            "text": "Como você descreve seu conhecimento financeiro?",
+            "dimension": "conhecimento",
+            "options": [
+              {
+                "code": 1,
+                "text": "Nenhum"
+              },
+              {
+                "code": 2,
+                "text": "Básico"
+              },
+              {
+                "code": 3,
+                "text": "Intermediário (entendo risco e retorno)"
+              },
+              {
+                "code": 4,
+                "text": "Avançado (formação ou atuação na área)"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "responder-perfil": [
+    {
+      "label": "Perfil Moderado (14 pontos)",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/suitability",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "answers": [
+            {
+              "question_code": "Q1",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q2",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q3",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q4",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q5",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q6",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q7",
+              "option_code": 2
+            }
+          ]
+        }
+      },
+      "status": 201,
+      "response": {
+        "assessment_key": "2a095ea6-334e-4269-bc64-f6844a4c7a7a",
+        "profile": "MODERATE",
+        "maximum_risk_level": 3,
+        "score": 14,
+        "forced_by_rule": false,
+        "valid_until": "2028-10-09T13:12:48Z",
+        "created_at": "2026-10-09T13:12:48Z",
+        "answers": [
+          {
+            "question_code": "Q1",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q2",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q3",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q4",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q5",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q6",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q7",
+            "option_code": 2
+          }
+        ]
+      }
+    },
+    {
+      "label": "Resposta faltando",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/suitability",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "answers": [
+            {
+              "question_code": "Q1",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q2",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q3",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q4",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q5",
+              "option_code": 2
+            },
+            {
+              "question_code": "Q6",
+              "option_code": 2
+            }
+          ]
+        }
+      },
+      "status": 422,
+      "response": {
+        "title": "Incomplete Answers",
+        "description": "Every question must be answered exactly once, and only existing questions can be answered.",
+        "translation": "Cada pergunta do questionário precisa de exatamente uma resposta.",
+        "code": "PPP004002"
+      }
+    }
+  ],
+  "perfil-atual": [
+    {
+      "label": "Perfil vigente",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/suitability",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "assessment_key": "2a095ea6-334e-4269-bc64-f6844a4c7a7a",
+        "profile": "MODERATE",
+        "maximum_risk_level": 3,
+        "score": 14,
+        "forced_by_rule": false,
+        "valid_until": "2028-10-09T13:12:48Z",
+        "created_at": "2026-10-09T13:12:48Z",
+        "answers": [
+          {
+            "question_code": "Q1",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q2",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q3",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q4",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q5",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q6",
+            "option_code": 2
+          },
+          {
+            "question_code": "Q7",
+            "option_code": 2
+          }
+        ]
+      }
+    }
+  ],
+  "historico-perfil": [
+    {
+      "label": "Avaliações",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/suitabilities",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "assessment_key": "2a095ea6-334e-4269-bc64-f6844a4c7a7a",
+            "profile": "MODERATE",
+            "maximum_risk_level": 3,
+            "score": 14,
+            "forced_by_rule": false,
+            "valid_until": "2028-10-09T13:12:48Z",
+            "created_at": "2026-10-09T13:12:48Z",
+            "answers": [
+              {
+                "question_code": "Q1",
+                "option_code": 2
+              },
+              {
+                "question_code": "Q2",
+                "option_code": 2
+              },
+              {
+                "question_code": "Q3",
+                "option_code": 2
+              },
+              {
+                "question_code": "Q4",
+                "option_code": 2
+              },
+              {
+                "question_code": "Q5",
+                "option_code": 2
+              },
+              {
+                "question_code": "Q6",
+                "option_code": 2
+              },
+              {
+                "question_code": "Q7",
+                "option_code": 2
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "listar-produtos": [
+    {
+      "label": "Catálogo completo",
+      "request": {
+        "method": "GET",
+        "path": "/products",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "product_key": "c951f46b-0b99-4aec-8b35-44629976b9ad",
+            "name": "Tesouro Selic 2031",
+            "type": "PUBLIC_BOND",
+            "issuer": "Tesouro Nacional",
+            "indexer": "SELIC",
+            "rate_description": "100% da Selic",
+            "risk_level": 1,
+            "term_months": null,
+            "minimum_application_amount": 5000
+          },
+          {
+            "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+            "name": "CDB Triple P Bank Liquidez",
+            "type": "PRIVATE_BOND",
+            "issuer": "Triple P Bank",
+            "indexer": "CDI",
+            "rate_description": "95% do CDI",
+            "risk_level": 2,
+            "term_months": null,
+            "minimum_application_amount": 5000
+          },
+          {
+            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "name": "LCI Triple P Bank 12 meses",
+            "type": "PRIVATE_BOND",
+            "issuer": "Triple P Bank",
+            "indexer": "CDI",
+            "rate_description": "93% do CDI, isento de IR",
+            "risk_level": 2,
+            "term_months": 12,
+            "minimum_application_amount": 10000
+          },
+          {
+            "product_key": "c3ec45f9-35af-41b5-8bf1-1cc4c83c898a",
+            "name": "Tesouro Prefixado 2029",
+            "type": "PUBLIC_BOND",
+            "issuer": "Tesouro Nacional",
+            "indexer": "PREFIXED",
+            "rate_description": "13% a.a.",
+            "risk_level": 2,
+            "term_months": null,
+            "minimum_application_amount": 5000
+          },
+          {
+            "product_key": "6450ac4e-7aca-4d5e-b752-00402d38984f",
+            "name": "Tesouro IPCA+ 2035",
+            "type": "PUBLIC_BOND",
+            "issuer": "Tesouro Nacional",
+            "indexer": "IPCA",
+            "rate_description": "IPCA + 6% a.a.",
+            "risk_level": 3,
+            "term_months": null,
+            "minimum_application_amount": 5000
+          },
+          {
+            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "name": "FGV Quant Capital FIM",
+            "type": "FUND",
+            "issuer": "FGV Quant Capital",
+            "indexer": "QUOTA",
+            "rate_description": "Varia com a cota",
+            "risk_level": 3,
+            "term_months": null,
+            "minimum_application_amount": 10000
+          }
+        ]
+      }
+    },
+    {
+      "label": "Só risco até 2",
+      "request": {
+        "method": "GET",
+        "path": "/products",
+        "query": {
+          "maximum_risk_level": "2"
+        },
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "product_key": "c951f46b-0b99-4aec-8b35-44629976b9ad",
+            "name": "Tesouro Selic 2031",
+            "type": "PUBLIC_BOND",
+            "issuer": "Tesouro Nacional",
+            "indexer": "SELIC",
+            "rate_description": "100% da Selic",
+            "risk_level": 1,
+            "term_months": null,
+            "minimum_application_amount": 5000
+          },
+          {
+            "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+            "name": "CDB Triple P Bank Liquidez",
+            "type": "PRIVATE_BOND",
+            "issuer": "Triple P Bank",
+            "indexer": "CDI",
+            "rate_description": "95% do CDI",
+            "risk_level": 2,
+            "term_months": null,
+            "minimum_application_amount": 5000
+          },
+          {
+            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "name": "LCI Triple P Bank 12 meses",
+            "type": "PRIVATE_BOND",
+            "issuer": "Triple P Bank",
+            "indexer": "CDI",
+            "rate_description": "93% do CDI, isento de IR",
+            "risk_level": 2,
+            "term_months": 12,
+            "minimum_application_amount": 10000
+          },
+          {
+            "product_key": "c3ec45f9-35af-41b5-8bf1-1cc4c83c898a",
+            "name": "Tesouro Prefixado 2029",
+            "type": "PUBLIC_BOND",
+            "issuer": "Tesouro Nacional",
+            "indexer": "PREFIXED",
+            "rate_description": "13% a.a.",
+            "risk_level": 2,
+            "term_months": null,
+            "minimum_application_amount": 5000
+          }
+        ]
+      }
+    }
+  ],
+  "consultar-produto": [
+    {
+      "label": "Fundo com o preço do dia",
+      "request": {
+        "method": "GET",
+        "path": "/product/25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "name": "FGV Quant Capital FIM",
+        "type": "FUND",
+        "issuer": "FGV Quant Capital",
+        "indexer": "QUOTA",
+        "rate_description": "Varia com a cota",
+        "risk_level": 3,
+        "term_months": null,
+        "minimum_application_amount": 10000,
+        "price": {
+          "price_date": "2026-10-09",
+          "unit_price": "105.33466498"
+        }
+      }
+    },
+    {
+      "label": "Produto inexistente",
+      "request": {
+        "method": "GET",
+        "path": "/product/368e77d2-b857-46ce-9b93-8416a76f423e",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 404,
+      "response": {
+        "title": "Product Not Found",
+        "description": "The product_key does not exist.",
+        "translation": "Produto não encontrado.",
+        "code": "PPP005001"
+      }
+    }
+  ],
+  "historico-precos": [
+    {
+      "label": "Preços do fundo",
+      "request": {
+        "method": "GET",
+        "path": "/product/25e3f41a-c91e-4084-9265-e70ae6448a68/prices",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "price_date": "2026-10-09",
+            "unit_price": "105.33466498"
+          }
+        ]
+      }
+    }
+  ],
+  "sugestao-carteira": [
+    {
+      "label": "R$ 1.000,00 na carteira Moderada",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/portfolio_suggestion",
+        "query": {
+          "amount": "100000"
+        },
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "profile": "MODERATE",
+        "amount": 100000,
+        "items": [
+          {
+            "product_key": "c951f46b-0b99-4aec-8b35-44629976b9ad",
+            "name": "Tesouro Selic 2031",
+            "weight_bps": 2500,
+            "amount": 25000
+          },
+          {
+            "product_key": "6450ac4e-7aca-4d5e-b752-00402d38984f",
+            "name": "Tesouro IPCA+ 2035",
+            "weight_bps": 2000,
+            "amount": 20000
+          },
+          {
+            "product_key": "c3ec45f9-35af-41b5-8bf1-1cc4c83c898a",
+            "name": "Tesouro Prefixado 2029",
+            "weight_bps": 2000,
+            "amount": 20000
+          },
+          {
+            "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+            "name": "CDB Triple P Bank Liquidez",
+            "weight_bps": 2000,
+            "amount": 20000
+          },
+          {
+            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "name": "FGV Quant Capital FIM",
+            "weight_bps": 1500,
+            "amount": 15000
+          }
+        ]
+      }
+    },
+    {
+      "label": "Valor abaixo do mínimo",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/portfolio_suggestion",
+        "query": {
+          "amount": "5000"
+        },
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 422,
+      "response": {
+        "title": "Suggestion Amount Too Low",
+        "description": "The amount for a portfolio suggestion must be at least 100000 cents (R$ 1,000.00).",
+        "translation": "O valor mínimo para pedir uma sugestão de carteira é R$ 1.000,00.",
+        "code": "PPP006001"
+      }
+    }
+  ],
+  "ordem": [
+    {
+      "label": "Aplicação de R$ 1.000,00 no fundo",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "e4a15cf6-1f0c-4d4b-954b-5b9da681a189",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+          "side": "APPLY",
+          "amount": 100000
+        }
+      },
+      "status": 201,
+      "response": {
+        "order_key": "451ddd5f-2c5d-4038-902e-1f27892053d3",
+        "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "side": "APPLY",
+        "source": "CUSTOMER",
+        "amount": 100000,
+        "unit_price": "105.33466498",
+        "quantity": "9.49355086",
+        "maturity_date": null,
+        "status": "EXECUTED",
+        "transaction_key": "809cbcb1-2d2c-4579-8f0a-c52ebd162298"
+      }
+    },
+    {
+      "label": "Aplicação de R$ 100,00 na LCI (com vencimento)",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "39a15e58-4c1f-4b79-926f-05601c4595cd",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+          "side": "APPLY",
+          "amount": 10000
+        }
+      },
+      "status": 201,
+      "response": {
+        "order_key": "57b27b90-23e3-40e8-8122-2ae0078991cd",
+        "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+        "side": "APPLY",
+        "source": "CUSTOMER",
+        "amount": 10000,
+        "unit_price": "110.85247616",
+        "quantity": "0.90209983",
+        "maturity_date": "2027-10-09",
+        "status": "EXECUTED",
+        "transaction_key": "488c860b-3a4b-4fe3-9e9f-11cc6a69a71a"
+      }
+    },
+    {
+      "label": "Resgate de R$ 300,00 do fundo",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "43a37a7e-383e-4e32-a873-7b22834919d2",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+          "side": "REDEEM",
+          "amount": 30000
+        }
+      },
+      "status": 201,
+      "response": {
+        "order_key": "a53777de-42b9-4e40-a524-31139dbc61e1",
+        "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "side": "REDEEM",
+        "source": "CUSTOMER",
+        "amount": 30000,
+        "unit_price": "105.33466498",
+        "quantity": "2.84806525",
+        "maturity_date": null,
+        "status": "EXECUTED",
+        "transaction_key": "24cae251-26ee-45a6-97b1-e162c29d24e1",
+        "acquisition_cost_amount": 29999,
+        "result_amount": 1,
+        "return_bps": 0
+      }
+    },
+    {
+      "label": "Abaixo da aplicação mínima",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "d893996e-e044-4c6f-addb-360339d69551",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+          "side": "APPLY",
+          "amount": 1000
+        }
+      },
+      "status": 422,
+      "response": {
+        "title": "Below Minimum Application",
+        "description": "The amount is below the product's minimum application.",
+        "translation": "O valor está abaixo da aplicação mínima do produto.",
+        "code": "PPP007002"
+      }
+    },
+    {
+      "label": "Resgate da LCI antes do vencimento",
+      "request": {
+        "method": "POST",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Idempotency-Key": "72a87504-15f1-48e5-beac-cebce1420ad4",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+          "side": "REDEEM",
+          "redeem_all": true
+        }
+      },
+      "status": 422,
+      "response": {
+        "title": "Redemption Not Allowed",
+        "description": "This product can only be redeemed at maturity.",
+        "translation": "Este produto só pode ser resgatado no vencimento.",
+        "code": "PPP007005"
+      }
+    }
+  ],
+  "consultar-ordem": [
+    {
+      "label": "Ordem de aplicação",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order/451ddd5f-2c5d-4038-902e-1f27892053d3",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "order_key": "451ddd5f-2c5d-4038-902e-1f27892053d3",
+        "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "side": "APPLY",
+        "source": "CUSTOMER",
+        "amount": 100000,
+        "unit_price": "105.33466498",
+        "quantity": "9.49355086",
+        "maturity_date": null,
+        "status": "EXECUTED",
+        "transaction_key": "809cbcb1-2d2c-4579-8f0a-c52ebd162298"
+      }
+    }
+  ],
+  "listar-ordens": [
+    {
+      "label": "Ordens da conta",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_orders",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "order_key": "a53777de-42b9-4e40-a524-31139dbc61e1",
+            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "side": "REDEEM",
+            "source": "CUSTOMER",
+            "amount": 30000,
+            "unit_price": "105.33466498",
+            "quantity": "2.84806525",
+            "maturity_date": null,
+            "status": "EXECUTED",
+            "transaction_key": "24cae251-26ee-45a6-97b1-e162c29d24e1",
+            "acquisition_cost_amount": 29999,
+            "result_amount": 1,
+            "return_bps": 0
+          },
+          {
+            "order_key": "57b27b90-23e3-40e8-8122-2ae0078991cd",
+            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "side": "APPLY",
+            "source": "CUSTOMER",
+            "amount": 10000,
+            "unit_price": "110.85247616",
+            "quantity": "0.90209983",
+            "maturity_date": "2027-10-09",
+            "status": "EXECUTED",
+            "transaction_key": "488c860b-3a4b-4fe3-9e9f-11cc6a69a71a"
+          },
+          {
+            "order_key": "451ddd5f-2c5d-4038-902e-1f27892053d3",
+            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "side": "APPLY",
+            "source": "CUSTOMER",
+            "amount": 100000,
+            "unit_price": "105.33466498",
+            "quantity": "9.49355086",
+            "maturity_date": null,
+            "status": "EXECUTED",
+            "transaction_key": "809cbcb1-2d2c-4579-8f0a-c52ebd162298"
+          }
+        ],
+        "page": 1,
+        "limit": 20,
+        "total": 3
+      }
+    }
+  ],
+  "posicao": [
+    {
+      "label": "Posições e capital total",
+      "request": {
+        "method": "GET",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/positions",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "quantity": "0.90209983",
+            "unit_price": "110.85247616",
+            "current_amount": 9999,
+            "acquisition_cost_amount": 10000,
+            "result_amount": -1,
+            "return_bps": -1
+          },
+          {
+            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "quantity": "6.64548561",
+            "unit_price": "105.33466498",
+            "current_amount": 70000,
+            "acquisition_cost_amount": 70001,
+            "result_amount": -1,
+            "return_bps": 0
+          }
+        ],
+        "total": {
+          "investments_amount": 79999,
+          "acquisition_cost_amount": 80001,
+          "result_amount": -2,
+          "return_bps": 0,
+          "cash_amount": 99800,
+          "net_worth_amount": 179799,
+          "cash_bps": 5550,
+          "investments_bps": 4450
+        }
+      }
+    }
+  ],
+  "status-conta-banco": [
+    {
+      "label": "Banco bloqueia a conta",
+      "request": {
+        "method": "PATCH",
+        "path": "/internal/account/02242ebe-b923-4974-8cf2-58f2ca0bff9d/status",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "OPERATOR-TOKEN": "<OPERATOR_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "BLOCKED",
+          "reason": "Suspeita de fraude em análise"
+        }
+      },
+      "status": 200,
+      "response": {
+        "account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+        "status": "BLOCKED",
+        "balance": 20000,
+        "investments_amount": 0,
+        "net_worth_amount": 20000,
+        "created_at": "2026-10-09T13:12:48Z",
+        "updated_at": "2026-10-09T13:12:49Z"
+      }
+    },
+    {
+      "label": "Banco desbloqueia a conta",
+      "request": {
+        "method": "PATCH",
+        "path": "/internal/account/02242ebe-b923-4974-8cf2-58f2ca0bff9d/status",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "OPERATOR-TOKEN": "<OPERATOR_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "ACTIVE",
+          "reason": "Análise concluída"
+        }
+      },
+      "status": 200,
+      "response": {
+        "account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+        "status": "ACTIVE",
+        "balance": 20000,
+        "investments_amount": 0,
+        "net_worth_amount": 20000,
+        "created_at": "2026-10-09T13:12:48Z",
+        "updated_at": "2026-10-09T13:12:49Z"
+      }
+    }
+  ],
+  "encerrar-conta": [
+    {
+      "label": "Cliente encerra a conta vazia",
+      "request": {
+        "method": "PATCH",
+        "path": "/customer/654e2a0c-cdda-420c-b8e6-7a1d066d6410/account/e16e4083-10d5-4a60-ba74-9de3fc7cd745",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "CLOSED",
+          "reason": "Não vou mais usar"
+        }
+      },
+      "status": 200,
+      "response": {
+        "account_key": "e16e4083-10d5-4a60-ba74-9de3fc7cd745",
+        "status": "CLOSED",
+        "balance": 0,
+        "investments_amount": 0,
+        "net_worth_amount": 0,
+        "created_at": "2026-10-09T13:12:49Z",
+        "updated_at": "2026-10-09T13:12:49Z"
+      }
+    },
+    {
+      "label": "Cliente tenta bloquear",
+      "request": {
+        "method": "PATCH",
+        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "status": "BLOCKED",
+          "reason": "Teste"
+        }
+      },
+      "status": 403,
+      "response": {
+        "title": "Status Change Reserved To Bank",
+        "description": "Customers can only close their own account; blocking and unblocking are bank decisions.",
+        "translation": "O cliente só pode encerrar a própria conta; bloquear e desbloquear são decisões do banco.",
+        "code": "PPP002007"
+      }
+    }
+  ],
+  "historico-status": [
+    {
+      "label": "Abertura e encerramento",
+      "request": {
+        "method": "GET",
+        "path": "/customer/654e2a0c-cdda-420c-b8e6-7a1d066d6410/account/e16e4083-10d5-4a60-ba74-9de3fc7cd745/status_events",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "items": [
+          {
+            "from_status": null,
+            "to_status": "ACTIVE",
+            "reason": null,
+            "actor": "CUSTOMER",
+            "created_at": "2026-10-09T13:12:49Z"
+          },
+          {
+            "from_status": "ACTIVE",
+            "to_status": "CLOSED",
+            "reason": "Não vou mais usar",
+            "actor": "CUSTOMER",
+            "created_at": "2026-10-09T13:12:49Z"
+          }
+        ]
+      }
+    }
+  ],
+  "receita": [
+    {
+      "label": "Tarifas do mês",
+      "request": {
+        "method": "GET",
+        "path": "/internal/revenue",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "OPERATOR-TOKEN": "<OPERATOR_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "from": "2026-10-01",
+        "to": "2026-10-31",
+        "realized": {
+          "fee_amount": 200
+        }
+      }
+    }
+  ],
+  "data-movimento": [
+    {
+      "label": "Data atual",
+      "request": {
+        "method": "GET",
+        "path": "/internal/business_date",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "OPERATOR-TOKEN": "<OPERATOR_TOKEN>"
+        },
+        "body": null
+      },
+      "status": 200,
+      "response": {
+        "business_date": "2026-10-09"
+      }
+    }
+  ],
+  "fechamento-dia": [
+    {
+      "label": "Data que não é a atual",
+      "request": {
+        "method": "POST",
+        "path": "/internal/day_close",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "OPERATOR-TOKEN": "<OPERATOR_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "close_date": "2000-01-03"
+        }
+      },
+      "status": 409,
+      "response": {
+        "title": "Business Date Mismatch",
+        "description": "The close_date is not the current business date.",
+        "translation": "A data a fechar não é a data de movimento atual.",
+        "code": "PPP000006"
+      }
+    },
+    {
+      "label": "Dia fechado",
+      "request": {
+        "method": "POST",
+        "path": "/internal/day_close",
+        "query": null,
+        "headers": {
+          "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
+          "OPERATOR-TOKEN": "<OPERATOR_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "close_date": "2026-10-09"
+        }
+      },
+      "status": 201,
+      "response": {
+        "business_date": "2026-10-12",
+        "prices": [
+          {
+            "product_key": "c951f46b-0b99-4aec-8b35-44629976b9ad",
+            "name": "Tesouro Selic 2031",
+            "unit_price": "111.85479805"
+          },
+          {
+            "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+            "name": "CDB Triple P Bank Liquidez",
+            "unit_price": "111.15648714"
+          },
+          {
+            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "name": "LCI Triple P Bank 12 meses",
+            "unit_price": "110.90931232"
+          },
+          {
+            "product_key": "c3ec45f9-35af-41b5-8bf1-1cc4c83c898a",
+            "name": "Tesouro Prefixado 2029",
+            "unit_price": "110.29276038"
+          },
+          {
+            "product_key": "6450ac4e-7aca-4d5e-b752-00402d38984f",
+            "name": "Tesouro IPCA+ 2035",
+            "unit_price": "108.54460334"
+          },
+          {
+            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "name": "FGV Quant Capital FIM",
+            "unit_price": "105.77542398"
+          }
+        ],
+        "rates": [
+          {
+            "code": "CDI",
+            "annual_rate_bps": 1490
+          },
+          {
+            "code": "SELIC",
+            "annual_rate_bps": 1500
+          }
+        ]
+      }
+    }
+  ]
+}

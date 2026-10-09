@@ -1,0 +1,237 @@
+<title>Triple P Bank API</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Três colunas de referência de API: navegação | conteúdo | "nesta página". Azul-marinho da marca, código sempre em painel escuro. */
+:root {
+  --brand: #0b1b5e;
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --ink: #0e1530;
+  --muted: #59627e;
+  --line: #dde2ee;
+  --accent: #2446b8;
+  --accent-soft: #e6ebf8;
+  --code-bg: #0b1430;
+  --code-ink: #dbe3f7;
+  --get: #2457c5;
+  --post: #0f7a55;
+  --patch: #a35b05;
+  --ok: #0f7a55;
+  --warn: #a35b05;
+  --bad: #b3261e;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+  --header: 56px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0f20; --surface: #10172b; --ink: #e3e8f5; --muted: #97a1bd; --line: #222c47;
+    --accent: #8fa8ff; --accent-soft: #1a2550; --code-bg: #070b18; --code-ink: #dbe3f7;
+    --get: #8fb0ff; --post: #49c99a; --patch: #e3a24f; --ok: #49c99a; --warn: #e3a24f; --bad: #f2867f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0f20; --surface: #10172b; --ink: #e3e8f5; --muted: #97a1bd; --line: #222c47;
+  --accent: #8fa8ff; --accent-soft: #1a2550; --code-bg: #070b18; --code-ink: #dbe3f7;
+  --get: #8fb0ff; --post: #49c99a; --patch: #e3a24f; --ok: #49c99a; --warn: #e3a24f; --bad: #f2867f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--font-body); }
+a { color: var(--accent); }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--accent-soft); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; height: var(--header);
+  display: flex; align-items: center; gap: 16px; padding-inline: 16px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: none; color: var(--ink); text-decoration: none; font-weight: 700; white-space: nowrap; }
+.mark { width: 32px; height: 32px; flex: none; display: block; }
+.chip { font: 500 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 8px; }
+.search { margin-left: auto; width: min(320px, 40vw); min-width: 0; }
+.search input { width: 100%; font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.menu { display: none; font: inherit; font-size: 14px; color: var(--ink); background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+
+.layout { display: grid; grid-template-columns: 272px minmax(0, 1fr) 220px; min-height: calc(100vh - var(--header)); }
+.side { border-right: 1px solid var(--line); background: var(--surface); padding-block: 16px; padding-inline: 12px; position: sticky; top: var(--header); height: calc(100vh - var(--header)); overflow-y: auto; }
+.nav-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 18px; }
+.nav-title { margin: 0 0 6px; padding-inline: 8px; font: 600 11px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.side a { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 14px; line-height: 1.35; }
+.side a:hover { background: var(--bg); }
+.side a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.side .method { flex: none; width: 46px; text-align: center; }
+
+.content { min-width: 0; padding-block: 32px 64px; padding-inline: 40px; }
+.page { display: none; max-width: 860px; }
+.page.active { display: block; }
+.toc { position: sticky; top: var(--header); height: calc(100vh - var(--header)); overflow-y: auto; padding-block: 32px; padding-inline: 16px; border-left: 1px solid var(--line); }
+.toc p { margin: 0 0 8px; font: 600 11px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.toc button { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; padding: 4px 0; cursor: pointer; }
+.toc button.sub { padding-left: 12px; }
+.toc button:hover { color: var(--accent); }
+
+h1 { font-size: 30px; line-height: 1.2; letter-spacing: -0.01em; margin: 4px 0 12px; text-wrap: balance; }
+h2 { font-size: 20px; line-height: 1.3; margin: 36px 0 12px; padding-top: 4px; text-wrap: balance; scroll-margin-top: calc(var(--header) + 16px); }
+h3 { font-size: 16px; margin: 24px 0 10px; scroll-margin-top: calc(var(--header) + 16px); }
+p, li { max-width: 70ch; }
+.lede { font-size: 16px; color: var(--muted); }
+.crumb { margin: 0; font: 500 12px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.note { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.req { color: var(--bad); font-weight: 700; margin-left: 2px; }
+
+.endpoint { display: flex; flex-wrap: wrap; gap: 12px 32px; padding: 14px 16px; margin: 20px 0 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.endpoint > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.label { font: 600 11px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.path { font-size: 14px; background: none; padding: 0; color: var(--ink); }
+.param { color: var(--accent); font-weight: 600; }
+.method { display: inline-block; font: 600 11px/1 var(--font-mono); letter-spacing: 0.04em; padding: 5px 7px; border-radius: 5px; color: var(--surface); }
+.m-get { background: var(--get); }
+.m-post { background: var(--post); }
+.m-patch { background: var(--patch); }
+.status { display: inline-block; font: 600 12px/1 var(--font-mono); padding: 4px 7px; border-radius: 5px; border: 1px solid currentColor; white-space: nowrap; }
+.s-ok { color: var(--ok); }
+.s-warn { color: var(--warn); }
+.s-bad { color: var(--bad); }
+
+.table { overflow-x: auto; margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font: 600 11px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--bg); padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+
+.code { position: relative; margin: 8px 0; padding: 38px 16px 14px; background: var(--code-bg); color: var(--code-ink); border-radius: 10px; overflow-x: auto; font: 13px/1.55 var(--font-mono); }
+.code code { background: none; padding: 0; color: inherit; font-size: inherit; overflow-wrap: normal; }
+.copy { position: absolute; top: 8px; right: 8px; font: 500 11px/1 var(--font-mono); color: var(--code-ink); background: transparent; border: 1px solid #34406a; border-radius: 6px; padding: 5px 7px; cursor: pointer; opacity: 0.8; }
+.copy:hover { opacity: 1; }
+.example { margin: 14px 0; }
+.example-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+
+.pager { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 48px; }
+.pager a { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-decoration: none; color: var(--ink); font-weight: 600; }
+.pager a span { font: 500 11px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.pager .next { text-align: right; grid-column: -2; }
+
+@media (max-width: 1180px) { .layout { grid-template-columns: 260px minmax(0, 1fr); } .toc { display: none; } }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .menu { display: inline-block; }
+  .chip { display: none; }
+  .side { display: none; position: fixed; inset: var(--header) 0 0 0; height: auto; z-index: 9; border-right: 0; }
+  body.nav-open .side { display: block; }
+  .content { padding-inline: 16px; }
+  .search { width: auto; flex: 1; }
+  h1 { font-size: 25px; }
+  /* Tabelas rolam para o lado inteiras, em vez de espremer as colunas. */
+  table { min-width: 600px; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<header class="top">
+  <button class="menu" id="menu" aria-expanded="false" aria-controls="side">Menu</button>
+  <a class="brand" href="#visao-geral"><svg class="mark" viewBox="330 334 594 594" aria-hidden="true"><rect x="330" y="334" width="594" height="594" rx="130" fill="#0b1b5e"/><g fill="#fff"><circle cx="554" cy="445" r="39"/><circle cx="470" cy="507" r="31"/><circle cx="465" cy="605" r="35"/><rect x="543" y="545" width="70" height="312" rx="35"/></g><path d="M655 442 A135 135 0 0 1 655 712" fill="none" stroke="#fff" stroke-width="70" stroke-linecap="round"/></svg>Triple P Bank</a>
+  <span class="chip">API Reference</span>
+  <label class="search"><span hidden>Buscar</span><input id="search" type="search" placeholder="Buscar rota, campo ou erro"></label>
+</header>
+<div class="layout">
+  <nav class="side" id="side" aria-label="Documentação">
+{{NAV}}
+  </nav>
+  <main class="content" id="content">
+{{PAGES}}
+  </main>
+  <aside class="toc" id="toc" aria-label="Nesta página"></aside>
+</div>
+<script>
+(function () {
+  var pages = Array.prototype.slice.call(document.querySelectorAll(".page"));
+  var links = Array.prototype.slice.call(document.querySelectorAll(".side a"));
+  var toc = document.getElementById("toc");
+
+  function show(id) {
+    var target = document.getElementById("p-" + id);
+    if (!target || !target.classList.contains("page")) { target = pages[0]; }
+    pages.forEach(function (page) { page.classList.toggle("active", page === target); });
+    links.forEach(function (link) {
+      if (link.getAttribute("href") === "#" + target.id.slice(2)) { link.setAttribute("aria-current", "page"); }
+      else { link.removeAttribute("aria-current"); }
+    });
+    document.title = target.getAttribute("data-title") + " · Triple P Bank API";
+    buildToc(target);
+    document.body.classList.remove("nav-open");
+    document.getElementById("menu").setAttribute("aria-expanded", "false");
+    window.scrollTo(0, 0);
+  }
+
+  function buildToc(page) {
+    toc.innerHTML = "";
+    var headings = page.querySelectorAll("h2, h3");
+    if (!headings.length) { return; }
+    var title = document.createElement("p");
+    title.textContent = "Nesta página";
+    toc.appendChild(title);
+    Array.prototype.forEach.call(headings, function (heading) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = heading.textContent;
+      if (heading.tagName === "H3") { button.className = "sub"; }
+      button.addEventListener("click", function () { heading.scrollIntoView(); });
+      toc.appendChild(button);
+    });
+  }
+
+  document.querySelectorAll(".code").forEach(function (block) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy";
+    button.textContent = "Copiar";
+    button.addEventListener("click", function () {
+      var text = block.querySelector("code").textContent;
+      var done = function () { button.textContent = "Copiado"; setTimeout(function () { button.textContent = "Copiar"; }, 1500); };
+      try {
+        navigator.clipboard.writeText(text).then(done, function () { selectText(block); });
+      } catch (error) { selectText(block); }
+    });
+    block.appendChild(button);
+  });
+
+  function selectText(block) {
+    var range = document.createRange();
+    range.selectNodeContents(block.querySelector("code"));
+    var selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  document.getElementById("search").addEventListener("input", function (event) {
+    var term = event.target.value.trim().toLowerCase();
+    document.querySelectorAll(".nav-group").forEach(function (group) {
+      var visible = 0;
+      group.querySelectorAll("a").forEach(function (link) {
+        var page = document.getElementById("p-" + link.getAttribute("href").slice(1));
+        var haystack = (link.textContent + " " + (page ? page.textContent : "")).toLowerCase();
+        var match = !term || haystack.indexOf(term) !== -1;
+        link.hidden = !match;
+        if (match) { visible += 1; }
+      });
+      group.hidden = visible === 0;
+    });
+    if (term && window.innerWidth <= 860) { document.body.classList.add("nav-open"); }
+  });
+
+  document.getElementById("menu").addEventListener("click", function () {
+    var open = document.body.classList.toggle("nav-open");
+    this.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+
+  window.addEventListener("hashchange", function () { show(location.hash.slice(1)); });
+  show(location.hash.slice(1));
+})();
+</script>
