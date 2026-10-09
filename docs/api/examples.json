@@ -49,11 +49,11 @@
       },
       "status": 201,
       "response": {
-        "customer_key": "932279ce-d073-4fc1-bdc2-38a596bd21e8",
+        "customer_key": "d37c004e-bbd7-43b9-bebc-a7b64dee4776",
         "name": "Ana Souza",
         "document_number": "***.982.247-**",
         "birth_date": "1992-04-17",
-        "created_at": "2026-10-09T13:12:47Z"
+        "created_at": "2026-10-09T20:38:30Z"
       }
     },
     {
@@ -86,7 +86,7 @@
       "label": "Dados do cliente",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -95,11 +95,11 @@
       },
       "status": 200,
       "response": {
-        "customer_key": "932279ce-d073-4fc1-bdc2-38a596bd21e8",
+        "customer_key": "d37c004e-bbd7-43b9-bebc-a7b64dee4776",
         "name": "Ana Souza",
         "document_number": "***.982.247-**",
         "birth_date": "1992-04-17",
-        "created_at": "2026-10-09T13:12:47Z"
+        "created_at": "2026-10-09T20:38:30Z"
       }
     }
   ],
@@ -108,7 +108,7 @@
       "label": "Conta aberta",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -117,13 +117,13 @@
       },
       "status": 201,
       "response": {
-        "account_key": "bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "account_key": "dcbeec00-be2b-4ea5-99dc-b93d92757792",
         "status": "ACTIVE",
         "balance": 0,
         "investments_amount": 0,
         "net_worth_amount": 0,
-        "created_at": "2026-10-09T13:12:48Z",
-        "updated_at": "2026-10-09T13:12:48Z"
+        "created_at": "2026-10-09T20:38:30Z",
+        "updated_at": "2026-10-09T20:38:30Z"
       }
     }
   ],
@@ -132,7 +132,7 @@
       "label": "Dados da conta",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -141,20 +141,20 @@
       },
       "status": 200,
       "response": {
-        "account_key": "bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "account_key": "dcbeec00-be2b-4ea5-99dc-b93d92757792",
         "status": "ACTIVE",
         "balance": 0,
         "investments_amount": 0,
         "net_worth_amount": 0,
-        "created_at": "2026-10-09T13:12:48Z",
-        "updated_at": "2026-10-09T13:12:48Z"
+        "created_at": "2026-10-09T20:38:30Z",
+        "updated_at": "2026-10-09T20:38:30Z"
       }
     },
     {
       "label": "Conta com investimentos",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -163,13 +163,13 @@
       },
       "status": 200,
       "response": {
-        "account_key": "bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "account_key": "dcbeec00-be2b-4ea5-99dc-b93d92757792",
         "status": "ACTIVE",
         "balance": 99800,
         "investments_amount": 79999,
         "net_worth_amount": 179799,
-        "created_at": "2026-10-09T13:12:48Z",
-        "updated_at": "2026-10-09T13:12:48Z"
+        "created_at": "2026-10-09T20:38:30Z",
+        "updated_at": "2026-10-09T20:38:31Z"
       }
     }
   ],
@@ -178,11 +178,11 @@
       "label": "Depósito de R$ 2.000,00",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/transaction",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "bc40769b-0051-48fb-8e1b-5d13a51f5df8",
+          "Idempotency-Key": "6733015e-5921-4ee7-b713-305a1a01a74e",
           "Content-Type": "application/json"
         },
         "body": {
@@ -193,53 +193,53 @@
       },
       "status": 201,
       "response": {
-        "transaction_key": "35da1460-542f-453e-ae9d-22b401003e03",
+        "transaction_key": "dcd8cb8a-c011-4ebb-a74e-e13e6dce9b23",
         "type": "DEPOSIT",
         "amount": 200000,
         "fee_amount": 0,
         "description": "Salário",
         "balance": 200000,
-        "created_at": "2026-10-09T13:12:48Z"
+        "created_at": "2026-10-09T20:38:30Z"
       }
     },
     {
       "label": "Transferência de R$ 200,00 (tarifa de R$ 2,00)",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/transaction",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "8a21e777-5bd1-4de2-b356-238952ba64dd",
+          "Idempotency-Key": "bf1c22be-b574-4a2d-9266-093bb59eab44",
           "Content-Type": "application/json"
         },
         "body": {
           "type": "TRANSFER",
           "amount": 20000,
-          "destination_account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+          "destination_account_key": "87c63482-649e-4e7e-bb4d-e841d094d10d",
           "description": "Aluguel"
         }
       },
       "status": 201,
       "response": {
-        "transaction_key": "94312a44-57a7-4447-adfb-6aa62e9b37a6",
+        "transaction_key": "aad04a8b-a40e-46c5-bd92-83e550907d1f",
         "type": "TRANSFER",
         "amount": 20000,
         "fee_amount": 200,
         "description": "Aluguel",
         "balance": 179800,
-        "created_at": "2026-10-09T13:12:48Z"
+        "created_at": "2026-10-09T20:38:30Z"
       }
     },
     {
       "label": "Reenvio do mesmo depósito (mesma chave)",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/transaction",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "bc40769b-0051-48fb-8e1b-5d13a51f5df8",
+          "Idempotency-Key": "6733015e-5921-4ee7-b713-305a1a01a74e",
           "Content-Type": "application/json"
         },
         "body": {
@@ -250,24 +250,24 @@
       },
       "status": 200,
       "response": {
-        "transaction_key": "35da1460-542f-453e-ae9d-22b401003e03",
+        "transaction_key": "dcd8cb8a-c011-4ebb-a74e-e13e6dce9b23",
         "type": "DEPOSIT",
         "amount": 200000,
         "fee_amount": 0,
         "description": "Salário",
         "balance": 200000,
-        "created_at": "2026-10-09T13:12:48Z"
+        "created_at": "2026-10-09T20:38:30Z"
       }
     },
     {
       "label": "Mesma chave com outro valor",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/transaction",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "bc40769b-0051-48fb-8e1b-5d13a51f5df8",
+          "Idempotency-Key": "6733015e-5921-4ee7-b713-305a1a01a74e",
           "Content-Type": "application/json"
         },
         "body": {
@@ -288,11 +288,11 @@
       "label": "Saldo insuficiente",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/transaction",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "21f91107-ea3f-451a-90e1-c1d245347c1e",
+          "Idempotency-Key": "044cddc1-8694-4f91-9767-e26ef07511f6",
           "Content-Type": "application/json"
         },
         "body": {
@@ -314,7 +314,7 @@
       "label": "Últimos lançamentos",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transactions",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/transactions",
         "query": {
           "limit": "5"
         },
@@ -327,29 +327,29 @@
       "response": {
         "items": [
           {
-            "transaction_key": "94312a44-57a7-4447-adfb-6aa62e9b37a6",
+            "transaction_key": "aad04a8b-a40e-46c5-bd92-83e550907d1f",
             "type": "TRANSFER",
             "direction": "DEBIT",
             "category": "FEE",
             "amount": 200,
             "balance_after": 179800,
             "description": "Aluguel",
-            "counterparty_account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
-            "created_at": "2026-10-09T13:12:48Z"
+            "counterparty_account_key": "87c63482-649e-4e7e-bb4d-e841d094d10d",
+            "created_at": "2026-10-09T20:38:30Z"
           },
           {
-            "transaction_key": "94312a44-57a7-4447-adfb-6aa62e9b37a6",
+            "transaction_key": "aad04a8b-a40e-46c5-bd92-83e550907d1f",
             "type": "TRANSFER",
             "direction": "DEBIT",
             "category": "PRINCIPAL",
             "amount": 20000,
             "balance_after": 180000,
             "description": "Aluguel",
-            "counterparty_account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
-            "created_at": "2026-10-09T13:12:48Z"
+            "counterparty_account_key": "87c63482-649e-4e7e-bb4d-e841d094d10d",
+            "created_at": "2026-10-09T20:38:30Z"
           },
           {
-            "transaction_key": "35da1460-542f-453e-ae9d-22b401003e03",
+            "transaction_key": "dcd8cb8a-c011-4ebb-a74e-e13e6dce9b23",
             "type": "DEPOSIT",
             "direction": "CREDIT",
             "category": "PRINCIPAL",
@@ -357,7 +357,7 @@
             "balance_after": 200000,
             "description": "Salário",
             "counterparty_account_key": null,
-            "created_at": "2026-10-09T13:12:48Z"
+            "created_at": "2026-10-09T20:38:30Z"
           }
         ],
         "page": 1,
@@ -371,7 +371,7 @@
       "label": "Comprovante da transferência",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/transaction/94312a44-57a7-4447-adfb-6aa62e9b37a6",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/transaction/aad04a8b-a40e-46c5-bd92-83e550907d1f",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -380,14 +380,14 @@
       },
       "status": 200,
       "response": {
-        "transaction_key": "94312a44-57a7-4447-adfb-6aa62e9b37a6",
+        "transaction_key": "aad04a8b-a40e-46c5-bd92-83e550907d1f",
         "type": "TRANSFER",
         "amount": 20000,
         "fee_amount": 200,
         "description": "Aluguel",
-        "origin_account_key": "bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
-        "destination_account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
-        "created_at": "2026-10-09T13:12:48Z"
+        "origin_account_key": "dcbeec00-be2b-4ea5-99dc-b93d92757792",
+        "destination_account_key": "87c63482-649e-4e7e-bb4d-e841d094d10d",
+        "created_at": "2026-10-09T20:38:30Z"
       }
     }
   ],
@@ -576,7 +576,7 @@
       "label": "Perfil Moderado (14 pontos)",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/suitability",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/suitability",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
@@ -617,13 +617,13 @@
       },
       "status": 201,
       "response": {
-        "assessment_key": "2a095ea6-334e-4269-bc64-f6844a4c7a7a",
+        "assessment_key": "28fad535-0970-47bd-a91f-af98d9921a08",
         "profile": "MODERATE",
         "maximum_risk_level": 3,
         "score": 14,
         "forced_by_rule": false,
-        "valid_until": "2028-10-09T13:12:48Z",
-        "created_at": "2026-10-09T13:12:48Z",
+        "valid_until": "2028-10-09T20:38:30Z",
+        "created_at": "2026-10-09T20:38:30Z",
         "answers": [
           {
             "question_code": "Q1",
@@ -660,7 +660,7 @@
       "label": "Resposta faltando",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/suitability",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/suitability",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
@@ -709,7 +709,7 @@
       "label": "Perfil vigente",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/suitability",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/suitability",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -718,13 +718,13 @@
       },
       "status": 200,
       "response": {
-        "assessment_key": "2a095ea6-334e-4269-bc64-f6844a4c7a7a",
+        "assessment_key": "28fad535-0970-47bd-a91f-af98d9921a08",
         "profile": "MODERATE",
         "maximum_risk_level": 3,
         "score": 14,
         "forced_by_rule": false,
-        "valid_until": "2028-10-09T13:12:48Z",
-        "created_at": "2026-10-09T13:12:48Z",
+        "valid_until": "2028-10-09T20:38:30Z",
+        "created_at": "2026-10-09T20:38:30Z",
         "answers": [
           {
             "question_code": "Q1",
@@ -763,7 +763,7 @@
       "label": "Avaliações",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/suitabilities",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/suitabilities",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -774,13 +774,13 @@
       "response": {
         "items": [
           {
-            "assessment_key": "2a095ea6-334e-4269-bc64-f6844a4c7a7a",
+            "assessment_key": "28fad535-0970-47bd-a91f-af98d9921a08",
             "profile": "MODERATE",
             "maximum_risk_level": 3,
             "score": 14,
             "forced_by_rule": false,
-            "valid_until": "2028-10-09T13:12:48Z",
-            "created_at": "2026-10-09T13:12:48Z",
+            "valid_until": "2028-10-09T20:38:30Z",
+            "created_at": "2026-10-09T20:38:30Z",
             "answers": [
               {
                 "question_code": "Q1",
@@ -832,7 +832,7 @@
       "response": {
         "items": [
           {
-            "product_key": "c951f46b-0b99-4aec-8b35-44629976b9ad",
+            "product_key": "d058f3ff-a099-408e-b366-0c0b49e227ab",
             "name": "Tesouro Selic 2031",
             "type": "PUBLIC_BOND",
             "issuer": "Tesouro Nacional",
@@ -843,7 +843,7 @@
             "minimum_application_amount": 5000
           },
           {
-            "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+            "product_key": "13d3cf2d-3278-4a62-8aa3-5490f8040228",
             "name": "CDB Triple P Bank Liquidez",
             "type": "PRIVATE_BOND",
             "issuer": "Triple P Bank",
@@ -854,7 +854,7 @@
             "minimum_application_amount": 5000
           },
           {
-            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "product_key": "3d887d70-7ab8-48fd-8680-ceac6f15add4",
             "name": "LCI Triple P Bank 12 meses",
             "type": "PRIVATE_BOND",
             "issuer": "Triple P Bank",
@@ -865,7 +865,7 @@
             "minimum_application_amount": 10000
           },
           {
-            "product_key": "c3ec45f9-35af-41b5-8bf1-1cc4c83c898a",
+            "product_key": "6bb19313-9f23-4c57-b7b1-f8dd228e7d23",
             "name": "Tesouro Prefixado 2029",
             "type": "PUBLIC_BOND",
             "issuer": "Tesouro Nacional",
@@ -876,7 +876,7 @@
             "minimum_application_amount": 5000
           },
           {
-            "product_key": "6450ac4e-7aca-4d5e-b752-00402d38984f",
+            "product_key": "333e5a37-02d7-485e-b067-bef3813a6d6c",
             "name": "Tesouro IPCA+ 2035",
             "type": "PUBLIC_BOND",
             "issuer": "Tesouro Nacional",
@@ -887,7 +887,7 @@
             "minimum_application_amount": 5000
           },
           {
-            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
             "name": "FGV Quant Capital FIM",
             "type": "FUND",
             "issuer": "FGV Quant Capital",
@@ -917,7 +917,7 @@
       "response": {
         "items": [
           {
-            "product_key": "c951f46b-0b99-4aec-8b35-44629976b9ad",
+            "product_key": "d058f3ff-a099-408e-b366-0c0b49e227ab",
             "name": "Tesouro Selic 2031",
             "type": "PUBLIC_BOND",
             "issuer": "Tesouro Nacional",
@@ -928,7 +928,7 @@
             "minimum_application_amount": 5000
           },
           {
-            "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+            "product_key": "13d3cf2d-3278-4a62-8aa3-5490f8040228",
             "name": "CDB Triple P Bank Liquidez",
             "type": "PRIVATE_BOND",
             "issuer": "Triple P Bank",
@@ -939,7 +939,7 @@
             "minimum_application_amount": 5000
           },
           {
-            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "product_key": "3d887d70-7ab8-48fd-8680-ceac6f15add4",
             "name": "LCI Triple P Bank 12 meses",
             "type": "PRIVATE_BOND",
             "issuer": "Triple P Bank",
@@ -950,7 +950,7 @@
             "minimum_application_amount": 10000
           },
           {
-            "product_key": "c3ec45f9-35af-41b5-8bf1-1cc4c83c898a",
+            "product_key": "6bb19313-9f23-4c57-b7b1-f8dd228e7d23",
             "name": "Tesouro Prefixado 2029",
             "type": "PUBLIC_BOND",
             "issuer": "Tesouro Nacional",
@@ -969,7 +969,7 @@
       "label": "Fundo com o preço do dia",
       "request": {
         "method": "GET",
-        "path": "/product/25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "path": "/product/4a2da881-4390-4658-adca-f46a93eba521",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -978,7 +978,7 @@
       },
       "status": 200,
       "response": {
-        "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
         "name": "FGV Quant Capital FIM",
         "type": "FUND",
         "issuer": "FGV Quant Capital",
@@ -997,7 +997,7 @@
       "label": "Produto inexistente",
       "request": {
         "method": "GET",
-        "path": "/product/368e77d2-b857-46ce-9b93-8416a76f423e",
+        "path": "/product/b2f35197-3d58-41f6-a803-9f4fa6c3ffc5",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -1018,7 +1018,7 @@
       "label": "Preços do fundo",
       "request": {
         "method": "GET",
-        "path": "/product/25e3f41a-c91e-4084-9265-e70ae6448a68/prices",
+        "path": "/product/4a2da881-4390-4658-adca-f46a93eba521/prices",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -1041,7 +1041,7 @@
       "label": "R$ 1.000,00 na carteira Moderada",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/portfolio_suggestion",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/portfolio_suggestion",
         "query": {
           "amount": "100000"
         },
@@ -1056,31 +1056,31 @@
         "amount": 100000,
         "items": [
           {
-            "product_key": "c951f46b-0b99-4aec-8b35-44629976b9ad",
+            "product_key": "d058f3ff-a099-408e-b366-0c0b49e227ab",
             "name": "Tesouro Selic 2031",
             "weight_bps": 2500,
             "amount": 25000
           },
           {
-            "product_key": "6450ac4e-7aca-4d5e-b752-00402d38984f",
+            "product_key": "333e5a37-02d7-485e-b067-bef3813a6d6c",
             "name": "Tesouro IPCA+ 2035",
             "weight_bps": 2000,
             "amount": 20000
           },
           {
-            "product_key": "c3ec45f9-35af-41b5-8bf1-1cc4c83c898a",
+            "product_key": "6bb19313-9f23-4c57-b7b1-f8dd228e7d23",
             "name": "Tesouro Prefixado 2029",
             "weight_bps": 2000,
             "amount": 20000
           },
           {
-            "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+            "product_key": "13d3cf2d-3278-4a62-8aa3-5490f8040228",
             "name": "CDB Triple P Bank Liquidez",
             "weight_bps": 2000,
             "amount": 20000
           },
           {
-            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
             "name": "FGV Quant Capital FIM",
             "weight_bps": 1500,
             "amount": 15000
@@ -1092,7 +1092,7 @@
       "label": "Valor abaixo do mínimo",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/portfolio_suggestion",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/portfolio_suggestion",
         "query": {
           "amount": "5000"
         },
@@ -1115,23 +1115,23 @@
       "label": "Aplicação de R$ 1.000,00 no fundo",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/investment_order",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "e4a15cf6-1f0c-4d4b-954b-5b9da681a189",
+          "Idempotency-Key": "2694ec41-591e-48b5-b2ad-dbcd0879c0e4",
           "Content-Type": "application/json"
         },
         "body": {
-          "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+          "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
           "side": "APPLY",
           "amount": 100000
         }
       },
       "status": 201,
       "response": {
-        "order_key": "451ddd5f-2c5d-4038-902e-1f27892053d3",
-        "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "order_key": "257f8001-3a82-4446-b742-04402d69c290",
+        "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
         "side": "APPLY",
         "source": "CUSTOMER",
         "amount": 100000,
@@ -1139,30 +1139,30 @@
         "quantity": "9.49355086",
         "maturity_date": null,
         "status": "EXECUTED",
-        "transaction_key": "809cbcb1-2d2c-4579-8f0a-c52ebd162298"
+        "transaction_key": "c76c22cf-ca43-4dd6-a862-797a185926de"
       }
     },
     {
       "label": "Aplicação de R$ 100,00 na LCI (com vencimento)",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/investment_order",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "39a15e58-4c1f-4b79-926f-05601c4595cd",
+          "Idempotency-Key": "1742ed7a-1a33-4fbb-9c7c-7cd2086583a1",
           "Content-Type": "application/json"
         },
         "body": {
-          "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+          "product_key": "3d887d70-7ab8-48fd-8680-ceac6f15add4",
           "side": "APPLY",
           "amount": 10000
         }
       },
       "status": 201,
       "response": {
-        "order_key": "57b27b90-23e3-40e8-8122-2ae0078991cd",
-        "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+        "order_key": "033cc019-f128-4a69-96f6-0572a561001e",
+        "product_key": "3d887d70-7ab8-48fd-8680-ceac6f15add4",
         "side": "APPLY",
         "source": "CUSTOMER",
         "amount": 10000,
@@ -1170,30 +1170,30 @@
         "quantity": "0.90209983",
         "maturity_date": "2027-10-09",
         "status": "EXECUTED",
-        "transaction_key": "488c860b-3a4b-4fe3-9e9f-11cc6a69a71a"
+        "transaction_key": "07549e29-8152-406f-8a53-455772fefb6e"
       }
     },
     {
       "label": "Resgate de R$ 300,00 do fundo",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/investment_order",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "43a37a7e-383e-4e32-a873-7b22834919d2",
+          "Idempotency-Key": "d1f994ff-2907-477a-9509-38c159b214f9",
           "Content-Type": "application/json"
         },
         "body": {
-          "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+          "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
           "side": "REDEEM",
           "amount": 30000
         }
       },
       "status": 201,
       "response": {
-        "order_key": "a53777de-42b9-4e40-a524-31139dbc61e1",
-        "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "order_key": "e072409e-2fea-4dbd-9267-accce4263126",
+        "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
         "side": "REDEEM",
         "source": "CUSTOMER",
         "amount": 30000,
@@ -1201,7 +1201,7 @@
         "quantity": "2.84806525",
         "maturity_date": null,
         "status": "EXECUTED",
-        "transaction_key": "24cae251-26ee-45a6-97b1-e162c29d24e1",
+        "transaction_key": "f38146f3-779a-46eb-b24c-a38c8890fdac",
         "acquisition_cost_amount": 29999,
         "result_amount": 1,
         "return_bps": 0
@@ -1211,15 +1211,15 @@
       "label": "Abaixo da aplicação mínima",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/investment_order",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "d893996e-e044-4c6f-addb-360339d69551",
+          "Idempotency-Key": "3488238f-552a-4fc4-851d-f7b9b695397c",
           "Content-Type": "application/json"
         },
         "body": {
-          "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+          "product_key": "13d3cf2d-3278-4a62-8aa3-5490f8040228",
           "side": "APPLY",
           "amount": 1000
         }
@@ -1236,15 +1236,15 @@
       "label": "Resgate da LCI antes do vencimento",
       "request": {
         "method": "POST",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/investment_order",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
-          "Idempotency-Key": "72a87504-15f1-48e5-beac-cebce1420ad4",
+          "Idempotency-Key": "59d60bcd-0530-425e-8df8-f59176c20597",
           "Content-Type": "application/json"
         },
         "body": {
-          "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+          "product_key": "3d887d70-7ab8-48fd-8680-ceac6f15add4",
           "side": "REDEEM",
           "redeem_all": true
         }
@@ -1263,7 +1263,7 @@
       "label": "Ordem de aplicação",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_order/451ddd5f-2c5d-4038-902e-1f27892053d3",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/investment_order/257f8001-3a82-4446-b742-04402d69c290",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -1272,8 +1272,8 @@
       },
       "status": 200,
       "response": {
-        "order_key": "451ddd5f-2c5d-4038-902e-1f27892053d3",
-        "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+        "order_key": "257f8001-3a82-4446-b742-04402d69c290",
+        "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
         "side": "APPLY",
         "source": "CUSTOMER",
         "amount": 100000,
@@ -1281,7 +1281,7 @@
         "quantity": "9.49355086",
         "maturity_date": null,
         "status": "EXECUTED",
-        "transaction_key": "809cbcb1-2d2c-4579-8f0a-c52ebd162298"
+        "transaction_key": "c76c22cf-ca43-4dd6-a862-797a185926de"
       }
     }
   ],
@@ -1290,7 +1290,7 @@
       "label": "Ordens da conta",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/investment_orders",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/investment_orders",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -1301,8 +1301,8 @@
       "response": {
         "items": [
           {
-            "order_key": "a53777de-42b9-4e40-a524-31139dbc61e1",
-            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "order_key": "e072409e-2fea-4dbd-9267-accce4263126",
+            "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
             "side": "REDEEM",
             "source": "CUSTOMER",
             "amount": 30000,
@@ -1310,14 +1310,14 @@
             "quantity": "2.84806525",
             "maturity_date": null,
             "status": "EXECUTED",
-            "transaction_key": "24cae251-26ee-45a6-97b1-e162c29d24e1",
+            "transaction_key": "f38146f3-779a-46eb-b24c-a38c8890fdac",
             "acquisition_cost_amount": 29999,
             "result_amount": 1,
             "return_bps": 0
           },
           {
-            "order_key": "57b27b90-23e3-40e8-8122-2ae0078991cd",
-            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "order_key": "033cc019-f128-4a69-96f6-0572a561001e",
+            "product_key": "3d887d70-7ab8-48fd-8680-ceac6f15add4",
             "side": "APPLY",
             "source": "CUSTOMER",
             "amount": 10000,
@@ -1325,11 +1325,11 @@
             "quantity": "0.90209983",
             "maturity_date": "2027-10-09",
             "status": "EXECUTED",
-            "transaction_key": "488c860b-3a4b-4fe3-9e9f-11cc6a69a71a"
+            "transaction_key": "07549e29-8152-406f-8a53-455772fefb6e"
           },
           {
-            "order_key": "451ddd5f-2c5d-4038-902e-1f27892053d3",
-            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "order_key": "257f8001-3a82-4446-b742-04402d69c290",
+            "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
             "side": "APPLY",
             "source": "CUSTOMER",
             "amount": 100000,
@@ -1337,7 +1337,7 @@
             "quantity": "9.49355086",
             "maturity_date": null,
             "status": "EXECUTED",
-            "transaction_key": "809cbcb1-2d2c-4579-8f0a-c52ebd162298"
+            "transaction_key": "c76c22cf-ca43-4dd6-a862-797a185926de"
           }
         ],
         "page": 1,
@@ -1351,7 +1351,7 @@
       "label": "Posições e capital total",
       "request": {
         "method": "GET",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4/positions",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792/positions",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -1362,7 +1362,7 @@
       "response": {
         "items": [
           {
-            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "product_key": "3d887d70-7ab8-48fd-8680-ceac6f15add4",
             "quantity": "0.90209983",
             "unit_price": "110.85247616",
             "current_amount": 9999,
@@ -1371,7 +1371,7 @@
             "return_bps": -1
           },
           {
-            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
             "quantity": "6.64548561",
             "unit_price": "105.33466498",
             "current_amount": 70000,
@@ -1398,7 +1398,7 @@
       "label": "Banco bloqueia a conta",
       "request": {
         "method": "PATCH",
-        "path": "/internal/account/02242ebe-b923-4974-8cf2-58f2ca0bff9d/status",
+        "path": "/internal/account/87c63482-649e-4e7e-bb4d-e841d094d10d/status",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
@@ -1412,20 +1412,20 @@
       },
       "status": 200,
       "response": {
-        "account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+        "account_key": "87c63482-649e-4e7e-bb4d-e841d094d10d",
         "status": "BLOCKED",
         "balance": 20000,
         "investments_amount": 0,
         "net_worth_amount": 20000,
-        "created_at": "2026-10-09T13:12:48Z",
-        "updated_at": "2026-10-09T13:12:49Z"
+        "created_at": "2026-10-09T20:38:30Z",
+        "updated_at": "2026-10-09T20:38:31Z"
       }
     },
     {
       "label": "Banco desbloqueia a conta",
       "request": {
         "method": "PATCH",
-        "path": "/internal/account/02242ebe-b923-4974-8cf2-58f2ca0bff9d/status",
+        "path": "/internal/account/87c63482-649e-4e7e-bb4d-e841d094d10d/status",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
@@ -1439,13 +1439,13 @@
       },
       "status": 200,
       "response": {
-        "account_key": "02242ebe-b923-4974-8cf2-58f2ca0bff9d",
+        "account_key": "87c63482-649e-4e7e-bb4d-e841d094d10d",
         "status": "ACTIVE",
         "balance": 20000,
         "investments_amount": 0,
         "net_worth_amount": 20000,
-        "created_at": "2026-10-09T13:12:48Z",
-        "updated_at": "2026-10-09T13:12:49Z"
+        "created_at": "2026-10-09T20:38:30Z",
+        "updated_at": "2026-10-09T20:38:31Z"
       }
     }
   ],
@@ -1454,7 +1454,7 @@
       "label": "Cliente encerra a conta vazia",
       "request": {
         "method": "PATCH",
-        "path": "/customer/654e2a0c-cdda-420c-b8e6-7a1d066d6410/account/e16e4083-10d5-4a60-ba74-9de3fc7cd745",
+        "path": "/customer/7661627e-23f6-4d4c-b599-d89f9c30d7f5/account/ef2a5d00-7265-4c9c-9f08-3454798f11e2",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
@@ -1467,20 +1467,20 @@
       },
       "status": 200,
       "response": {
-        "account_key": "e16e4083-10d5-4a60-ba74-9de3fc7cd745",
+        "account_key": "ef2a5d00-7265-4c9c-9f08-3454798f11e2",
         "status": "CLOSED",
         "balance": 0,
         "investments_amount": 0,
         "net_worth_amount": 0,
-        "created_at": "2026-10-09T13:12:49Z",
-        "updated_at": "2026-10-09T13:12:49Z"
+        "created_at": "2026-10-09T20:38:31Z",
+        "updated_at": "2026-10-09T20:38:31Z"
       }
     },
     {
       "label": "Cliente tenta bloquear",
       "request": {
         "method": "PATCH",
-        "path": "/customer/932279ce-d073-4fc1-bdc2-38a596bd21e8/account/bbc61813-8d2b-4cf6-a66b-d9eef5946cd4",
+        "path": "/customer/d37c004e-bbd7-43b9-bebc-a7b64dee4776/account/dcbeec00-be2b-4ea5-99dc-b93d92757792",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>",
@@ -1505,7 +1505,7 @@
       "label": "Abertura e encerramento",
       "request": {
         "method": "GET",
-        "path": "/customer/654e2a0c-cdda-420c-b8e6-7a1d066d6410/account/e16e4083-10d5-4a60-ba74-9de3fc7cd745/status_events",
+        "path": "/customer/7661627e-23f6-4d4c-b599-d89f9c30d7f5/account/ef2a5d00-7265-4c9c-9f08-3454798f11e2/status_events",
         "query": null,
         "headers": {
           "INTERNAL-TOKEN": "<INTERNAL_TOKEN>"
@@ -1520,14 +1520,14 @@
             "to_status": "ACTIVE",
             "reason": null,
             "actor": "CUSTOMER",
-            "created_at": "2026-10-09T13:12:49Z"
+            "created_at": "2026-10-09T20:38:31Z"
           },
           {
             "from_status": "ACTIVE",
             "to_status": "CLOSED",
             "reason": "Não vou mais usar",
             "actor": "CUSTOMER",
-            "created_at": "2026-10-09T13:12:49Z"
+            "created_at": "2026-10-09T20:38:31Z"
           }
         ]
       }
@@ -1550,9 +1550,27 @@
       "response": {
         "from": "2026-10-01",
         "to": "2026-10-31",
+        "days": 31,
         "realized": {
-          "fee_amount": 200
-        }
+          "fee_amount": 2800
+        },
+        "estimated": {
+          "fund_administration_fee": {
+            "base_amount": 120000,
+            "annual_rate_bps": 100,
+            "amount": 101
+          },
+          "own_issue_spread": {
+            "base_amount": 60000,
+            "amount": 40
+          },
+          "float": {
+            "base_amount": 119317700,
+            "annual_rate_bps": 1500,
+            "amount": 1520074
+          }
+        },
+        "total_amount": 1523015
       }
     }
   ],
@@ -1619,32 +1637,32 @@
         "business_date": "2026-10-12",
         "prices": [
           {
-            "product_key": "c951f46b-0b99-4aec-8b35-44629976b9ad",
+            "product_key": "d058f3ff-a099-408e-b366-0c0b49e227ab",
             "name": "Tesouro Selic 2031",
             "unit_price": "111.85479805"
           },
           {
-            "product_key": "c700f551-16bf-420b-8499-dad866a3d4ff",
+            "product_key": "13d3cf2d-3278-4a62-8aa3-5490f8040228",
             "name": "CDB Triple P Bank Liquidez",
             "unit_price": "111.15648714"
           },
           {
-            "product_key": "d975eb07-e274-4106-abe5-1db3284e8906",
+            "product_key": "3d887d70-7ab8-48fd-8680-ceac6f15add4",
             "name": "LCI Triple P Bank 12 meses",
             "unit_price": "110.90931232"
           },
           {
-            "product_key": "c3ec45f9-35af-41b5-8bf1-1cc4c83c898a",
+            "product_key": "6bb19313-9f23-4c57-b7b1-f8dd228e7d23",
             "name": "Tesouro Prefixado 2029",
             "unit_price": "110.29276038"
           },
           {
-            "product_key": "6450ac4e-7aca-4d5e-b752-00402d38984f",
+            "product_key": "333e5a37-02d7-485e-b067-bef3813a6d6c",
             "name": "Tesouro IPCA+ 2035",
             "unit_price": "108.54460334"
           },
           {
-            "product_key": "25e3f41a-c91e-4084-9265-e70ae6448a68",
+            "product_key": "4a2da881-4390-4658-adca-f46a93eba521",
             "name": "FGV Quant Capital FIM",
             "unit_price": "105.77542398"
           }
