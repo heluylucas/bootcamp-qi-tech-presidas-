@@ -12,27 +12,28 @@ class InvestmentOrderResource:
     def on_post(
         self,
         customer_key: str,
+        account_key: str,
         payload: dict,
         idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     ) -> JSONResponse:
-        order, created = InvestmentOrderController().create(customer_key, payload, idempotency_key)
+        order, created = InvestmentOrderController().create(customer_key, account_key, payload, idempotency_key)
         return JSONResponse(content=order, status_code=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-    def on_get(self, customer_key: str, order_key: str) -> JSONResponse:
-        order = InvestmentOrderController().get(customer_key, order_key)
+    def on_get(self, customer_key: str, account_key: str, order_key: str) -> JSONResponse:
+        order = InvestmentOrderController().get(customer_key, account_key, order_key)
         return JSONResponse(content=order, status_code=status.HTTP_200_OK)
 
     @SchemaHandler.validate_query_params("get_investment_orders.json")
-    def on_get_list(self, customer_key: str, request: Request) -> JSONResponse:
+    def on_get_list(self, customer_key: str, account_key: str, request: Request) -> JSONResponse:
         # O schema já garantiu que page e limit, se vieram, são inteiros de 1 a 100 (limit).
         query = request.query_params
         orders = InvestmentOrderController().list_orders(
-            customer_key, int(query.get("page", 1)), int(query.get("limit", 20)), query.get("product_key")
+            customer_key, account_key, int(query.get("page", 1)), int(query.get("limit", 20)), query.get("product_key")
         )
         return JSONResponse(content=orders, status_code=status.HTTP_200_OK)
 
     @SchemaHandler.validate_query_params("get_positions.json")
-    def on_get_positions(self, customer_key: str, request: Request) -> JSONResponse:
+    def on_get_positions(self, customer_key: str, account_key: str, request: Request) -> JSONResponse:
         include_closed = request.query_params.get("include_closed") == "true"
-        positions = InvestmentOrderController().positions(customer_key, include_closed)
+        positions = InvestmentOrderController().positions(customer_key, account_key, include_closed)
         return JSONResponse(content=positions, status_code=status.HTTP_200_OK)

@@ -209,17 +209,18 @@ def create_app() -> FastAPI:
 
     investment_order_resource = InvestmentOrderResource()
 
-    investment_order_path = "/customer/{customer_key}/investment_order"
+    # A ordem e a posição são da conta, como as movimentações: mesmo prefixo de caminho.
+    investment_order_path = f"{account_path}/investment_order"
 
     application.add_api_route(investment_order_path, investment_order_resource.on_post, methods=["POST"])
     application.add_api_route(f"{investment_order_path}/{{order_key}}", investment_order_resource.on_get, methods=["GET"])
     application.add_api_route(
-        "/customer/{customer_key}/investment_orders",
+        f"{account_path}/investment_orders",
         investment_order_resource.on_get_list,
         methods=["GET"]
     )
     application.add_api_route(
-        "/customer/{customer_key}/positions",
+        f"{account_path}/positions",
         investment_order_resource.on_get_positions,
         methods=["GET"]
     )
