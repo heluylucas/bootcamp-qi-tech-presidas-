@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 from database import Context
 from models import ReferenceRate
@@ -14,6 +14,16 @@ class ReferenceRateRepository:
             .filter(ReferenceRate.code == code, ReferenceRate.rate_date <= day)
             .order_by(ReferenceRate.rate_date.desc())
             .first()
+        )
+
+    @staticmethod
+    def list_until(context: Context, code: str, day: date) -> List[ReferenceRate]:
+        """Todas as taxas publicadas até o dia, da mais antiga para a mais nova."""
+        return (
+            context.db_session.query(ReferenceRate)
+            .filter(ReferenceRate.code == code, ReferenceRate.rate_date <= day)
+            .order_by(ReferenceRate.rate_date)
+            .all()
         )
 
     @staticmethod

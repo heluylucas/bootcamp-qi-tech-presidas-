@@ -1,12 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional, Tuple
 
-from sqlalchemy import func, or_
+from sqlalchemy import Date, case, cast, func, or_
 from sqlalchemy.orm import joinedload
 
 from database import Context
-from models import LedgerEntry, Transaction
+from models import Account, LedgerEntry, Transaction
 
 
 class TransactionRepository:
@@ -82,6 +82,25 @@ class TransactionRepository:
         )
 
         return int(total or 0)
+
+    @staticmethod
+    def daily_customer_balance_changes(context: Context, end: datetime) -> List[Tuple[date, int]]:
+        """Por dia (UTC), a variação somada dos saldos das contas de cliente antes de `end`.
+
+        Crédito soma, débito subtrai: acumulando os dias, sai o saldo total no fim de cada dia.
+        A conta do banco (sem cliente) fica de fora.
+        """
+        day = cast(func.timezone("UTC", LedgerEntry.created_at), Date)
+        signed = case((LedgerEntry.direction == "CREDIT", LedgerEntry.amount), else_=-LedgerEntry.amount)
+        rows = (
+            context.db_session.query(day, func.sum(signed))
+            .join(Account, LedgerEntry.account_id == Account.id)
+            .filter(Account.customer_id.isnot(None), LedgerEntry.created_at < end)
+            .group_by(day)
+            .order_by(day)
+            .all()
+        )
+        return [(row_day, int(change)) for row_day, change in rows]
 
     @staticmethod
     def get_by_key_for_account(context: Context, transaction_key: str, account_id: int) -> Optional[Transaction]:
