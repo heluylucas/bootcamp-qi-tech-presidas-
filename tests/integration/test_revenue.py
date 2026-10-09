@@ -1,6 +1,6 @@
 import calendar
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -81,44 +81,86 @@ class TestFeeRevenue:
         assert fee_revenue_today() == before + TRANSFER_FEE
 
 
+def day_offset(days: int) -> str:
+    """Hoje (UTC) mais `days` dias, em AAAA-MM-DD."""
+    return (datetime.now(timezone.utc).date() + timedelta(days=days)).isoformat()
+
+
 def estimated(period: dict = None) -> dict:
-    _, body = RequestGenerator.get_revenue(period or {"from": "2026-10-01", "to": "2026-10-30"})
+    """As estimativas do período; sem período, só o dia de hoje."""
+    _, body = RequestGenerator.get_revenue(period or {"from": today(), "to": today()})
     return body["estimated"]
 
 
-def by_formula(estimate: dict, days: int) -> int:
-    """RN-REC-05 e 07: base × taxa anual × dias / 365, em centavos para baixo."""
-    return int(Decimal(estimate["base_amount"]) * estimate["annual_rate_bps"] * days / (10000 * 365))
+def base_today(name: str) -> int:
+    return estimated()[name]["daily"][0]["base_amount"]
+
+
+def by_formula(day: dict) -> int:
+    """RN-REC-05 e 07: base do dia × taxa anual do dia / 365, em centavos para baixo.
+
+    Dia anterior à primeira taxa publicada (o banco ainda não existia) vale 0.
+    """
+    if day["annual_rate_bps"] is None:
+        return 0
+    return int(Decimal(day["base_amount"]) * day["annual_rate_bps"] / (10000 * 365))
 
 
 class TestEstimatedRevenue:
-    def test_estimates_follow_the_formula(self):
-        status, body = RequestGenerator.get_revenue({"from": "2026-10-01", "to": "2026-10-30"})
+    def test_each_estimate_is_the_sum_of_its_days(self):
+        status, body = RequestGenerator.get_revenue({"from": day_offset(-6), "to": today()})
 
         assert status == 200
-        assert body["days"] == 30
-        assert body["estimated"]["float"]["amount"] == by_formula(body["estimated"]["float"], 30)
-        fund_fee = body["estimated"]["fund_administration_fee"]
-        assert fund_fee["annual_rate_bps"] == 100
-        assert fund_fee["amount"] == by_formula(fund_fee, 30)
+        assert body["days"] == 7
+        for name, estimate in body["estimated"].items():
+            assert [day["date"] for day in estimate["daily"]] == [day_offset(offset) for offset in range(-6, 1)]
+            assert estimate["amount"] == sum(day["amount"] for day in estimate["daily"]), name
+        for name in ("fund_administration_fee", "float"):
+            for day in body["estimated"][name]["daily"]:
+                assert day["amount"] == by_formula(day), name
         assert body["total_amount"] == body["realized"]["fee_amount"] + sum(
             estimate["amount"] for estimate in body["estimated"].values()
         )
 
-    def test_deposit_raises_the_float_base(self):
+    def test_deposit_today_does_not_change_a_past_period(self):
+        """Cada dia usa a base daquele dia: o dinheiro de hoje não entra na receita de ontem."""
         customer_key, account_key = open_account()
-        before = estimated()["float"]["base_amount"]
+        yesterday = {"from": day_offset(-1), "to": day_offset(-1)}
+        before = estimated(yesterday)
 
         send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000})
 
-        assert estimated()["float"]["base_amount"] == before + 10000
+        assert estimated(yesterday) == before
+
+    def test_days_after_today_are_not_counted(self):
+        status, body = RequestGenerator.get_revenue({"from": today(), "to": day_offset(10)})
+
+        assert status == 200
+        assert body["days"] == 1
+        assert all(len(estimate["daily"]) == 1 for estimate in body["estimated"].values())
+
+    def test_period_in_the_future_has_no_estimate(self):
+        status, body = RequestGenerator.get_revenue({"from": day_offset(1), "to": day_offset(5)})
+
+        assert status == 200
+        assert body["days"] == 0
+        for estimate in body["estimated"].values():
+            assert estimate == {"amount": 0, "daily": []}
+
+    def test_deposit_raises_the_float_base(self):
+        customer_key, account_key = open_account()
+        before = base_today("float")
+
+        send(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000})
+
+        assert base_today("float") == before + 10000
 
     def test_transfer_fee_leaves_the_float(self):
         """A tarifa vai para a conta do banco, que não entra no float (RN-REC-07)."""
         origin_customer, origin_account = open_account()
         _, destination_account = open_account()
         send(origin_customer, origin_account, {"type": "DEPOSIT", "amount": 100000})
-        before = estimated()["float"]["base_amount"]
+        before = base_today("float")
 
         send(
             origin_customer,
@@ -126,26 +168,25 @@ class TestEstimatedRevenue:
             {"type": "TRANSFER", "amount": 20000, "destination_account_key": destination_account},
         )
 
-        assert estimated()["float"]["base_amount"] == before - TRANSFER_FEE
+        assert base_today("float") == before - TRANSFER_FEE
 
     def test_own_issue_application_raises_the_spread_base(self):
         customer_key, account_key = investor()
-        before = estimated()
+        spread_before, float_before = base_today("own_issue_spread"), base_today("float")
 
         apply(customer_key, account_key, CDB, 50000)
 
-        after = estimated()
-        assert after["own_issue_spread"]["base_amount"] == before["own_issue_spread"]["base_amount"] + 50000
-        assert after["float"]["base_amount"] == before["float"]["base_amount"] - 50000
+        assert base_today("own_issue_spread") == spread_before + 50000
+        assert base_today("float") == float_before - 50000
 
     def test_fund_application_raises_the_fund_base(self):
         customer_key, account_key = investor()
-        before = estimated()["fund_administration_fee"]["base_amount"]
+        before = base_today("fund_administration_fee")
 
         apply(customer_key, account_key, FUND, 50000)
 
         # As cotas são truncadas em 8 casas: o patrimônio ao preço do dia pode ficar 1 centavo abaixo.
-        assert before + 49999 <= estimated()["fund_administration_fee"]["base_amount"] <= before + 50000
+        assert before + 49999 <= base_today("fund_administration_fee") <= before + 50000
 
     def test_report_does_not_move_money(self):
         customer_key, account_key = open_account()
