@@ -185,6 +185,7 @@ class InvestmentOrderController(BaseController):
         idempotency_key: Optional[str],
         redeem_all: bool = False,
         matured_investment_order_id: Optional[int] = None,
+        business_date: Optional[date] = None,
     ) -> InvestmentOrder:
         """As escritas do resgate, com conta e posição já travadas. Não decide nada: só grava."""
         # RN-ORD-13: custo médio. Sai a fração do custo igual à fração das cotas; no total, tudo.
@@ -193,7 +194,7 @@ class InvestmentOrderController(BaseController):
         else:
             acquisition_cost_amount = int(position.acquisition_cost_amount * quantity // position.quantity)
 
-        transaction = self.money_transaction("INVESTMENT_REDEEM", account, amount, idempotency_key)
+        transaction = self.money_transaction("INVESTMENT_REDEEM", account, amount, idempotency_key, business_date)
         TransactionController().add_entry(transaction, account, "CREDIT", "PRINCIPAL", amount, account.balance + amount)
         order = InvestmentOrderRepository.create(
             self.context,
@@ -235,6 +236,8 @@ class InvestmentOrderController(BaseController):
                 int(quantity * unit_price * 100),
                 None,
                 matured_investment_order_id=application.id,
+                # O dinheiro volta antes de o novo dia abrir: a transação é do dia novo.
+                business_date=day,
             )
 
     def has_matured(self, account_id: int, product: Product, business_date: date) -> bool:
@@ -309,9 +312,18 @@ class InvestmentOrderController(BaseController):
 
         return order
 
-    def money_transaction(self, transaction_type: str, account: Account, amount: int, idempotency_key: Optional[str]):
+    def money_transaction(
+        self,
+        transaction_type: str,
+        account: Account,
+        amount: int,
+        idempotency_key: Optional[str],
+        business_date: Optional[date] = None,
+    ):
         """O pedido de dinheiro da ordem: o dono é a conta, o tipo diz se é aplicação ou resgate."""
-        return TransactionController().create_transaction(transaction_type, account, None, amount, 0, None, idempotency_key)
+        return TransactionController().create_transaction(
+            transaction_type, account, None, amount, 0, None, idempotency_key, business_date
+        )
 
     def get_active_account(self, customer_key: str, account_key: str) -> Account:
         """A conta que paga e recebe (RN-ORD-01): do cliente (senão 404, R8) e ativa."""

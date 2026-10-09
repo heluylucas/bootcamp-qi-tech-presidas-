@@ -8,6 +8,7 @@ from connectors.price_source_connector import CentralBankConnector, FundAdminCon
 from connectors.rest_connector import BaseConnectorResponse
 from controllers.base_controller import BaseController
 from controllers.investment_order_controller import InvestmentOrderController
+from controllers.revenue_controller import RevenueController
 from errors import BusinessDateMismatch, InvalidPriceSourceResponse, PriceSourceUnavailable
 from models import Product
 from repositories import BusinessDayRepository, ProductRepository, ReferenceRateRepository
@@ -60,9 +61,13 @@ class BusinessDayController(BaseController):
                 ProductRepository.create_price(self.context, product.id, new_day, prices[product.id])
             ReferenceRateRepository.create(self.context, "CDI", new_day, cdi_bps)
             ReferenceRateRepository.create(self.context, "SELIC", new_day, selic_bps)
+            # RN-REC-05 a 07: a provisão do dia que fecha, com a foto do fim dele. Vem antes da
+            # liquidação, que já mexe nos saldos do dia novo.
+            RevenueController().accrue(close_date, new_day)
+            # O dia novo existe antes da liquidação: as transações dela são desse dia.
+            BusinessDayRepository.create(self.context, new_day)
             # RN-FEC-09: o dinheiro das aplicações que vencem no novo dia volta antes de ele abrir.
             InvestmentOrderController().settle_maturities(new_day, prices)
-            BusinessDayRepository.create(self.context, new_day)
         except IntegrityError:
             raise BusinessDateMismatch()
 

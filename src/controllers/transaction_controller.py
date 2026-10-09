@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 from typing import Optional
 
 from sqlalchemy.exc import IntegrityError
@@ -22,7 +22,7 @@ from errors import (
     TransactionNotFound,
 )
 from models import Account, Transaction
-from repositories import AccountRepository, CustomerRepository, TransactionRepository
+from repositories import AccountRepository, BusinessDayRepository, CustomerRepository, TransactionRepository
 from utils.dates import parse_date
 
 
@@ -123,13 +123,9 @@ class TransactionController(BaseController):
         limit = int(query_params.get("limit", DEFAULT_LIMIT))
         account = self.get_owned_account(customer_key, account_key)
 
-        # Datas reais do lançamento, em UTC, com as duas pontas inclusas: o dia
-        # inteiro de `to` cabe porque o fim é o começo do dia seguinte.
-        start = start_of_day(from_date) if from_date else None
-        end = start_of_day(to_date + timedelta(days=1)) if to_date else None
-
+        # Datas do calendário do banco (o dia de movimento de cada transação), com as duas pontas inclusas.
         entries, total = TransactionRepository.list_entries(
-            self.context, account.id, query_params.get("type"), start, end, (page - 1) * limit, limit
+            self.context, account.id, query_params.get("type"), from_date, to_date, (page - 1) * limit, limit
         )
         return {"items": [entry_to_dict(entry) for entry in entries], "page": page, "limit": limit, "total": total}
 
@@ -228,7 +224,13 @@ class TransactionController(BaseController):
         fee: int,
         description: Optional[str],
         idempotency_key: Optional[str],
+        business_date: Optional[date] = None,
     ) -> Transaction:
+        # O dia da transação no calendário do banco: a data de movimento atual, salvo quando quem
+        # chama já sabe o dia (a liquidação no fechamento grava no dia que está abrindo).
+        if business_date is None:
+            business_date = BusinessDayRepository.get_current(self.context).business_date
+
         # Dois pedidos com a mesma chave em contas diferentes, ao mesmo tempo, passam os dois
         # pelo find_repetition (cada um trava só a sua conta); o UNIQUE recusa o segundo aqui.
         try:
@@ -241,6 +243,7 @@ class TransactionController(BaseController):
                 fee_amount=fee,
                 description=description,
                 idempotency_key=idempotency_key,
+                business_date=business_date,
             )
         except IntegrityError:
             raise IdempotencyKeyReused()
@@ -251,10 +254,6 @@ class TransactionController(BaseController):
             self.context, transaction.id, account.id, direction, category, amount, balance_after
         )
         AccountRepository.update_balance(self.context, account, balance_after)
-
-
-def start_of_day(day: date) -> datetime:
-    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
 
 
 def is_same_transaction(previous: Transaction, payload: dict, destination: Optional[Account]) -> bool:

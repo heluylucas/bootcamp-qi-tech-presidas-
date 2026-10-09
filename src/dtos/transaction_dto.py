@@ -27,6 +27,7 @@ def entry_to_dict(entry: LedgerEntry) -> dict:
         "balance_after": entry.balance_after,
         "description": transaction.description,
         "counterparty_account_key": counterparty_key(transaction, entry.account_id),
+        "business_date": transaction.business_date.isoformat(),
         "created_at": to_utc_text(entry.created_at),
     }
 
@@ -50,6 +51,7 @@ def receipt_to_dict(transaction: Transaction) -> dict:
         "description": transaction.description,
         "origin_account_key": account_key_or_none(origin),
         "destination_account_key": account_key_or_none(destination),
+        "business_date": transaction.business_date.isoformat(),
         "created_at": to_utc_text(transaction.created_at),
     }
 
