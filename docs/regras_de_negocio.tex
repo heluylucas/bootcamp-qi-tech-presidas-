@@ -1237,7 +1237,9 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   só: o CDB rende pelo mesmo número que o relatório usa, e cada preço de CDB pode ser refeito com
   o CDI gravado do dia.
   \item[RN-REC-09 \dec] \textbf{Relatório.} \tb{GET /internal/revenue?from=\&to=} devolve as
-  duas partes, em centavos. O período filtra pelo \tb{created_at} (hora real) dos lançamentos.
+  duas partes e o total, em centavos. Cada estimativa traz a base (\tb{base_amount}) e a taxa
+  anual usadas, e o valor é truncado para baixo; \tb{days} são os dias corridos do período,
+  contando as duas pontas. O período filtra pelo \tb{created_at} (hora real) dos lançamentos.
   Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
   intervalo maior que 366 dias $\to$ 400 (\tb{PPP000005}). A rota é interna (não pertence a
   nenhum cliente) e fica protegida pelo \tb{OPERATOR-TOKEN} (RN-GER-14); num banco real ela
@@ -1257,11 +1259,11 @@ a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI de 14,9\% e Selic d
 \textbf{Fonte} & \textbf{Conta} & \textbf{Receita} \\
 \midrule
 Tarifas (realizada) & $2.000 \times \rs 2{,}00$ & \rs 4.000,00 \\
-Taxa de administração & $5.000.000 \times 1\% \times 30/365$ & \rs 4.109,59 \\
-Spread do CDB & $3.000.000 \times 14{,}9\% \times 5\% \times 30/365$ & \rs 1.836,99 \\
+Taxa de administração & $5.000.000 \times 1\% \times 30/365$ & \rs 4.109,58 \\
+Spread do CDB & $3.000.000 \times 14{,}9\% \times 5\% \times 30/365$ & \rs 1.836,98 \\
 Float & $2.000.000 \times 15\% \times 30/365$ & \rs 24.657,53 \\
 \midrule
-\textbf{Total} & & \textbf{\rs 34.604,11} \\
+\textbf{Total} & & \textbf{\rs 34.604,09} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1749,6 +1751,11 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \item \textbf{Cobrar a taxa de administração como transação diária} --- descartada porque exigiria
   uma rotina agendada e não é assim que o mercado faz: a taxa já vem descontada da cota. Ganharia se
   quiséssemos mostrar a cobrança no extrato do cliente.
+  \item \textbf{Relatório de receita só com os valores estimados} (um número por fonte) ---
+  descartada porque o número não se explica sozinho: na banca, ``de onde saiu esse float?'' fica sem
+  resposta, e o teste black box não consegue conferir a fórmula com outros testes mexendo nos saldos.
+  \emph{Escolhido:} cada estimativa traz a base e a taxa usadas (RN-REC-09). Ganharia se a resposta
+  fosse para um painel que só mostra totais.
   \item \textbf{Não fazer o módulo de investimentos} (``não fazer nada'') --- é a opção mais
   barata e deixaria todo o tempo para o núcleo. Descartada porque perderíamos o diferencial e a
   conexão com a vertical de fundos da QI Tech. \textbf{Vira o plano de corte:} se o núcleo atrasar,
@@ -2305,15 +2312,27 @@ HTTP/1.1 200 OK
 {
   "from": "2026-10-01",
   "to": "2026-10-30",
+  "days": 30,
   "realized": {
-    "transfer_fees": 400000
+    "fee_amount": 400000
   },
   "estimated": {
-    "fund_administration_fee": 410959,
-    "own_issue_spread": 183699,
-    "float": 2465753
+    "fund_administration_fee": {
+      "base_amount": 500000000,
+      "annual_rate_bps": 100,
+      "amount": 410958
+    },
+    "own_issue_spread": {
+      "base_amount": 300000000,
+      "amount": 183698
+    },
+    "float": {
+      "base_amount": 200000000,
+      "annual_rate_bps": 1500,
+      "amount": 2465753
+    }
   },
-  "total": 3460411
+  "total_amount": 3460409
 }
 \end{lstlisting}
 
