@@ -151,12 +151,6 @@ provisão de sexta vale três dias, porque o dinheiro continua aplicado no fim d
 `/internal/revenue` só soma as linhas do período (em datas de movimento) e mostra cada dia (`daily`)
 para ser conferido. O dia ainda aberto não tem provisão; a tarifa dele aparece.
 
-> **Limitação conhecida.** As operações de dinheiro não travam a data de movimento. Uma operação
-> feita no exato instante do fechamento pode ficar com o dia que fechou, mas fora da foto dele: entra
-> na provisão do dia seguinte. São alguns centavos de estimativa, só naquele instante; dinheiro,
-> extrato e tarifa continuam exatos. Em produção, a saída seria uma trava compartilhada na data de
-> movimento ou uma janela de corte durante o fechamento.
-
 **O capital do cliente.** O `balance` da conta é só o dinheiro parado nela; o que foi aplicado sai
 do saldo e vira posição. Por isso a consulta da conta (`GET /customer/{ck}/account/{ak}`) traz também
 `investments_amount` (as posições ao preço do dia) e `net_worth_amount` (saldo + investimentos).
@@ -288,9 +282,6 @@ devolve o dinheiro à conta. A ordem de resgate aponta para a aplicação que pa
   é a data real simulada; depois de alguns fechamentos, o extrato mostraria 09/10 para uma transação
   feita no dia 14/10 do banco. Deduzir o dia pelo horário também foi descartado: o dia da transação
   é um dado de primeira classe, gravado em `transaction.business_date`.
-- **Trava na data de movimento em toda operação de dinheiro:** descartada porque o custo (uma trava a
-  mais em cada operação e uma ordem de travas nova) não compensa corrigir centavos de estimativa no
-  instante do fechamento. Ganharia em produção, com volume alto.
 
 ## Implementação
 

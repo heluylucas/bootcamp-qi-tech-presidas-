@@ -940,9 +940,7 @@ produção, mudando só o endereço.
   \item[RN-FEC-08 \dec] \textbf{Simplificações do MVP.} As chamadas externas acontecem com a trava
   da data segurada (no máximo 5 s por serviço), então fechamentos simultâneos ficam em fila. Ordens
   e as movimentações não travam a data de movimento: uma operação que começou antes do fechamento
-  usa o preço e o dia de movimento de quando começou. Se ela terminar depois de o fechamento tirar a
-  foto do dia, fica fora da provisão desse dia e entra na do dia seguinte (ver a limitação conhecida
-  no Módulo 8).
+  usa o preço e o dia de movimento de quando começou.
   \item[RN-FEC-09 \dec] \textbf{Liquidação no vencimento.} No fechamento, depois de gravar os
   preços do novo dia e antes de abri-lo, na mesma transação (tudo ou nada, RN-FEC-06), o banco
   devolve o dinheiro de cada aplicação de produto com prazo cujo \tb{maturity_date} (gravado na
@@ -1266,22 +1264,6 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   exigiria login por funcionário com perfil de administrador, o que está fora do escopo.
   \item[RN-REC-10 \dec] Tesouro Direto não tem taxa para o cliente.
 \end{regras}
-
-\begin{aviso}{Limitação conhecida: operação no instante do fechamento}
-As operações de dinheiro não travam a data de movimento (RN-FEC-08). Uma operação que lê a data
-antes do fechamento e termina depois de ele tirar a foto do dia fica com o dia que fechou (no
-extrato e na tarifa), mas fora da provisão desse dia: entra na do dia seguinte. As somas do
-fechamento também podem pegar uma ordem pela metade (já no saldo, ainda não no fundo). O efeito são
-alguns centavos nas estimativas, só naquele instante. Dinheiro, extrato e tarifa continuam exatos,
-porque são protegidos pelas travas das contas.
-
-\textbf{Por que aceitamos.} Fechar a janela custaria uma trava a mais em toda operação de dinheiro
-e uma ordem de travas nova (RN-GER-12), para corrigir centavos de uma estimativa num instante que,
-no simulador, é um clique do operador. \textbf{Em produção}, a saída seria uma trava compartilhada
-na data de movimento (as operações seguram em modo compartilhado; o fechamento, em modo exclusivo,
-espera as que estão em andamento) ou uma janela de corte, em que o banco para de aceitar operações
-por alguns segundos enquanto fecha.
-\end{aviso}
 
 \subsection{Exemplo: quatro semanas de operação}
 
@@ -1806,8 +1788,7 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \tb{ledger_entry} e \tb{investment_order} desde o primeiro dia), que foi a segunda versão: o custo
   crescia com a idade do banco, não com o período. \emph{Escolhido:} a provisão diária gravada no
   fechamento (RN-REC-05 a 07), como a contabilidade de um banco faz; o relatório só soma as linhas do
-  período. \emph{Preço aceito:} uma tabela a mais, o dia aberto sem estimativa até fechar, e a
-  limitação da operação no instante do fechamento (Módulo 8).
+  período. \emph{Preço aceito:} uma tabela a mais e o dia aberto sem estimativa até fechar.
   \item \textbf{Extrato e receita pelo relógio da máquina} (\tb{created_at}) --- descartado porque a
   data de movimento é a data real simulada: depois de alguns fechamentos, o extrato mostraria 09/10
   para uma transação feita no dia 14/10 do banco. \emph{Também descartado:} deduzir o dia de movimento
@@ -1815,10 +1796,6 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   dia da transação é um dado de primeira classe, não algo a calcular por fora. \emph{Escolhido:}
   \tb{transaction.business_date}, gravado na criação (RN-GER-13). Idade mínima e validade do perfil
   continuam no relógio real, por serem fatos regulatórios.
-  \item \textbf{Trava na data de movimento em toda operação de dinheiro} (para a foto do fechamento
-  ser sempre exata) --- descartada porque o custo (um passo e uma trava a mais em cada operação, e
-  uma ordem de travas nova) não compensa corrigir centavos de estimativa no instante do fechamento.
-  Ganharia em produção, com volume alto (ver a limitação conhecida no Módulo 8).
   \item \textbf{Não fazer o módulo de investimentos} (``não fazer nada'') --- é a opção mais
   barata e deixaria todo o tempo para o núcleo. Descartada porque perderíamos o diferencial e a
   conexão com a vertical de fundos da QI Tech. \textbf{Vira o plano de corte:} se o núcleo atrasar,

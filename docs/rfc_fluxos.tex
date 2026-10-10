@@ -280,10 +280,6 @@ escrita. O cliente recebe 422 (\tb{PPP004002}).
 
 A trava da data faz dois fechamentos simultâneos virarem uma fila: o segundo encontra a data já
 avançada no passo 3 e recebe 409. Os passos 5 a 7 só leem; toda escrita fica nos passos 8 a 11.
-As operações de dinheiro não travam a data de movimento: uma que começou antes do fechamento e
-termina depois da foto do passo 9 fica com o dia que fechou, mas fora da provisão dele (entra na do
-dia seguinte). É a limitação conhecida do Módulo 8 de \tb{regras_de_negocio.tex}: alguns centavos de
-estimativa, nunca dinheiro.
 A liquidação trava contas e posições na mesma ordem das ordens do cliente (conta, depois
 posição), então uma aplicação no mesmo instante espera em vez de causar \emph{deadlock}.
 
