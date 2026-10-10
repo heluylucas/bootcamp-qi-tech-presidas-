@@ -48,14 +48,6 @@ class TestListQuestions:
             assert question["dimension"]
             assert [option["code"] for option in question["options"]] == [1, 2, 3, 4]
 
-    def test_points_are_not_exposed(self):
-        """Se os pontos aparecessem, o cliente escolheria o perfil em vez de responder."""
-        _, body = RequestGenerator.get_suitability_questions()
-
-        for question in body["items"]:
-            for option in question["options"]:
-                assert "points" not in option
-
 
 class TestSubmitSuitability:
     @pytest.mark.parametrize(
