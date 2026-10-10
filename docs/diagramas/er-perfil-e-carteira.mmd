@@ -18,11 +18,9 @@ config:
 ---
 erDiagram
     customer ||--o{ suitability_assessment : "responde"
-    investor_profile ||--o{ suitability_assessment : "resulta em"
     suitability_assessment ||--|{ suitability_answer : "7 respostas"
     suitability_question ||--|{ suitability_option : "4 opções"
     suitability_option ||--o{ suitability_answer : "escolhida"
-    investor_profile ||--|{ model_portfolio_item : "carteira-modelo"
     product ||--o{ model_portfolio_item : "compõe"
 
     suitability_question {
@@ -39,19 +37,11 @@ erDiagram
         text text
         timestamptz created_at
     }
-    investor_profile {
-        int id PK
-        varchar code UK "seed (não é ENUM): CONSERVATIVE | MODERATE | AGGRESSIVE"
-        smallint minimum_score
-        smallint maximum_score
-        smallint maximum_risk_level
-        timestamptz created_at
-    }
     suitability_assessment {
         int id PK
         char assessment_key UK
         int customer_id FK
-        int investor_profile_id FK "fora da faixa do score = trava (forced_by_rule)"
+        investor_profile investor_profile "ENUM: CONSERVATIVE | MODERATE | AGGRESSIVE; fora da faixa do score = trava (forced_by_rule)"
         smallint score
         timestamptz created_at "mais recente = vigente; vale 24 meses"
     }
@@ -63,7 +53,7 @@ erDiagram
     }
     model_portfolio_item {
         int id PK
-        int investor_profile_id FK "UK com product_id"
+        investor_profile investor_profile "ENUM: CONSERVATIVE | MODERATE | AGGRESSIVE; UK com product_id"
         int product_id FK
         smallint weight_bps "a carteira soma 10000"
         timestamptz created_at

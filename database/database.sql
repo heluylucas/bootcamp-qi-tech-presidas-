@@ -119,21 +119,16 @@ CREATE TABLE suitability_option(
     UNIQUE(suitability_question_id, code)
 );
 
-CREATE TABLE investor_profile(
-    id                              SERIAL PRIMARY KEY,
-    code                            VARCHAR(50) NOT NULL UNIQUE,
-    minimum_score                   SMALLINT NOT NULL,
-    maximum_score                   SMALLINT NOT NULL,
-    maximum_risk_level              SMALLINT NOT NULL CHECK (maximum_risk_level BETWEEN 1 AND 5),
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- O perfil do investidor. A faixa de pontos e o risco máximo de cada um são regras fixas,
+-- como a tarifa: ficam no código (models/suitability.py), não numa tabela (RN-SUI-03 e 04).
+CREATE TYPE investor_profile AS ENUM ('CONSERVATIVE', 'MODERATE', 'AGGRESSIVE');
 
 -- Validade (created_at + 24 meses) e trava (perfil fora da faixa do score) são calculadas.
 CREATE TABLE suitability_assessment(
     id                              SERIAL PRIMARY KEY,
     assessment_key                  CHAR(36) NOT NULL UNIQUE,
     customer_id                     INTEGER NOT NULL REFERENCES customer(id),
-    investor_profile_id             INTEGER NOT NULL REFERENCES investor_profile(id),
+    investor_profile                investor_profile NOT NULL,
     score                           SMALLINT NOT NULL,
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -148,11 +143,6 @@ CREATE TABLE suitability_answer(
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(suitability_assessment_id, suitability_option_id)
 );
-
-INSERT INTO investor_profile (code, minimum_score, maximum_score, maximum_risk_level) VALUES
-('CONSERVATIVE', 7, 13, 2),
-('MODERATE', 14, 20, 3),
-('AGGRESSIVE', 21, 28, 5);
 
 INSERT INTO suitability_question (code, text, dimension) VALUES
 ('Q1', 'Por quanto tempo pretende deixar o dinheiro investido?', 'objetivo'),
@@ -302,16 +292,16 @@ FROM product p CROSS JOIN series s CROSS JOIN cdi;
 -- A carteira-modelo de cada perfil: os produtos e o peso de cada um.
 CREATE TABLE model_portfolio_item(
     id                              SERIAL PRIMARY KEY,
-    investor_profile_id             INTEGER NOT NULL REFERENCES investor_profile(id),
+    investor_profile                investor_profile NOT NULL,
     product_id                      INTEGER NOT NULL REFERENCES product(id),
     weight_bps                      SMALLINT NOT NULL CHECK (weight_bps > 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(investor_profile_id, product_id)
+    UNIQUE(investor_profile, product_id)
 );
 
 -- Pesos em pontos-base: cada carteira soma 10.000.
-INSERT INTO model_portfolio_item (investor_profile_id, product_id, weight_bps)
-SELECT ip.id, p.id, v.weight_bps
+INSERT INTO model_portfolio_item (investor_profile, product_id, weight_bps)
+SELECT v.profile::investor_profile, p.id, v.weight_bps
 FROM (VALUES
     ('CONSERVATIVE', 'Tesouro Selic 2031',      5000),
     ('CONSERVATIVE', 'CDB Triple P Bank Liquidez', 3000),
@@ -326,7 +316,6 @@ FROM (VALUES
     ('AGGRESSIVE',   'Tesouro IPCA+ 2035',      3000),
     ('AGGRESSIVE',   'FGV Quant Capital FIM',   4000)
 ) AS v(profile, product_name, weight_bps)
-JOIN investor_profile ip ON ip.code = v.profile
 JOIN product p ON p.name = v.product_name;
 
 -- =====================================================================

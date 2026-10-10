@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import NamedTuple
 
-from sqlalchemy import CHAR, Column, DateTime, ForeignKey, Integer, SmallInteger, String, Text, func
+from sqlalchemy import CHAR, Column, DateTime, Enum, ForeignKey, Integer, SmallInteger, String, Text, func
 from sqlalchemy.orm import relationship
 
 from models.base import Base
@@ -10,18 +11,29 @@ from utils.dates import add_months
 # Validade do perfil, em meses (RN-SUI-05).
 VALIDITY_MONTHS = 24
 
+# Espelho do tipo ENUM do database.sql: o banco recusa qualquer perfil fora da lista.
+InvestorProfile = Enum("CONSERVATIVE", "MODERATE", "AGGRESSIVE", name="investor_profile")
 
-class InvestorProfile(Base):
-    """Enumerador com dados: cada perfil traz a sua faixa de pontos e o risco máximo que aceita."""
 
-    __tablename__ = "investor_profile"
+class ProfileRule(NamedTuple):
+    minimum_score: int
+    maximum_score: int
+    maximum_risk_level: int
 
-    id = Column(Integer, primary_key=True)
-    code = Column(String(50), nullable=False, unique=True)
-    minimum_score = Column(SmallInteger, nullable=False)
-    maximum_score = Column(SmallInteger, nullable=False)
-    maximum_risk_level = Column(SmallInteger, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+# Regras fixas de cada perfil, como a tarifa: a faixa de pontos (RN-SUI-03) e o risco máximo que aceita.
+PROFILE_RULES = {
+    "CONSERVATIVE": ProfileRule(minimum_score=7, maximum_score=13, maximum_risk_level=2),
+    "MODERATE": ProfileRule(minimum_score=14, maximum_score=20, maximum_risk_level=3),
+    "AGGRESSIVE": ProfileRule(minimum_score=21, maximum_score=28, maximum_risk_level=5),
+}
+
+
+def profile_for_score(score: int) -> str:
+    """O perfil cuja faixa de pontos contém o score (RN-SUI-03). As faixas cobrem de 7 a 28 sem buraco."""
+    return next(
+        profile for profile, rule in PROFILE_RULES.items() if rule.minimum_score <= score <= rule.maximum_score
+    )
 
 
 class SuitabilityOption(Base):
@@ -57,11 +69,10 @@ class SuitabilityAssessment(Base):
     id = Column(Integer, primary_key=True)
     assessment_key = Column(CHAR(36), nullable=False, unique=True)
     customer_id = Column(Integer, ForeignKey("customer.id"), nullable=False)
-    investor_profile_id = Column(Integer, ForeignKey("investor_profile.id"), nullable=False)
+    investor_profile = Column(InvestorProfile, nullable=False)
     score = Column(SmallInteger, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    investor_profile = relationship(InvestorProfile)
     answers = relationship("SuitabilityAnswer", order_by="SuitabilityAnswer.id")
 
     # Calculados a partir das colunas, não gravados: guardar seria repetir informação.
@@ -73,7 +84,13 @@ class SuitabilityAssessment(Base):
     @property
     def forced_by_rule(self) -> bool:
         """A trava da Q3/Q5 forçou Conservador (RN-SUI-04): o perfil gravado não é o da faixa do score."""
-        return not self.investor_profile.minimum_score <= self.score <= self.investor_profile.maximum_score
+        rule = PROFILE_RULES[self.investor_profile]
+        return not rule.minimum_score <= self.score <= rule.maximum_score
+
+    @property
+    def maximum_risk_level(self) -> int:
+        """O risco máximo de produto que o perfil aceita."""
+        return PROFILE_RULES[self.investor_profile].maximum_risk_level
 
 
 class SuitabilityAnswer(Base):

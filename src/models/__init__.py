@@ -3,7 +3,6 @@ from models.customer import Customer
 from models.account import Account, AccountStatusEvent
 from models.transaction import Transaction, LedgerEntry
 from models.suitability import (
-    InvestorProfile,
     SuitabilityOption,
     SuitabilityQuestion,
     SuitabilityAssessment,
