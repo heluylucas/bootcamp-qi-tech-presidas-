@@ -248,10 +248,12 @@ devolve o dinheiro à conta. A ordem de resgate aponta para a aplicação que pa
 - **Tabelas de enumerador e colunas que repetem outras** (versão 1): descartadas por complexidade sem
   ganho. Listas fixas viraram tipos ENUM do Postgres, a ordem de investimento virou o anexo da sua
   transação, a posição passou a ser da conta, e o que pode ser calculado deixou de ser gravado. O banco
-  foi de 21 para 17 tabelas (18 depois, com a provisão diária de receita).
+  foi de 21 para 17 tabelas. Depois entrou a provisão diária de receita, e o perfil do investidor
+  virou ENUM (as faixas de pontos e o risco máximo são regras fixas, no código como a tarifa): 17 de
+  novo.
 - **Nomes curtos ou genéricos de coluna** (`profile_id`, `min_score`, `reference_date` em três
   tabelas), versão 1: descartados porque obrigavam a abrir o schema para saber o que a coluna guarda.
-  Agora a chave estrangeira leva o nome completo da tabela de destino (`investor_profile_id`), com o
+  Agora a chave estrangeira leva o nome completo da tabela de destino (`suitability_question_id`), com o
   papel na frente quando há mais de uma (`owner_account_id`, `destination_account_id`); `minimum` e
   `maximum` por extenso; dinheiro termina em `_amount`; cada data diz de quê é (`business_date`,
   `price_date`). Banco e API usam o mesmo vocabulário.

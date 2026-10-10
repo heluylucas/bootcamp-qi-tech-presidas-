@@ -1320,10 +1320,11 @@ sugerida leva para o fundo.
 Convenções: toda tabela tem \tb{id SERIAL PRIMARY KEY}; tabelas de entidade têm
 \tb{..._key CHAR(36) NOT NULL UNIQUE}, \tb{created_at} e (quando mudam) \tb{updated_at}. Listas
 fixas de valores são \textbf{tipos ENUM nativos} do Postgres (\tb{CREATE TYPE ... AS ENUM}): o banco
-recusa qualquer valor fora da lista, sem tabela de enumerador nem \emph{join}. São oito:
+recusa qualquer valor fora da lista, sem tabela de enumerador nem \emph{join}. São nove:
 \tb{account_status}, \tb{status_actor}, \tb{transaction_type}, \tb{entry_direction},
-\tb{entry_category}, \tb{product_type}, \tb{product_indexer} e
-\tb{reference_rate_code}. O que pode ser calculado a partir de outras colunas não é gravado.
+\tb{entry_category}, \tb{investor_profile}, \tb{product_type}, \tb{product_indexer} e
+\tb{reference_rate_code}. Regras fixas ligadas a um valor da lista (a faixa de pontos e o risco
+máximo de cada perfil, RN-SUI-03) ficam no código, como a tarifa e os limites de valor. O que pode ser calculado a partir de outras colunas não é gravado.
 Abaixo, as colunas e restrições; os diagramas ER (\tb{docs/diagramas/er-*.mmd}) mostram
 \textbf{todas} as colunas, e o \tb{scripts/check_er.py} confere que eles batem com o
 \tb{database.sql}.
@@ -1352,15 +1353,14 @@ Abaixo, as colunas e restrições; os diagramas ER (\tb{docs/diagramas/er-*.mmd}
 \endhead
 \tb{suitability_question} & \tb{code} (Q1..Q7) UNIQUE, que também dá a ordem do questionário; \tb{text}; \tb{dimension} (objetivo, situação financeira, conhecimento). \\
 \tb{suitability_option} & \tb{suitability_question_id} FK; \tb{code SMALLINT CHECK (1..4)}, que também é a pontuação; \tb{text}. \tb{UNIQUE(suitability_question_id, code)}. \\
-\tb{investor_profile} & Enumerador com dados: \tb{CONSERVATIVE}, \tb{MODERATE}, \tb{AGGRESSIVE}; \tb{minimum_score}, \tb{maximum_score}, \tb{maximum_risk_level}. Fica tabela porque guarda dados, não só o nome. \\
-\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{investor_profile_id} FK; \tb{score SMALLINT}; \tb{created_at}. Uma linha por vez que o cliente responde; nunca é editada. \tb{valid_until} (\tb{created_at} + 24 meses) e \tb{forced_by_rule} (perfil fora da faixa do \tb{score}) são calculados (RN-SUI-04, RN-SUI-05). \\
+\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{investor_profile investor_profile NOT NULL} (\tb{CONSERVATIVE}/\tb{MODERATE}/\tb{AGGRESSIVE}); \tb{score SMALLINT}; \tb{created_at}. Uma linha por vez que o cliente responde; nunca é editada. \tb{valid_until} (\tb{created_at} + 24 meses) e \tb{forced_by_rule} (perfil fora da faixa do \tb{score}) são calculados (RN-SUI-04, RN-SUI-05), assim como o risco máximo do perfil, lido das regras no código (RN-SUI-03). \\
 \tb{suitability_answer} & \tb{suitability_assessment_id} FK; \tb{suitability_option_id} FK (a pergunta vem da opção). \tb{UNIQUE(suitability_assessment_id, suitability_option_id)}. \\
 \tb{product} & \tb{product_key}; \tb{name}; \tb{type product_type}; \tb{issuer}; \tb{indexer product_indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{term_months SMALLINT CHECK (> 0)} (prazo de cada aplicação; nulo = resgate a qualquer dia, RN-PRO-09); \tb{minimum_application_amount BIGINT}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{administration_fee_bps SMALLINT} (só no fundo); \tb{price_source_code VARCHAR(50)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo é emissão própria, CDB e LCI). \\
 \tb{business_day} & \tb{business_date DATE NOT NULL UNIQUE}; \tb{created_at}. Uma linha por dia aberto, nunca alterada; a data de movimento é a maior \tb{business_date} (RN-GER-13). \\
 \tb{revenue_accrual} & A provisão diária (RN-REC-05 a 07). \tb{business_date DATE NOT NULL UNIQUE} FK $\to$ \tb{business_day(business_date)} (o dia que fechou); \tb{calendar_days SMALLINT CHECK (> 0)} (até o próximo dia de movimento); as bases \tb{customer_balance_amount}, \tb{fund_equity_amount} e \tb{own_issue_cost_amount}; os valores \tb{float_amount}, \tb{fund_administration_fee_amount} e \tb{own_issue_spread_amount} (todos \tb{BIGINT CHECK (>= 0)}); \tb{created_at}. Uma linha por dia fechado, nunca alterada; sem \tb{key}, porque nunca sai sozinha na API. As taxas não se repetem aqui: estão em \tb{reference_rate} e \tb{product}. \\
 \tb{reference_rate} & \tb{code reference_rate_code} (\tb{CDI}, \tb{SELIC}); \tb{rate_date DATE NOT NULL}; \tb{annual_rate_bps INTEGER CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(code, rate_date)}. Histórico das taxas (RN-REC-08). \\
 \tb{product_price} & \tb{product_id} FK; \tb{price_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, price_date)}. \\
-\tb{model_portfolio_item} & A carteira-modelo de cada perfil. \tb{investor_profile_id} FK $\to$ investor_profile; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(investor_profile_id, product_id)}. A soma de 10.000 é conferida por um teste. \\
+\tb{model_portfolio_item} & A carteira-modelo de cada perfil. \tb{investor_profile investor_profile NOT NULL}; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(investor_profile, product_id)}. A soma de 10.000 é conferida por um teste. \\
 \tb{investment_order} & O \emph{anexo} da transação de investimento: dono, lado (pelo tipo da transação), valor e chave de idempotência ficam na transação. \tb{order_key}; \tb{transaction_id} FK NOT NULL UNIQUE (1 ordem = 1 transação); \tb{product_id} FK; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{acquisition_cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{redeem_all BOOLEAN NOT NULL DEFAULT false} (o cliente pediu resgate total, RN-ORD-12); \tb{maturity_date DATE} (só na aplicação em produto com prazo, RN-ORD-17); \tb{matured_investment_order_id INTEGER UNIQUE} FK $\to$ \tb{investment_order} (só na liquidação do vencimento: a aplicação devolvida; o \tb{UNIQUE} impede liquidar duas vezes); \tb{created_at}. \\
 \tb{position} & \tb{account_id} FK; \tb{product_id} FK; \tb{quantity NUMERIC(24,8) NOT NULL CHECK (>= 0)}; \tb{acquisition_cost_amount BIGINT NOT NULL CHECK (>= 0)}; \tb{created_at}, \tb{updated_at}. \tb{UNIQUE(account_id, product_id)}. \\
 \bottomrule
@@ -1376,7 +1376,7 @@ Abaixo, as colunas e restrições; os diagramas ER (\tb{docs/diagramas/er-*.mmd}
   \item \textbf{transaction 1:0..1 investment_order} --- a ordem é o anexo do pedido de investimento.
   \item \textbf{investment_order 1:0..1 investment_order} --- a liquidação no vencimento aponta para a aplicação que devolveu (\tb{matured_investment_order_id}).
   \item \textbf{customer 1:N suitability_assessment 1:N suitability_answer N:1 suitability_option N:1 suitability_question}.
-  \item \textbf{investor_profile 1:N model_portfolio_item N:1 product} --- carteira-modelo é um N:N entre perfil e produto, com o peso na tabela do meio.
+  \item \textbf{model_portfolio_item N:1 product}, com o perfil numa coluna ENUM --- a carteira-modelo liga cada perfil aos seus produtos, com o peso na linha.
   \item \textbf{product 1:N product_price}.
 \end{itemize}
 
@@ -1386,7 +1386,7 @@ Os diagramas estão em \tb{docs/diagramas/er-nucleo.mmd}, \tb{er-perfil-e-cartei
 \subsection{O que o seed (\tb{database.sql}) precisa inserir}
 
 \begin{enumerate}
-  \item Os tipos ENUM e os perfis de investidor (\tb{investor_profile}).
+  \item Os tipos ENUM (entre eles, o perfil do investidor, \tb{investor_profile}).
   \item A conta do banco, sem cliente, que recebe as tarifas (RN-REC-02).
   \item As 7 perguntas e 28 opções do questionário.
   \item A primeira data de movimento (\tb{business_day} = data real em que o banco nasce).
@@ -1655,7 +1655,7 @@ Seguindo as camadas do repositório-base. Para cada módulo, criar:
 \midrule
 \endhead
 \tb{database/} & \tb{database.sql}: todas as tabelas, índices, \tb{CHECK}s e o seed. \\
-\tb{src/models/} & \tb{customer.py}, \tb{account.py} (+ status e evento), \tb{transaction.py} (+ tipo e \tb{ledger_entry}), \tb{suitability.py}, \tb{product.py} (+ tipo e preço), \tb{model_portfolio.py}, \tb{investment_order.py} (ordem e posição). Atenção à ordem no \tb{models/__init__.py}: enumerador antes da entidade que o usa. \\
+\tb{src/models/} & \tb{customer.py}, \tb{account.py} (+ status e evento), \tb{transaction.py} (+ tipo e \tb{ledger_entry}), \tb{suitability.py} (+ perfil e as regras de cada um), \tb{product.py} (+ tipo e preço), \tb{model_portfolio.py}, \tb{investment_order.py} (ordem e posição). Atenção à ordem no \tb{models/__init__.py}: enumerador antes da entidade que o usa. \\
 \tb{src/schemas/} & Um \tb{.json} por corpo de entrada: \tb{customer_create}, \tb{account_status_update}, \tb{transaction_create}, \tb{suitability_submit}, \tb{price_create}, \tb{investment_order_create}. \\
 \tb{src/repositories/} & Um por entidade. Gera a \tb{key} no \tb{create}; métodos \tb{get_by_key}, \tb{get_by_key_for_update}, listagens paginadas. Não decide nada. \\
 \tb{src/controllers/} & \tb{customer}, \tb{account}, \tb{transaction}, \tb{suitability}, \tb{product}, \tb{portfolio}, \tb{investment_order}. Aqui moram todos os \tb{if} de negócio e o \tb{commit}. \\
@@ -2020,7 +2020,11 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \tb{product_type}, com \tb{id} e \tb{enumerator}, como no repositório-base) --- descartadas porque
   exigiam \emph{join} para ler um nome, um \tb{status_id <> 3} ``mágico'' no índice e conviviam com
   outras listas feitas de \tb{VARCHAR + CHECK}. \emph{Escolhido:} tipos ENUM nativos do Postgres,
-  um padrão só. \tb{investor_profile} continua tabela porque guarda dados.
+  um padrão só. \emph{Também descartado:} manter \tb{investor_profile} como tabela por guardar
+  dados (a faixa de pontos e o risco máximo de cada perfil), que foi a primeira versão da revisão.
+  São três números fixos por perfil que nenhuma rota altera, ou seja, uma regra; e regra fixa mora no
+  código, como a tarifa. O perfil virou ENUM, e as faixas e o risco máximo, constantes em
+  \tb{models/suitability.py}.
   \item \textbf{Colunas que repetem outras} --- descartadas: \tb{suitability_question.position}
   (= código), \tb{suitability_option.points} (= código), \tb{suitability_answer.question_id} (vem
   da opção), \tb{suitability_assessment.valid_until} e \tb{forced_by_rule} (calculados),
@@ -2036,7 +2040,7 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \tb{min_score}, \tb{max_risk_level}, \tb{reference_date} em três tabelas, \tb{cost_amount} na ordem
   e \tb{invested_amount} na posição para o mesmo conceito) --- descartados a pedido dos devs da QI Tech, porque obrigavam a abrir o
   \tb{database.sql} para saber o que a coluna guarda. \emph{Escolhido:} chave estrangeira com o
-  nome completo da tabela de destino (\tb{investor_profile_id}, \tb{suitability_question_id}), com
+  nome completo da tabela de destino (\tb{suitability_question_id}, \tb{suitability_assessment_id}), com
   o papel na frente quando há mais de uma para a mesma tabela (\tb{owner_account_id},
   \tb{destination_account_id}, \tb{matured_investment_order_id}); \tb{minimum}/\tb{maximum} por
   extenso; dinheiro em centavos termina em \tb{_amount}; cada data diz de quê é

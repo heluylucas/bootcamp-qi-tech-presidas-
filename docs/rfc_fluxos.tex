@@ -229,8 +229,8 @@ nada foi escrito. O cliente recebe 409 (\tb{PPP007004}).
   \item Confere sete respostas, uma por \tb{suitability_question}, cada \tb{option} pertencendo à
         sua pergunta.
   \item Soma os códigos das opções escolhidas (o código é a pontuação). Se Q3 ou Q5 tiver a
-        opção 1, o perfil é \tb{CONSERVATIVE}. Se não, o perfil sai da faixa de pontos em
-        \tb{investor_profile}.
+        opção 1, o perfil é \tb{CONSERVATIVE}. Se não, o perfil sai da faixa de pontos (regra
+        fixa no código: 7 a 13 Conservador, 14 a 20 Moderado, 21 a 28 Arrojado).
   \item Grava a \tb{suitability_assessment} (perfil e pontuação) e as sete
         \tb{suitability_answer}. A validade (\tb{created_at} + 24 meses) e o
         \tb{forced_by_rule} (perfil fora da faixa da pontuação) são calculados, não gravados.
