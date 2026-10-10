@@ -11,6 +11,7 @@ from errors import (
     SuitabilityRequired,
 )
 from models import Customer, SuitabilityAssessment
+from models.suitability import profile_for_score
 from repositories import CustomerRepository, SuitabilityRepository
 
 
@@ -56,12 +57,9 @@ class SuitabilityController(BaseController):
         # (perfil fora da faixa do score), a resposta mostra forced_by_rule = true.
         lock_triggered = any(chosen[code].code == option_code for code, option_code in SAFETY_LOCK.items())
 
-        if lock_triggered:
-            profile = SuitabilityRepository.get_profile(self.context, SAFE_PROFILE)
-        else:
-            profile = SuitabilityRepository.get_profile_for_score(self.context, score)
+        profile = SAFE_PROFILE if lock_triggered else profile_for_score(score)
 
-        assessment = SuitabilityRepository.create_assessment(self.context, customer.id, profile.id, score)
+        assessment = SuitabilityRepository.create_assessment(self.context, customer.id, profile, score)
 
         # Na ordem do questionário (a do código), e não na ordem em que o cliente mandou.
         for code in sorted(chosen):

@@ -62,7 +62,7 @@ class InvestmentOrderController(BaseController):
         product = self.get_product(payload["product_key"])
         business_date = BusinessDayRepository.get_current(self.context).business_date
 
-        if product.risk_level > assessment.investor_profile.maximum_risk_level:
+        if product.risk_level > assessment.maximum_risk_level:
             raise ProductNotSuitable()
 
         if amount < product.minimum_application_amount:

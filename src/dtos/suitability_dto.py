@@ -15,9 +15,9 @@ def question_to_dict(question: SuitabilityQuestion) -> dict:
 def assessment_to_dict(assessment: SuitabilityAssessment) -> dict:
     return {
         "assessment_key": assessment.assessment_key,
-        "profile": assessment.investor_profile.code,
+        "profile": assessment.investor_profile,
         # Até que risco de produto o perfil aceita (a carteira e as ordens usam).
-        "maximum_risk_level": assessment.investor_profile.maximum_risk_level,
+        "maximum_risk_level": assessment.maximum_risk_level,
         "score": assessment.score,
         "forced_by_rule": assessment.forced_by_rule,
         "valid_until": to_utc_text(assessment.valid_until),
