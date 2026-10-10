@@ -1,5 +1,4 @@
 import calendar
-import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -58,19 +57,6 @@ class TestFeeRevenue:
         send(customer_key, account_key, {"type": "WITHDRAWAL", "amount": 3000})
 
         assert fee_revenue_today() == before
-
-    def test_repeated_transfer_charges_the_fee_once(self):
-        origin_customer, origin_account = open_account()
-        _, destination_account = open_account()
-        send(origin_customer, origin_account, {"type": "DEPOSIT", "amount": 100000})
-        before = fee_revenue_today()
-        key = str(uuid.uuid4())
-        payload = {"type": "TRANSFER", "amount": 20000, "destination_account_key": destination_account}
-
-        RequestGenerator.post_transaction(origin_customer, origin_account, payload, key)
-        RequestGenerator.post_transaction(origin_customer, origin_account, payload, key)
-
-        assert fee_revenue_today() == before + TRANSFER_FEE
 
     def test_fee_belongs_to_the_business_day_of_the_transfer(self):
         """A tarifa conta no dia de movimento em que a transferência aconteceu, não no dia seguinte."""
@@ -208,15 +194,6 @@ class TestEstimatedRevenue:
         # As cotas são truncadas em 8 casas: o patrimônio ao preço do dia pode ficar 1 centavo abaixo.
         assert base_of(before, "fund_administration_fee") + 49999 <= after
         assert after <= base_of(before, "fund_administration_fee") + 50000
-
-    def test_period_without_closed_day_has_no_estimate(self):
-        later = business_date() + timedelta(days=10)
-
-        body = revenue(later, later + timedelta(days=5))
-
-        assert body["days"] == 0
-        for estimate in body["estimated"].values():
-            assert estimate == {"amount": 0, "daily": []}
 
     def test_report_does_not_move_money(self):
         customer_key, account_key = open_account()

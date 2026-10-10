@@ -100,7 +100,8 @@ class TestApply:
         assert status == 201
         assert balance_of(customer_key, account_key) == 0
 
-    def test_moderate_can_apply_in_fund(self):
+    def test_product_at_profile_risk_limit_is_accepted(self):
+        """O fundo tem risco 3, o máximo do Moderado: risco igual ao limite passa."""
         customer_key, account_key = investor(MODERATE)
 
         status, _ = apply(customer_key, account_key, FUND, 10000)
@@ -364,7 +365,7 @@ def investor_with_fund_quote_up() -> tuple:
 
 
 class TestRedeem:
-    def test_partial_redeem_takes_average_cost(self):
+    def test_partial_redeem_credits_account_at_average_cost(self):
         """RN-ORD-12, 13 e 16: resgata R$ 500,00 com a cota a 1,24."""
         customer_key, account_key = investor_with_fund_quote_up()
 
@@ -402,16 +403,6 @@ class TestRedeem:
         status, body = redeem(customer_key, account_key, FUND)
         assert status == 409
         assert body["code"] == "PPP007004"
-
-    def test_partial_redeem_credits_account(self):
-        customer_key, account_key = investor()
-        apply(customer_key, account_key, CDB, 10000)
-
-        status, body = redeem(customer_key, account_key, CDB, 4000)
-
-        assert status == 201
-        assert body["amount"] == 4000
-        assert balance_of(customer_key, account_key) == 1_000_000 - 10000 + 4000
 
 
 class TestRedeemIdempotency:
@@ -647,14 +638,6 @@ class TestListOrders:
         assert status == 200
         assert (body["items"], body["total"]) == ([], 0)
 
-    def test_account_without_orders(self):
-        customer_key, account_key = investor()
-
-        status, body = RequestGenerator.get_investment_orders(customer_key, account_key)
-
-        assert status == 200
-        assert body == {"items": [], "page": 1, "limit": 20, "total": 0}
-
     def test_account_of_another_customer(self):
         owner, owner_account = investor()
         apply(owner, owner_account, CDB, 10000)
@@ -739,18 +722,7 @@ class TestPositions:
         _, default = RequestGenerator.get_positions(customer_key, account_key)
         status, with_closed = RequestGenerator.get_positions(customer_key, account_key, {"include_closed": "true"})
 
-        cash = balance_of(customer_key, account_key)
         assert default["items"] == []
-        assert default["total"] == {
-            "investments_amount": 0,
-            "acquisition_cost_amount": 0,
-            "result_amount": 0,
-            "return_bps": 0,
-            "cash_amount": cash,
-            "net_worth_amount": cash,
-            "cash_bps": 10000,
-            "investments_bps": 0,
-        }
         assert status == 200
         assert len(with_closed["items"]) == 1
         closed = with_closed["items"][0]

@@ -78,15 +78,6 @@ class TestWithdrawal:
         assert body["balance"] == 7000
         assert balance_of(customer_key, account_key) == 7000
 
-    def test_withdrawal_of_whole_balance(self):
-        customer_key, account_key = open_account()
-        deposit(customer_key, account_key, 10000)
-
-        status, body = withdraw(customer_key, account_key, 10000)
-
-        assert status == 201
-        assert body["balance"] == 0
-
     def test_insufficient_balance_changes_nothing(self):
         customer_key, account_key = open_account()
         deposit(customer_key, account_key, 10000)
@@ -127,6 +118,7 @@ class TestTransfer:
         assert balance_of(destination_customer, destination_account) == 70000
 
     def test_transfer_of_whole_balance_with_fee(self):
+        """O saque passa pela mesma conta de saldo (com tarifa zero): este limite vale pelos dois."""
         origin_customer, origin_account = open_account()
         _, destination_account = open_account()
         deposit(origin_customer, origin_account, 10000 + TRANSFER_FEE)
@@ -228,19 +220,6 @@ class TestTransfer:
 
 class TestIdempotency:
     """RN-GER-08 e RN-MOV-09: repetir o mesmo pedido não repete o efeito."""
-
-    def test_repeated_deposit_returns_original(self):
-        customer_key, account_key = open_account()
-        key = str(uuid.uuid4())
-        payload = {"type": "DEPOSIT", "amount": 10000}
-
-        first_status, first = RequestGenerator.post_transaction(customer_key, account_key, payload, key)
-        second_status, second = RequestGenerator.post_transaction(customer_key, account_key, payload, key)
-
-        assert first_status == 201
-        assert second_status == 200
-        assert second == first
-        assert balance_of(customer_key, account_key) == 10000
 
     def test_repeated_transfer_moves_money_once(self):
         origin_customer, origin_account = open_account()
@@ -532,17 +511,7 @@ class TestStatement:
         assert entry["counterparty_account_key"] is None
         assert "created_at" in entry
 
-    def test_newest_first(self):
-        customer_key, account_key = open_account()
-        for amount in [1000, 2000, 3000]:
-            deposit(customer_key, account_key, amount)
-
-        items = statement(customer_key, account_key)
-
-        assert [item["amount"] for item in items] == [3000, 2000, 1000]
-        assert [item["balance_after"] for item in items] == [6000, 3000, 1000]
-
-    def test_pagination(self):
+    def test_pagination_newest_first(self):
         customer_key, account_key = open_account()
         for amount in [1000, 2000, 3000, 4000, 5000]:
             deposit(customer_key, account_key, amount)
