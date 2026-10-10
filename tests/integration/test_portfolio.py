@@ -2,32 +2,26 @@ import uuid
 
 import pytest
 
-from tests.utils import RandomGenerator, RequestGenerator
-
-
-# Todas as respostas iguais: 1 dá Conservador, 2 dá Moderado, 4 dá Arrojado.
-CONSERVATIVE, MODERATE, AGGRESSIVE = 1, 2, 4
-
-SELIC = "Tesouro Selic 2031"
-CDB = "CDB Triple P Bank Liquidez"
-LCI = "LCI Triple P Bank 12 meses"
-PREFIXED = "Tesouro Prefixado 2029"
-IPCA = "Tesouro IPCA+ 2035"
-FUND = "FGV Quant Capital FIM"
-
-
-def create_customer() -> str:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, body = RequestGenerator.post_customer(payload)
-    return body["customer_key"]
+from tests.utils import RequestGenerator
+from tests.utils.helpers import (
+    AGGRESSIVE,
+    CDB,
+    CONSERVATIVE,
+    FUND,
+    IPCA,
+    LCI,
+    MODERATE,
+    PREFIXED,
+    SELIC,
+    answer_profile,
+    create_customer,
+)
 
 
 def customer_with_profile(option: int) -> tuple:
     """Cliente que respondeu o questionário inteiro com a mesma opção. Devolve a key e a avaliação."""
     customer_key = create_customer()
-    answers = [{"question_code": f"Q{number}", "option_code": option} for number in range(1, 8)]
-    _, assessment = RequestGenerator.post_suitability(customer_key, {"answers": answers})
-    return customer_key, assessment
+    return customer_key, answer_profile(customer_key, option)
 
 
 def suggest(customer_key: str, amount: int):

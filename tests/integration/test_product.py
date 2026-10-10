@@ -1,22 +1,13 @@
 import uuid
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 
 from tests.utils import RequestGenerator
+from tests.utils.helpers import FUND, LCI, SELIC, business_date, product_key
 
 
 PRODUCT_TYPES = {"PUBLIC_BOND", "PRIVATE_BOND", "FUND"}
-
-
-def business_date() -> date:
-    _, body = RequestGenerator.get_business_date()
-    return date.fromisoformat(body["business_date"])
-
-
-def product_named(name: str) -> dict:
-    _, body = RequestGenerator.get_products()
-    return next(product for product in body["items"] if product["name"] == name)
 
 
 class TestListProducts:
@@ -41,7 +32,7 @@ class TestListProducts:
         status, body = RequestGenerator.get_products({"type": "FUND"})
 
         assert status == 200
-        assert [product["name"] for product in body["items"]] == ["FGV Quant Capital FIM"]
+        assert [product["name"] for product in body["items"]] == [FUND]
 
     @pytest.mark.parametrize(
         "query_params",
@@ -56,12 +47,10 @@ class TestListProducts:
 
 class TestGetProduct:
     def test_get_product_with_price_of_the_day(self):
-        product = product_named("Tesouro Selic 2031")
-
-        status, body = RequestGenerator.get_product(product["product_key"])
+        status, body = RequestGenerator.get_product(product_key(SELIC))
 
         assert status == 200
-        assert body["name"] == "Tesouro Selic 2031"
+        assert body["name"] == SELIC
         # Aplicação mínima em centavos: R$ 50,00.
         assert body["minimum_application_amount"] == 5000
         # O preço do dia é o da data de movimento (RN-PRO-04), em texto (R6).
@@ -71,9 +60,7 @@ class TestGetProduct:
 
     def test_own_issue_letter_is_an_offer_with_term(self):
         # Emissão própria: cada aplicação vence em data da aplicação + prazo (RN-PRO-09).
-        product = product_named("LCI Triple P Bank 12 meses")
-
-        status, body = RequestGenerator.get_product(product["product_key"])
+        status, body = RequestGenerator.get_product(product_key(LCI))
 
         assert status == 200
         assert body["term_months"] == 12
@@ -85,9 +72,7 @@ class TestGetProduct:
 
     def test_public_bond_has_no_term(self):
         # Sem prazo: o resgate pode ser a qualquer dia.
-        product = product_named("Tesouro Selic 2031")
-
-        status, body = RequestGenerator.get_product(product["product_key"])
+        status, body = RequestGenerator.get_product(product_key(SELIC))
 
         assert status == 200
         assert body["term_months"] is None
@@ -101,12 +86,11 @@ class TestGetProduct:
 
 class TestProductPrices:
     def test_price_history_in_period(self):
-        product = product_named("FGV Quant Capital FIM")
         to_date = business_date()
         from_date = to_date - timedelta(days=6)
 
         status, body = RequestGenerator.get_product_prices(
-            product["product_key"], {"from": from_date.isoformat(), "to": to_date.isoformat()}
+            product_key(FUND), {"from": from_date.isoformat(), "to": to_date.isoformat()}
         )
 
         assert status == 200
@@ -124,9 +108,7 @@ class TestProductPrices:
 
     @pytest.mark.parametrize("query_params", [{"from": "01/10/2026"}, {"to": "2026-02-30"}, {"page": "1"}])
     def test_invalid_period(self, query_params):
-        product = product_named("FGV Quant Capital FIM")
-
-        status, body = RequestGenerator.get_product_prices(product["product_key"], query_params)
+        status, body = RequestGenerator.get_product_prices(product_key(FUND), query_params)
 
         assert status == 400
         assert body["code"] == "PPP000001"

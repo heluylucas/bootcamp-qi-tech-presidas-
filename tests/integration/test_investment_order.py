@@ -5,59 +5,30 @@ from decimal import ROUND_DOWN, Decimal
 
 import pytest
 
-from tests.integration.test_day_close import close_day
-from tests.utils import RandomGenerator, RequestGenerator
+from tests.utils import RequestGenerator
+from tests.utils.helpers import (
+    CDB,
+    CONSERVATIVE,
+    FUND,
+    LCI,
+    MODERATE,
+    answer_profile,
+    apply,
+    balance_of,
+    business_date,
+    close_day,
+    create_customer,
+    investor,
+    product,
+    product_key,
+)
 
-
-# Todas as respostas iguais: 1 dá Conservador (risco até 2), 2 dá Moderado (até 3).
-CONSERVATIVE, MODERATE = 1, 2
-
-CDB = "CDB Triple P Bank Liquidez"  # risco 2, mínimo R$ 50,00
-LCI = "LCI Triple P Bank 12 meses"  # risco 2, mínimo R$ 100,00, prazo de 12 meses
-FUND = "FGV Quant Capital FIM"  # risco 3, mínimo R$ 100,00
 
 EIGHT_PLACES = Decimal("0.00000001")
 
 
-def product_key(name: str) -> str:
-    _, body = RequestGenerator.get_products()
-    return next(product["product_key"] for product in body["items"] if product["name"] == name)
-
-
 def unit_price(name: str) -> Decimal:
-    _, product = RequestGenerator.get_product(product_key(name))
-    return Decimal(product["price"]["unit_price"])
-
-
-def business_date() -> date:
-    _, body = RequestGenerator.get_business_date()
-    return date.fromisoformat(body["business_date"])
-
-
-def create_customer() -> str:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, body = RequestGenerator.post_customer(payload)
-    return body["customer_key"]
-
-
-def answer_profile(customer_key: str, option: int) -> None:
-    answers = [{"question_code": f"Q{number}", "option_code": option} for number in range(1, 8)]
-    RequestGenerator.post_suitability(customer_key, {"answers": answers})
-
-
-def investor(option: int = MODERATE, balance: int = 1_000_000) -> tuple:
-    """Cliente com perfil, conta ativa e saldo. Devolve (customer_key, account_key)."""
-    customer_key = create_customer()
-    answer_profile(customer_key, option)
-    _, account = RequestGenerator.post_account(customer_key)
-    deposit = {"type": "DEPOSIT", "amount": balance}
-    RequestGenerator.post_transaction(customer_key, account["account_key"], deposit, str(uuid.uuid4()))
-    return customer_key, account["account_key"]
-
-
-def apply(customer_key: str, account_key: str, name: str, amount: int, idempotency_key: str = None):
-    payload = {"product_key": product_key(name), "side": "APPLY", "amount": amount}
-    return RequestGenerator.post_investment_order(customer_key, account_key, payload, idempotency_key or str(uuid.uuid4()))
+    return Decimal(product(name)["price"]["unit_price"])
 
 
 def redeem(customer_key: str, account_key: str, name: str, amount: int = None, idempotency_key: str = None):
@@ -75,11 +46,6 @@ def closed_account() -> tuple:
     closing = {"status": "CLOSED", "reason": "Pedido do cliente"}
     RequestGenerator.patch_account(customer_key, account["account_key"], closing)
     return customer_key, account["account_key"]
-
-
-def balance_of(customer_key: str, account_key: str) -> int:
-    _, account = RequestGenerator.get_account(customer_key, account_key)
-    return account["balance"]
 
 
 def plus_months(day: date, months: int) -> date:

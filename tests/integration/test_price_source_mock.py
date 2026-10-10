@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from tests.utils.helpers import next_business_day
 from tests.utils.mock_utils import Mock
 from tests.utils.price_source_mock import (
     CDI_SERIES,
@@ -9,13 +10,6 @@ from tests.utils.price_source_mock import (
     PriceSourceMock,
     bcb_query,
 )
-
-
-def next_business_day(day: date) -> date:
-    day += timedelta(days=1)
-    while day.weekday() >= 5:
-        day += timedelta(days=1)
-    return day
 
 
 def business_days_ahead(day: date, count: int) -> date:

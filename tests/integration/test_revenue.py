@@ -5,14 +5,20 @@ from decimal import Decimal
 
 import pytest
 
-from tests.integration.test_day_close import business_date, close_day
-from tests.integration.test_investment_order import CDB, FUND, apply, investor
-from tests.utils import INTERNAL_TOKEN, RandomGenerator, RequestGenerator
+from tests.utils import INTERNAL_TOKEN, RequestGenerator
+from tests.utils.helpers import (
+    CDB,
+    FUND,
+    TRANSFER_FEE,
+    apply,
+    balance_of,
+    business_date,
+    close_day,
+    investor,
+    open_account,
+    send,
+)
 from tests.utils.requisition import ClientRequisition
-
-
-# Tarifa de transferência (RN-MOV-10), em centavos.
-TRANSFER_FEE = 200
 
 
 def revenue(from_date: date, to_date: date) -> dict:
@@ -24,22 +30,6 @@ def revenue(from_date: date, to_date: date) -> dict:
 def fee_revenue_today() -> int:
     today = business_date()
     return revenue(today, today)["realized"]["fee_amount"]
-
-
-def open_account() -> tuple:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, customer = RequestGenerator.post_customer(payload)
-    _, account = RequestGenerator.post_account(customer["customer_key"])
-    return customer["customer_key"], account["account_key"]
-
-
-def send(customer_key: str, account_key: str, payload: dict):
-    return RequestGenerator.post_transaction(customer_key, account_key, payload, str(uuid.uuid4()))
-
-
-def balance_of(customer_key: str, account_key: str) -> int:
-    _, account = RequestGenerator.get_account(customer_key, account_key)
-    return account["balance"]
 
 
 class TestFeeRevenue:

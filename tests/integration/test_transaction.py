@@ -3,38 +3,23 @@ from datetime import timedelta
 
 import pytest
 
-from tests.integration.test_day_close import business_date, close_day
-from tests.utils import RandomGenerator, RequestGenerator
+from tests.utils import RequestGenerator
+from tests.utils.helpers import (
+    TRANSFER_FEE,
+    balance_of,
+    business_date,
+    close_day,
+    create_customer,
+    deposit,
+    open_account,
+    send,
+)
 
 
 # Limites por operação (RN-MOV-02), em centavos.
 DEPOSIT_LIMIT = 100_000_000
 WITHDRAWAL_LIMIT = 500_000
 TRANSFER_LIMIT = 5_000_000
-
-# Tarifa de transferência (RN-MOV-10), em centavos.
-TRANSFER_FEE = 200
-
-
-def create_customer() -> str:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, body = RequestGenerator.post_customer(payload)
-    return body["customer_key"]
-
-
-def open_account() -> tuple:
-    customer_key = create_customer()
-    _, account = RequestGenerator.post_account(customer_key)
-    return customer_key, account["account_key"]
-
-
-def send(customer_key: str, account_key: str, payload: dict):
-    """Cada chamada usa uma Idempotency-Key nova: é um pedido novo, não uma repetição."""
-    return RequestGenerator.post_transaction(customer_key, account_key, payload, str(uuid.uuid4()))
-
-
-def deposit(customer_key: str, account_key: str, amount: int):
-    return send(customer_key, account_key, {"type": "DEPOSIT", "amount": amount})
 
 
 def withdraw(customer_key: str, account_key: str, amount: int):
@@ -44,11 +29,6 @@ def withdraw(customer_key: str, account_key: str, amount: int):
 def transfer(customer_key: str, account_key: str, destination_account_key: str, amount: int):
     payload = {"type": "TRANSFER", "amount": amount, "destination_account_key": destination_account_key}
     return send(customer_key, account_key, payload)
-
-
-def balance_of(customer_key: str, account_key: str) -> int:
-    _, account = RequestGenerator.get_account(customer_key, account_key)
-    return account["balance"]
 
 
 class TestDeposit:

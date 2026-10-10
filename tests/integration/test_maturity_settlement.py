@@ -1,15 +1,7 @@
 from datetime import date
 
-from tests.integration.test_investment_order import (
-    CONSERVATIVE,
-    LCI,
-    apply,
-    balance_of,
-    business_date,
-    investor,
-    product_key,
-)
 from tests.utils import DbUtils, RequestGenerator
+from tests.utils.helpers import CONSERVATIVE, LCI, apply, balance_of, business_date, investor, product_key
 
 
 def close_days_until(day: date) -> None:

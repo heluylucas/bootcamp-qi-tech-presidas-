@@ -3,16 +3,11 @@ from datetime import datetime
 
 import pytest
 
-from tests.utils import RandomGenerator, RequestGenerator
+from tests.utils import RequestGenerator
+from tests.utils.helpers import create_customer
 
 
 QUESTION_CODES = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"]
-
-
-def create_customer() -> str:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, body = RequestGenerator.post_customer(payload)
-    return body["customer_key"]
 
 
 def answers(default: int, **overrides) -> dict:

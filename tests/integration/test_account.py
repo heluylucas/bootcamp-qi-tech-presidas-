@@ -2,19 +2,8 @@ import uuid
 
 import pytest
 
-from tests.utils import RandomGenerator, RequestGenerator
-
-
-def create_customer() -> str:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, body = RequestGenerator.post_customer(payload)
-    return body["customer_key"]
-
-
-def open_account() -> tuple:
-    customer_key = create_customer()
-    _, account = RequestGenerator.post_account(customer_key)
-    return customer_key, account["account_key"]
+from tests.utils import RequestGenerator
+from tests.utils.helpers import create_customer, deposit, open_account
 
 
 def customer_change(customer_key: str, account_key: str, status: str, reason: str = "motivo de teste"):
@@ -25,11 +14,6 @@ def customer_change(customer_key: str, account_key: str, status: str, reason: st
 def bank_change(account_key: str, status: str, reason: str = "motivo de teste"):
     """Rota do banco, com o token de operador: bloqueia, desbloqueia e encerra (RN-CON-11)."""
     return RequestGenerator.patch_internal_account_status(account_key, {"status": status, "reason": reason})
-
-
-def deposit(customer_key: str, account_key: str, amount: int) -> None:
-    payload = {"type": "DEPOSIT", "amount": amount}
-    RequestGenerator.post_transaction(customer_key, account_key, payload, str(uuid.uuid4()))
 
 
 def status_of(customer_key: str, account_key: str) -> str:
