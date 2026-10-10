@@ -42,16 +42,6 @@ class TestListQuestions:
             assert question["text"]
             assert question["dimension"]
             assert [option["code"] for option in question["options"]] == [1, 2, 3, 4]
-            assert "id" not in question
-
-    def test_points_are_not_exposed(self):
-        """Se os pontos aparecessem, o cliente escolheria o perfil em vez de responder."""
-        _, body = RequestGenerator.get_suitability_questions()
-
-        for question in body["items"]:
-            for option in question["options"]:
-                assert "points" not in option
-                assert "id" not in option
 
 
 class TestSubmitSuitability:
@@ -116,7 +106,6 @@ class TestSubmitSuitability:
 
         assert status == 201
         assert len(body["assessment_key"]) == 36
-        assert "id" not in body
         assert "created_at" in body
         assert body["answers"] == answers(2)["answers"]
 

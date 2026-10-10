@@ -38,7 +38,6 @@ class TestCreateCustomer:
 
         assert status == 201
         assert len(body["customer_key"]) == 36
-        assert "id" not in body
         assert body["name"] == payload["name"]
         assert body["document_number"] == masked(payload["document_number"])
         assert body["birth_date"] == payload["birth_date"]

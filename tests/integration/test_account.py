@@ -29,7 +29,6 @@ class TestOpenAccount:
 
         assert status == 201
         assert len(body["account_key"]) == 36
-        assert "id" not in body
         assert body["status"] == "ACTIVE"
         assert body["balance"] == 0
         # Conta nova: nada investido, o capital total é o próprio saldo.

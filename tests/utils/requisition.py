@@ -3,6 +3,8 @@ from requests import request, Response
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from os import environ
 
+from tests.utils.internal_id import assert_no_internal_id
+
 
 API_OFFLINE = (
     "Não consegui falar com a API em {base_url}.\n"
@@ -54,6 +56,8 @@ class ClientRequisition:
             response=response,
         )
 
+        # R5 em toda resposta de todo teste (ver tests/utils/internal_id.py).
+        assert_no_internal_id(base_response.response_json, endpoint)
         return base_response
 
 
