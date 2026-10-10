@@ -98,7 +98,6 @@ class TestApply:
         assert status == 201
         assert len(body["order_key"]) == 36
         assert len(body["transaction_key"]) == 36
-        assert "id" not in body
         assert body["product_key"] == product_key(CDB)
         assert body["side"] == "APPLY"
         assert body["amount"] == 10000

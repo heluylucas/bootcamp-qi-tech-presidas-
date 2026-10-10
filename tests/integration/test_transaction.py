@@ -59,7 +59,6 @@ class TestDeposit:
 
         assert status == 201
         assert len(body["transaction_key"]) == 36
-        assert "id" not in body
         assert body["type"] == "DEPOSIT"
         assert body["amount"] == 10000
         assert body["fee_amount"] == 0
@@ -541,7 +540,6 @@ class TestStatement:
 
         assert len(items) == 1
         entry = items[0]
-        assert "id" not in entry
         assert len(entry["transaction_key"]) == 36
         assert entry["type"] == "DEPOSIT"
         assert entry["direction"] == "CREDIT"

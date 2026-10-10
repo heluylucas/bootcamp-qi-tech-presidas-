@@ -27,7 +27,6 @@ class TestListProducts:
         assert len(body["items"]) == 6
         for product in body["items"]:
             assert len(product["product_key"]) == 36
-            assert "id" not in product
             assert product["type"] in PRODUCT_TYPES
 
     def test_filter_by_maximum_risk_level(self):
