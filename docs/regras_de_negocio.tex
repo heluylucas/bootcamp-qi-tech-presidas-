@@ -1656,7 +1656,12 @@ Seguindo as camadas do repositório-base. Para cada módulo, criar:
 % =====================================================================
 
 Todos black box (R1): preparam o mundo pela porta da frente (criando cliente e conta via HTTP),
-fazem a requisição e conferem \textbf{status e corpo}. Nomes sugeridos, lidos como frases:
+fazem a requisição e conferem \textbf{status e corpo}. Além disso, \textbf{toda resposta de todo
+teste é conferida contra a R5}: a função por onde passam as chamadas (\tb{tests/utils/requisition.py})
+procura, no JSON inteiro (inclusive listas e objetos aninhados), chaves \tb{id} ou terminadas em
+\tb{_id}, e o teste falha apontando o campo. Assim rotas novas ficam cobertas sem ninguém lembrar de
+escrever o \emph{assert}. Única exceção: \tb{GET /} do repositório-base, cujo \tb{id} é o número do
+processo da API, não do banco. Nomes sugeridos, lidos como frases:
 
 \begingroup\small
 \begin{longtable}{@{}P{2.4cm}P{13.7cm}@{}}

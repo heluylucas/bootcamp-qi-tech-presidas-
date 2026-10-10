@@ -124,6 +124,10 @@ tests/` não volta nada). A única exceção é o `tests/utils/db_utils.py`,
 que fala com o banco direto, só para **zerar** o banco antes de um teste
 que conta linhas. O cenário sempre nasce pela API.
 
+Toda resposta que um teste recebe passa também pela conferência da R5
+(`tests/utils/internal_id.py`): se aparecer uma chave `id` ou terminada em
+`_id` em qualquer parte do JSON, o teste falha apontando o campo.
+
 O conferidor de estilo roda assim:
 
 ```bash
