@@ -1,34 +1,63 @@
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: "#eef3fb"
+    primaryBorderColor: "#2f5f9e"
+    primaryTextColor: "#10233f"
+    lineColor: "#2f5f9e"
+    secondaryColor: "#f7f9fd"
+    tertiaryColor: "#ffffff"
+    noteBkgColor: "#f7f9fd"
+    noteBorderColor: "#2f5f9e"
+    noteTextColor: "#10233f"
+---
 sequenceDiagram
     autonumber
     participant O as Operador (rota interna)
     participant API as API (controller)
     participant DB as PostgreSQL
-    participant F as Administradora do fundo
-    participant T as Tesouro
-    participant BC as Banco Central
+    participant Fora as Fontes externas<br/>(administradora, Tesouro, Banco Central)
 
-    O->>API: POST /internal/day_close {close_date}
-    API->>DB: FOR UPDATE no business_day atual e relê a data
-    Note over API: close_date ≠ data atual → 409 PPP000006<br/>(clique duplo: o segundo encontra a data já avançada)
-    Note over API: próximo dia útil (sexta → segunda)
-    API->>F: cota do novo dia (timeout 5 s)
-    API->>T: preço dos 3 títulos
-    API->>BC: CDI e Selic
-    alt fora do ar, erro ou timeout
-        API-->>O: 502 PPP005006 (nada gravado, a data não anda)
-    else resposta sem sentido (preço ≤ 0, data errada, título faltando)
-        API-->>O: 502 PPP005007 (nada gravado)
+    Note over O,Fora: Exemplo: hoje é sexta 09/10. Fechar a sexta e abrir a segunda 12/10.
+    O->>API: POST /internal/day_close {close_date: 2026-10-09}
+
+    rect rgb(238, 243, 251)
+        Note over API,DB: Fase 1. Conferir (nada é gravado)
+        API->>DB: trava a data de movimento (FOR UPDATE) e relê
+        Note over API: close_date ≠ 09/10 → 409 PPP000006 (clique duplo)<br/>próximo dia útil: 12/10 (pula sábado e domingo)
     end
-    API->>DB: CDI do dia que fecha (reference_rate)
-    Note over API: CDB e LCI = preço anterior × (1 + c × %CDI)<br/>c = (1 + CDI do dia que fecha)^(1/252) − 1
-    API->>DB: INSERT 6 product_price + 2 reference_rate (taxas do novo dia)
-    API->>DB: soma saldos de cliente, cotas do fundo e custo em CDB/LCI (a foto do fim do dia)
-    API->>DB: INSERT revenue_accrual do dia que fecha<br/>(bases, calendar_days até o novo dia, valores)
-    API->>DB: INSERT business_day (novo dia), antes da liquidação
-    loop cada aplicação com maturity_date ≤ novo dia ainda não liquidada (account_id crescente)
-        API->>DB: FOR UPDATE na conta, depois na position
-        API->>DB: INSERT transaction INVESTMENT_REDEEM (business_date = novo dia, sem idempotency_key)<br/>+ ledger_entry CREDIT, UPDATE balance e position
-        API->>DB: INSERT investment_order ligada à transação,<br/>matured_investment_order_id = a aplicação (UNIQUE: não paga duas vezes)
+
+    rect rgb(247, 249, 253)
+        Note over API,Fora: Fase 2. Buscar e calcular (nada é gravado)
+        API->>Fora: cota do fundo, preços do Tesouro, CDI e Selic de 12/10 (timeout 5 s)
+        alt fora do ar, erro ou timeout
+            API-->>O: 502 PPP005006 (nada mudou, a data continua 09/10)
+        else resposta sem sentido (preço ≤ 0, data errada, título faltando)
+            API-->>O: 502 PPP005007 (nada mudou)
+        end
+        Note over API: CDB e LCI de 12/10 = preço de 09/10 rendido pelo CDI de 09/10
     end
-    API->>DB: COMMIT: preços, taxas, provisão, data e liquidações, tudo ou nada
-    API-->>O: 201 nova data, preços e taxas
+
+    rect rgb(238, 243, 251)
+        Note over API,DB: Fase 3. Gravar o que chegou para 12/10
+        API->>DB: INSERT 6 product_price + 2 reference_rate de 12/10
+    end
+
+    rect rgb(247, 249, 253)
+        Note over API,DB: Fase 4. Fechar a sexta: a provisão de receita de 09/10
+        API->>DB: soma saldos de cliente, cotas do fundo e custo em CDB/LCI (a foto do fim de 09/10)
+        API->>DB: INSERT revenue_accrual de 09/10<br/>calendar_days = 3 (sexta, sábado, domingo)
+    end
+
+    rect rgb(238, 243, 251)
+        Note over API,DB: Fase 5. Abrir a segunda e pagar o que vence nela
+        API->>DB: INSERT business_day 12/10
+        loop cada aplicação com maturity_date ≤ 12/10 ainda não liquidada (conta crescente)
+            API->>DB: FOR UPDATE na conta, depois na position
+            API->>DB: INSERT transaction INVESTMENT_REDEEM do dia 12/10 + ledger_entry CREDIT<br/>UPDATE balance e position, investment_order com matured_investment_order_id
+        end
+    end
+
+    API->>DB: COMMIT: tudo das fases 3 a 5 junto, ou nada
+    API-->>O: 201 business_date 12/10, preços e taxas

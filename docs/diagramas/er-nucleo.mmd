@@ -1,5 +1,16 @@
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: "#eef3fb"
+    primaryBorderColor: "#2f5f9e"
+    primaryTextColor: "#10233f"
+    lineColor: "#2f5f9e"
+    secondaryColor: "#f7f9fd"
+    tertiaryColor: "#ffffff"
+    noteBkgColor: "#f7f9fd"
+    noteBorderColor: "#2f5f9e"
+    noteTextColor: "#10233f"
   layout: elk
   elk:
     mergeEdges: false
@@ -25,7 +36,7 @@ erDiagram
         int id PK "a do banco é a 1"
         char account_key UK
         int customer_id FK "nulo só na conta do banco; UK parcial se não CLOSED"
-        account_status status "ACTIVE, BLOCKED, CLOSED"
+        account_status status "ENUM: ACTIVE | BLOCKED | CLOSED"
         bigint balance "centavos, CHECK >= 0"
         timestamptz created_at
         timestamptz updated_at
@@ -33,16 +44,16 @@ erDiagram
     account_status_event {
         int id PK
         int account_id FK
-        account_status from_status "nulo no nascimento"
-        account_status to_status
+        account_status from_status "ENUM: ACTIVE | BLOCKED | CLOSED; nulo no nascimento"
+        account_status to_status "ENUM: ACTIVE | BLOCKED | CLOSED"
         varchar reason
-        status_actor actor "CUSTOMER ou BANK"
+        status_actor actor "ENUM: CUSTOMER | BANK"
         timestamptz created_at
     }
     transaction {
         int id PK
         char transaction_key UK
-        transaction_type type "DEPOSIT, WITHDRAWAL, TRANSFER, INVESTMENT_APPLY, INVESTMENT_REDEEM"
+        transaction_type type "ENUM: DEPOSIT | WITHDRAWAL | TRANSFER | INVESTMENT_APPLY | INVESTMENT_REDEEM"
         int owner_account_id FK "dona do pedido"
         int destination_account_id FK "só e sempre na TRANSFER"
         bigint amount "centavos, > 0"
@@ -56,8 +67,8 @@ erDiagram
         int id PK
         int transaction_id FK
         int account_id FK
-        entry_direction direction "DEBIT ou CREDIT"
-        entry_category category "PRINCIPAL ou FEE"
+        entry_direction direction "ENUM: DEBIT | CREDIT"
+        entry_category category "ENUM: PRINCIPAL | FEE"
         bigint amount
         bigint balance_after "saldo depois, >= 0"
         timestamptz created_at

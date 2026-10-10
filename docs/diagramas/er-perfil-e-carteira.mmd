@@ -1,5 +1,16 @@
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: "#eef3fb"
+    primaryBorderColor: "#2f5f9e"
+    primaryTextColor: "#10233f"
+    lineColor: "#2f5f9e"
+    secondaryColor: "#f7f9fd"
+    tertiaryColor: "#ffffff"
+    noteBkgColor: "#f7f9fd"
+    noteBorderColor: "#2f5f9e"
+    noteTextColor: "#10233f"
   layout: elk
   elk:
     mergeEdges: false
@@ -16,7 +27,7 @@ erDiagram
 
     suitability_question {
         int id PK
-        varchar code UK "Q1 a Q7, ordem do questionário"
+        varchar code UK "seed (não é ENUM): Q1 a Q7, ordem do questionário"
         text text
         varchar dimension
         timestamptz created_at
@@ -30,7 +41,7 @@ erDiagram
     }
     investor_profile {
         int id PK
-        varchar code UK "CONSERVATIVE, MODERATE, AGGRESSIVE"
+        varchar code UK "seed (não é ENUM): CONSERVATIVE | MODERATE | AGGRESSIVE"
         smallint minimum_score
         smallint maximum_score
         smallint maximum_risk_level

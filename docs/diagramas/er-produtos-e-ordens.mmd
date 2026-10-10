@@ -1,5 +1,16 @@
 ---
 config:
+  theme: base
+  themeVariables:
+    primaryColor: "#eef3fb"
+    primaryBorderColor: "#2f5f9e"
+    primaryTextColor: "#10233f"
+    lineColor: "#2f5f9e"
+    secondaryColor: "#f7f9fd"
+    tertiaryColor: "#ffffff"
+    noteBkgColor: "#f7f9fd"
+    noteBorderColor: "#2f5f9e"
+    noteTextColor: "#10233f"
   layout: elk
   elk:
     mergeEdges: false
@@ -19,9 +30,9 @@ erDiagram
         int id PK
         char product_key UK
         varchar name
-        product_type type "PUBLIC_BOND, PRIVATE_BOND, FUND"
+        product_type type "ENUM: PUBLIC_BOND | PRIVATE_BOND | FUND"
         varchar issuer
-        product_indexer indexer "SELIC, CDI, PREFIXED, IPCA, QUOTA"
+        product_indexer indexer "ENUM: SELIC | CDI | PREFIXED | IPCA | QUOTA"
         varchar rate_description
         smallint risk_level "1 a 5"
         smallint term_months "prazo por aplicação ou nulo"
@@ -45,7 +56,7 @@ erDiagram
     }
     reference_rate {
         int id PK
-        reference_rate_code code "CDI ou SELIC, UK com data"
+        reference_rate_code code "ENUM: CDI | SELIC; UK com rate_date"
         date rate_date
         int annual_rate_bps
         timestamptz created_at

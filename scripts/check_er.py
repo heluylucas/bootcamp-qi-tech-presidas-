@@ -34,6 +34,32 @@ def diagram_blocks(text: str) -> dict:
     return blocks
 
 
+def sql_enums(sql: str) -> dict:
+    """{tipo: [valores na ordem]} dos `CREATE TYPE tipo AS ENUM (...)`."""
+    return {
+        name: re.findall(r"'([^']*)'", values)
+        for name, values in re.findall(r"CREATE TYPE (\w+) AS ENUM \((.*?)\);", sql, re.S)
+    }
+
+
+def enum_problems(enums: dict, diagram: str, text: str) -> list:
+    """Padrão dos enumeradores: coluna de tipo ENUM tem a nota `ENUM: A | B` (+ `; outra nota`).
+
+    Os valores vêm na ordem do database.sql, para o leitor nunca ver duas versões da mesma lista.
+    """
+    problems = []
+    for name, body in re.findall(r"^\s*(\w+)\s*\{(.*?)^\s*\}", text, re.S | re.M):
+        for line in body.splitlines():
+            parts = line.split(maxsplit=2)
+            if len(parts) < 2 or parts[0] not in enums:
+                continue
+            expected = "ENUM: " + " | ".join(enums[parts[0]])
+            note = re.search(r'"([^"]*)"', line)
+            if note is None or not (note.group(1) == expected or note.group(1).startswith(expected + "; ")):
+                problems.append(f'{diagram}: {name}.{parts[1]} deveria ter a nota "{expected}"')
+    return problems
+
+
 def compare(tables: dict, diagrams: dict) -> list:
     """Lista de problemas encontrados; vazia quando tudo bate."""
     problems = []
@@ -56,12 +82,14 @@ def compare(tables: dict, diagrams: dict) -> list:
 
 
 def main() -> int:
-    tables = sql_tables((ROOT / "database" / "database.sql").read_text(encoding="utf-8"))
-    diagrams = {
-        path.name: diagram_blocks(path.read_text(encoding="utf-8"))
-        for path in sorted((ROOT / "docs" / "diagramas").glob("er-*.mmd"))
-    }
+    sql = (ROOT / "database" / "database.sql").read_text(encoding="utf-8")
+    tables = sql_tables(sql)
+    enums = sql_enums(sql)
+    texts = {path.name: path.read_text(encoding="utf-8") for path in sorted((ROOT / "docs" / "diagramas").glob("er-*.mmd"))}
+    diagrams = {name: diagram_blocks(text) for name, text in texts.items()}
     problems = compare(tables, diagrams)
+    for name, text in texts.items():
+        problems += enum_problems(enums, name, text)
 
     for problem in problems:
         print(problem)
@@ -69,7 +97,7 @@ def main() -> int:
     if problems:
         return 1
 
-    print(f"ok: {len(tables)} tabelas, diagramas iguais ao database.sql")
+    print(f"ok: {len(tables)} tabelas e {len(enums)} enumeradores, diagramas iguais ao database.sql")
     return 0
 
 
