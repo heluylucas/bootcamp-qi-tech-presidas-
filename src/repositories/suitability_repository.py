@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import selectinload
 
 from database import Context
-from models import InvestorProfile, SuitabilityAnswer, SuitabilityAssessment, SuitabilityQuestion
+from models import SuitabilityAnswer, SuitabilityAssessment, SuitabilityQuestion
 
 
 class SuitabilityRepository:
@@ -20,21 +20,9 @@ class SuitabilityRepository:
         )
 
     @staticmethod
-    def get_profile_for_score(context: Context, score: int) -> Optional[InvestorProfile]:
-        return (
-            context.db_session.query(InvestorProfile)
-            .filter(InvestorProfile.minimum_score <= score, InvestorProfile.maximum_score >= score)
-            .first()
-        )
-
-    @staticmethod
-    def get_profile(context: Context, code: str) -> Optional[InvestorProfile]:
-        return context.db_session.query(InvestorProfile).filter(InvestorProfile.code == code).first()
-
-    @staticmethod
-    def create_assessment(context: Context, customer_id: int, investor_profile_id: int, score: int) -> SuitabilityAssessment:
+    def create_assessment(context: Context, customer_id: int, investor_profile: str, score: int) -> SuitabilityAssessment:
         assessment = SuitabilityAssessment(
-            assessment_key=str(uuid.uuid4()), customer_id=customer_id, investor_profile_id=investor_profile_id, score=score
+            assessment_key=str(uuid.uuid4()), customer_id=customer_id, investor_profile=investor_profile, score=score
         )
         context.db_session.add(assessment)
         context.db_session.flush()
