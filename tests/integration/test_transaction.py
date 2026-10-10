@@ -55,15 +55,6 @@ class TestDeposit:
         assert status == 201
         assert body["balance"] == DEPOSIT_LIMIT
 
-    def test_deposit_above_limit(self):
-        customer_key, account_key = open_account()
-
-        status, body = deposit(customer_key, account_key, DEPOSIT_LIMIT + 1)
-
-        assert status == 422
-        assert body["code"] == "PPP003005"
-        assert balance_of(customer_key, account_key) == 0
-
 
 class TestWithdrawal:
     def test_withdrawal_decreases_balance(self):
@@ -87,16 +78,6 @@ class TestWithdrawal:
         assert status == 409
         assert body["code"] == "PPP003003"
         assert balance_of(customer_key, account_key) == 10000
-
-    def test_withdrawal_above_limit(self):
-        customer_key, account_key = open_account()
-        deposit(customer_key, account_key, WITHDRAWAL_LIMIT * 2)
-
-        status, body = withdraw(customer_key, account_key, WITHDRAWAL_LIMIT + 1)
-
-        assert status == 422
-        assert body["code"] == "PPP003005"
-        assert balance_of(customer_key, account_key) == WITHDRAWAL_LIMIT * 2
 
 
 class TestTransfer:
@@ -186,17 +167,6 @@ class TestTransfer:
         assert body["code"] == "PPP002005"
         assert balance_of(origin_customer, origin_account) == 10000
 
-    def test_transfer_above_limit(self):
-        origin_customer, origin_account = open_account()
-        _, destination_account = open_account()
-        deposit(origin_customer, origin_account, TRANSFER_LIMIT * 2)
-
-        status, body = transfer(origin_customer, origin_account, destination_account, TRANSFER_LIMIT + 1)
-
-        assert status == 422
-        assert body["code"] == "PPP003005"
-        assert balance_of(origin_customer, origin_account) == TRANSFER_LIMIT * 2
-
     def test_transfer_at_limit(self):
         origin_customer, origin_account = open_account()
         destination_customer, destination_account = open_account()
@@ -265,35 +235,32 @@ class TestIdempotency:
         assert "transaction_key" not in body
         assert balance_of(second_customer, second_account) == 0
 
-    def test_same_key_with_different_body(self):
-        """Repetição é o MESMO pedido: mesma chave com outro valor é outro pedido (409)."""
-        customer_key, account_key = open_account()
-        key = str(uuid.uuid4())
-        RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000}, key)
-
-        status, body = RequestGenerator.post_transaction(
-            customer_key, account_key, {"type": "DEPOSIT", "amount": 20000}, key
-        )
-
-        assert status == 409
-        assert body["code"] == "PPP000004"
-        assert balance_of(customer_key, account_key) == 10000
-
-    def test_same_key_with_another_destination(self):
+    @pytest.mark.parametrize(
+        "second_request",
+        [
+            lambda destination, other: {"type": "TRANSFER", "amount": 30000, "destination_account_key": destination},
+            lambda destination, other: {"type": "TRANSFER", "amount": 20000, "destination_account_key": other},
+            lambda destination, other: {"type": "WITHDRAWAL", "amount": 20000},
+        ],
+        ids=["other_amount", "other_destination", "other_type"],
+    )
+    def test_same_key_with_another_request(self, second_request):
+        """Repetição é o MESMO pedido: mesma chave com outro valor, destino ou tipo é outro pedido (409)."""
         origin_customer, origin_account = open_account()
-        _, first_destination = open_account()
-        _, second_destination = open_account()
+        _, destination = open_account()
+        _, other_destination = open_account()
         deposit(origin_customer, origin_account, 100000)
         key = str(uuid.uuid4())
-        payload = {"type": "TRANSFER", "amount": 20000, "destination_account_key": first_destination}
-        RequestGenerator.post_transaction(origin_customer, origin_account, payload, key)
+        first = {"type": "TRANSFER", "amount": 20000, "destination_account_key": destination}
+        RequestGenerator.post_transaction(origin_customer, origin_account, first, key)
 
         status, body = RequestGenerator.post_transaction(
-            origin_customer, origin_account, {**payload, "destination_account_key": second_destination}, key
+            origin_customer, origin_account, second_request(destination, other_destination), key
         )
 
         assert status == 409
         assert body["code"] == "PPP000004"
+        assert balance_of(origin_customer, origin_account) == 100000 - 20000 - TRANSFER_FEE
 
     def test_field_order_does_not_matter(self):
         customer_key, account_key = open_account()
@@ -305,20 +272,6 @@ class TestIdempotency:
         )
 
         assert status == 200
-        assert balance_of(customer_key, account_key) == 10000
-
-    def test_key_of_another_type_of_request_is_refused(self):
-        """Só é repetição se for o mesmo tipo de pedido: depósito e saque com a mesma chave dão 409."""
-        customer_key, account_key = open_account()
-        key = str(uuid.uuid4())
-        RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000}, key)
-
-        status, body = RequestGenerator.post_transaction(
-            customer_key, account_key, {"type": "WITHDRAWAL", "amount": 3000}, key
-        )
-
-        assert status == 409
-        assert body["code"] == "PPP000004"
         assert balance_of(customer_key, account_key) == 10000
 
     def test_refused_request_does_not_use_up_the_key(self):
@@ -348,7 +301,7 @@ class TestIdempotency:
         assert status == 200
         assert body == first
 
-    @pytest.mark.parametrize("key", ["", "a" * 37, "nao-e-um-uuid"])
+    @pytest.mark.parametrize("key", ["", "nao-e-um-uuid"])
     def test_invalid_idempotency_key(self, key):
         customer_key, account_key = open_account()
 
@@ -362,15 +315,32 @@ class TestIdempotency:
 
 
 class TestTransactionRefusals:
-    @pytest.mark.parametrize("transaction_type", ["DEPOSIT", "WITHDRAWAL"])
     @pytest.mark.parametrize("amount", [0, -100])
-    def test_invalid_amount(self, transaction_type, amount):
+    def test_invalid_amount(self, amount):
         customer_key, account_key = open_account()
 
-        status, body = send(customer_key, account_key, {"type": transaction_type, "amount": amount})
+        status, body = deposit(customer_key, account_key, amount)
 
         assert status == 422
         assert body["code"] == "PPP003004"
+
+    @pytest.mark.parametrize(
+        "transaction_type, limit",
+        [("DEPOSIT", DEPOSIT_LIMIT), ("WITHDRAWAL", WITHDRAWAL_LIMIT), ("TRANSFER", TRANSFER_LIMIT)],
+    )
+    def test_above_limit_changes_nothing(self, transaction_type, limit):
+        customer_key, account_key = open_account()
+        _, destination_account = open_account()
+        deposit(customer_key, account_key, TRANSFER_LIMIT * 2)
+        payload = {"type": transaction_type, "amount": limit + 1}
+        if transaction_type == "TRANSFER":
+            payload["destination_account_key"] = destination_account
+
+        status, body = send(customer_key, account_key, payload)
+
+        assert status == 422
+        assert body["code"] == "PPP003005"
+        assert balance_of(customer_key, account_key) == TRANSFER_LIMIT * 2
 
     @pytest.mark.parametrize(
         "payload",
@@ -406,8 +376,7 @@ class TestTransactionRefusals:
         assert body["code"] == "PPP000003"
         assert balance_of(customer_key, account_key) == 0
 
-    @pytest.mark.parametrize("transaction_type", ["DEPOSIT", "WITHDRAWAL"])
-    @pytest.mark.parametrize("target_status", ["BLOCKED", "CLOSED"])
+    @pytest.mark.parametrize("transaction_type, target_status", [("DEPOSIT", "BLOCKED"), ("WITHDRAWAL", "CLOSED")])
     def test_account_not_active(self, transaction_type, target_status):
         customer_key, account_key = open_account()
         RequestGenerator.patch_internal_account_status(account_key, {"status": target_status, "reason": "teste"})

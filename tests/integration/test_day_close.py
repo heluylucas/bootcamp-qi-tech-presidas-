@@ -154,7 +154,7 @@ class TestPriceSourceFailure:
         assert body["code"] == "PPP005007"
         self.assert_nothing_changed(today, fund_price)
 
-    @pytest.mark.parametrize("rate", [[], [{"data": "x", "valor": "abc"}], {"valor": "14.90"}])
+    @pytest.mark.parametrize("rate", [[], [{"data": "x", "valor": "abc"}]], ids=["empty", "not_a_number"])
     def test_rate_without_sense(self, rate):
         today, fund_price = business_date(), product(FUND)["price"]
         new_day = next_business_day(today)

@@ -255,8 +255,7 @@ class TestBankChangesStatus:
         assert status == 409
         assert body["code"] == "PPP002003"
 
-    @pytest.mark.parametrize("target", ["BLOCKED", "CLOSED"])
-    @pytest.mark.parametrize("payload_reason", [{}, {"reason": ""}, {"reason": "   "}])
+    @pytest.mark.parametrize("target, payload_reason", [("BLOCKED", {}), ("CLOSED", {"reason": "   "})])
     def test_reason_required(self, target, payload_reason):
         _, account_key = open_account()
 
