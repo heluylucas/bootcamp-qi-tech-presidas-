@@ -335,6 +335,12 @@ conta ou com um pedido diferente, `409` (`PPP000004`). `ck` = `customer_key`, `a
 
 ### Banco de Dados (Somente diagrama)
 
+Como ler os diagramas: `PK` é a chave primária, `FK` a estrangeira e `UK` um valor único. Coluna de
+tipo ENUM do Postgres traz a lista de valores aceitos na nota, sempre no formato
+`ENUM: VALOR_1 | VALOR_2`, na ordem do `database.sql`; o que vier depois de `;` é observação. Códigos
+que são linhas criadas pelo seed, e não ENUM, aparecem como `seed (não é ENUM): ...`. O script
+`scripts/check_er.py` confere as tabelas, as colunas e esse padrão contra o `database.sql`.
+
 **Núcleo bancário**
 
 ![ER — núcleo bancário](diagramas/er-nucleo.png)
@@ -404,6 +410,30 @@ posição fica com `quantity = 0` e não é apagada.
 
 **Fechamento do dia — caminho feliz**
 
+O fechamento é a "virada de data" do banco: o operador avisa que o dia acabou, e o banco busca os
+preços do dia seguinte, faz as contas do dia que terminou e abre o próximo. Com um exemplo: hoje é
+**sexta 09/10**, e o fechamento abre a **segunda 12/10**. Ele acontece em cinco fases, e as duas
+primeiras só leem.
+
+1. **Conferir.** Trava a data de movimento e confere se o pedido é para fechar 09/10. Um segundo
+   clique encontra a data já em 12/10 e recebe `409`. Calcula o próximo dia útil: 12/10, porque
+   sábado e domingo não abrem.
+2. **Buscar e calcular.** Pergunta às fontes externas a cota do fundo, os preços do Tesouro, o CDI e
+   a Selic de 12/10. O CDB e a LCI o próprio banco calcula: o preço de 09/10 rendido pelo CDI de
+   09/10. Se uma fonte falhar ou responder algo sem sentido, o fechamento para aqui com `502`. Como
+   nada foi gravado ainda, a data continua 09/10.
+3. **Gravar o que chegou.** Grava os preços e as taxas de 12/10.
+4. **Fechar a sexta.** Tira a foto do fim de 09/10 (saldos dos clientes, cotas do fundo, custo em CDB
+   e LCI) e grava a provisão de receita de 09/10. Ela vale três dias, sexta, sábado e domingo, porque
+   o dinheiro continua aplicado no fim de semana. A foto é tirada aqui, antes da fase 5, porque o
+   pagamento dos vencimentos mexe nos saldos.
+5. **Abrir a segunda e pagar o que vence nela.** Grava o dia 12/10 e devolve à conta o dinheiro das
+   aplicações da LCI que vencem até 12/10. Essas transações já são do dia 12/10, por isso o dia novo é
+   gravado antes delas.
+
+As fases 3 a 5 vão num `commit` só: ou o dia vira com tudo (preços, provisão, data e vencimentos), ou
+nada muda.
+
 ![Fechamento do dia](diagramas/fechamento-do-dia.png)
 
 **Fechamento — falha: serviço externo fora do ar (a mais provável).** Erro, timeout de 5 s ou conexão
@@ -412,8 +442,8 @@ Basta chamar de novo. Uma resposta sem sentido (cota = 0, título faltando) dá 
 pelo mesmo caminho. Gravar um preço errado seria pior, porque preço publicado não se reescreve.
 
 **Fechamento — falha: erro no meio da liquidação (a mais cara).** Preços gravados e uma aplicação já
-paga, mas a próxima falha. Como tudo está num `commit` só, o `rollback` desfaz preços, taxas e
-créditos juntos, e ninguém recebe pela metade. Uma aplicação nunca é paga duas vezes: depois de paga,
+paga, mas a próxima falha. Como tudo está num `commit` só, o `rollback` desfaz preços, taxas,
+provisão, a data nova e os créditos juntos, e ninguém recebe pela metade. Uma aplicação nunca é paga duas vezes: depois de paga,
 existe a ordem que aponta para ela, e o `UNIQUE(matured_investment_order_id)` barra a segunda.
 
 > ## Principal desafio
