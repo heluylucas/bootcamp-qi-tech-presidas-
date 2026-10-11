@@ -9,7 +9,18 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import AccountResource, BusinessDayResource, CustomerResource, HealthCheckResource, InvestmentOrderResource, PortfolioResource, ProductResource, RevenueResource, SuitabilityResource, TransactionResource
+from resources import (
+    AccountResource,
+    BusinessDayResource,
+    CustomerResource,
+    HealthCheckResource,
+    InvestmentOrderResource,
+    PortfolioResource,
+    ProductResource,
+    RevenueResource,
+    SuitabilityResource,
+    TransactionResource,
+)
 from utils.logger import setup_logging
 
 

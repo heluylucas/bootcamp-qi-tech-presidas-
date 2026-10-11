@@ -33,7 +33,7 @@ class Transaction(Base):
     business_date = Column(Date, ForeignKey("business_day.business_date"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    owner_account =relationship("Account", foreign_keys=[owner_account_id])
+    owner_account = relationship("Account", foreign_keys=[owner_account_id])
     destination_account = relationship("Account", foreign_keys=[destination_account_id])
 
 
