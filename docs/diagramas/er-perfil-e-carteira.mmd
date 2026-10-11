@@ -1,5 +1,6 @@
 ---
 config:
+  look: classic
   theme: base
   themeVariables:
     primaryColor: "#eef3fb"
@@ -39,7 +40,7 @@ erDiagram
     }
     suitability_assessment {
         int id PK
-        char assessment_key UK
+        char suitability_assessment_key UK
         int customer_id FK
         investor_profile investor_profile "ENUM: CONSERVATIVE | MODERATE | AGGRESSIVE; fora da faixa do score = trava (forced_by_rule)"
         smallint score

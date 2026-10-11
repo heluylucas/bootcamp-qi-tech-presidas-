@@ -1,3 +1,7 @@
+---
+config:
+  look: classic
+---
 sequenceDiagram
     autonumber
     participant O as Operador (rota interna)
@@ -19,7 +23,7 @@ sequenceDiagram
         API->>Fora: cota do fundo, preços do Tesouro, CDI e Selic de 12/10 (timeout 5 s)
         alt fora do ar, erro ou timeout
             API-->>O: 502 PPP005006 (nada mudou, a data continua 09/10)
-        else resposta sem sentido (preço ≤ 0, data errada, título faltando)
+        else resposta sem sentido<br/>(preço ≤ 0, data errada, título faltando)
             API-->>O: 502 PPP005007 (nada mudou)
         end
         Note over API: CDB e LCI de 12/10 = preço de 09/10 rendido pelo CDI de 09/10
@@ -39,7 +43,7 @@ sequenceDiagram
     rect rgb(238, 243, 251)
         Note over API,DB: Fase 5. Abrir a segunda e pagar o que vence nela
         API->>DB: INSERT business_day 12/10
-        loop cada aplicação com maturity_date ≤ 12/10 ainda não liquidada (conta crescente)
+        loop cada aplicação com maturity_date ≤ 12/10<br/>ainda não liquidada (conta crescente)
             API->>DB: FOR UPDATE na conta, depois na position
             API->>DB: INSERT transaction INVESTMENT_REDEEM do dia 12/10 + ledger_entry CREDIT<br/>UPDATE balance e position, investment_order com matured_investment_order_id
         end

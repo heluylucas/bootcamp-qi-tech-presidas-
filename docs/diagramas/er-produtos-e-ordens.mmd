@@ -1,5 +1,6 @@
 ---
 config:
+  look: classic
   theme: base
   themeVariables:
     primaryColor: "#eef3fb"
@@ -63,7 +64,7 @@ erDiagram
     }
     investment_order {
         int id PK
-        char order_key UK
+        char investment_order_key UK
         int transaction_id FK "UK; dono, lado, valor e chave vêm dela"
         int product_id FK
         numeric quantity "NUMERIC(24,8)"

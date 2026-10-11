@@ -1,3 +1,7 @@
+---
+config:
+  look: classic
+---
 sequenceDiagram
     autonumber
     participant C as Cliente da API
@@ -20,4 +24,4 @@ sequenceDiagram
     API->>DB: INSERT investment_order ligada à transação<br/>(maturity_date = data de movimento + term_months, se tiver prazo)
     API->>DB: UPDATE position: + quantity, + acquisition_cost_amount
     API->>DB: COMMIT: débito, ordem e posição juntos (tudo ou nada)
-    API-->>C: 201 order_key, quantity, unit_price
+    API-->>C: 201 investment_order_key, quantity, unit_price

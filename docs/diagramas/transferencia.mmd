@@ -1,3 +1,7 @@
+---
+config:
+  look: classic
+---
 sequenceDiagram
     autonumber
     participant C as Cliente da API
@@ -12,7 +16,7 @@ sequenceDiagram
     Note over API: inexistente → 404 PPP003002<br/>igual à origem → 422 PPP003006
     API->>DB: SELECT ... FOR UPDATE na conta do banco, na origem e no destino,<br/>em ordem crescente de id (a do banco é a primeira)
     API->>DB: procura transaction pela idempotency_key (única no banco)
-    alt da mesma conta e pedido igual (tipo, valor, destino, descrição)
+    alt da mesma conta e pedido igual<br/>(tipo, valor, destino, descrição)
         API-->>C: 200 com o corpo original (nada é debitado de novo)
     else de outra conta ou pedido diferente
         API-->>C: 409 PPP000004
