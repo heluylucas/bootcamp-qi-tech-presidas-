@@ -1,29 +1,19 @@
 import uuid
-from datetime import datetime
+from datetime import date
 from typing import List, Optional, Tuple
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 
 from database import Context
-from models import LedgerEntry, Transaction, TransactionType
+from models import LedgerEntry, Transaction
 
 
 class TransactionRepository:
     @staticmethod
-    def get_type(context: Context, enumerator: str) -> Optional[TransactionType]:
-        return context.db_session.query(TransactionType).filter(TransactionType.enumerator == enumerator).first()
-
-    @staticmethod
-    def get_by_idempotency_key(context: Context, requester_account_id: int, idempotency_key: str) -> Optional[Transaction]:
-        return (
-            context.db_session.query(Transaction)
-            .filter(
-                Transaction.requester_account_id == requester_account_id,
-                Transaction.idempotency_key == idempotency_key,
-            )
-            .first()
-        )
+    def get_by_idempotency_key(context: Context, idempotency_key: str) -> Optional[Transaction]:
+        # A chave é única no banco inteiro: a busca não filtra por dono, quem confere é o controller.
+        return context.db_session.query(Transaction).filter(Transaction.idempotency_key == idempotency_key).first()
 
     @staticmethod
     def get_balance_after(context: Context, transaction_id: int, account_id: int) -> Optional[int]:
@@ -42,29 +32,29 @@ class TransactionRepository:
         context: Context,
         account_id: int,
         transaction_type: Optional[str],
-        start: Optional[datetime],
-        end: Optional[datetime],
+        from_date: Optional[date],
+        to_date: Optional[date],
         offset: int,
         limit: int,
     ) -> Tuple[List[LedgerEntry], int]:
         """Uma página do extrato e o total de lançamentos que passam pelos filtros.
 
-        `start` entra e `end` não: o dia inteiro de `to` cabe com end = to + 1 dia.
+        As datas são do calendário do banco (o business_date da transação), com as duas pontas inclusas.
         """
-        query = context.db_session.query(LedgerEntry).filter(LedgerEntry.account_id == account_id)
+        query = (
+            context.db_session.query(LedgerEntry)
+            .join(Transaction, LedgerEntry.transaction_id == Transaction.id)
+            .filter(LedgerEntry.account_id == account_id)
+        )
 
         if transaction_type is not None:
-            query = (
-                query.join(Transaction, LedgerEntry.transaction_id == Transaction.id)
-                .join(TransactionType, Transaction.type_id == TransactionType.id)
-                .filter(TransactionType.enumerator == transaction_type)
-            )
+            query = query.filter(Transaction.type == transaction_type)
 
-        if start is not None:
-            query = query.filter(LedgerEntry.created_at >= start)
+        if from_date is not None:
+            query = query.filter(Transaction.business_date >= from_date)
 
-        if end is not None:
-            query = query.filter(LedgerEntry.created_at < end)
+        if to_date is not None:
+            query = query.filter(Transaction.business_date <= to_date)
 
         total = query.count()
         # Os lançamentos de uma transação nascem com o mesmo NOW(); o id desempata.
@@ -79,13 +69,31 @@ class TransactionRepository:
         return entries, total
 
     @staticmethod
+    def sum_credits(context: Context, account_id: int, category: str, from_date: date, to_date: date) -> int:
+        """Soma dos créditos da categoria na conta, nos dias de movimento do período (as duas pontas)."""
+        total = (
+            context.db_session.query(func.sum(LedgerEntry.amount))
+            .join(Transaction, LedgerEntry.transaction_id == Transaction.id)
+            .filter(
+                LedgerEntry.account_id == account_id,
+                LedgerEntry.direction == "CREDIT",
+                LedgerEntry.category == category,
+                Transaction.business_date >= from_date,
+                Transaction.business_date <= to_date,
+            )
+            .scalar()
+        )
+
+        return int(total or 0)
+
+    @staticmethod
     def get_by_key_for_account(context: Context, transaction_key: str, account_id: int) -> Optional[Transaction]:
-        # Só se a conta participou (origem ou destino): a de fora volta None, igual à inexistente (R8).
+        # Só se a conta participou (dona ou destino): a de fora volta None, igual à inexistente (R8).
         return (
             context.db_session.query(Transaction)
             .filter(
                 Transaction.transaction_key == transaction_key,
-                or_(Transaction.origin_account_id == account_id, Transaction.destination_account_id == account_id),
+                or_(Transaction.owner_account_id == account_id, Transaction.destination_account_id == account_id),
             )
             .first()
         )
@@ -93,27 +101,25 @@ class TransactionRepository:
     @staticmethod
     def create(
         context: Context,
-        type_id: int,
-        requester_account_id: int,
-        origin_account_id: Optional[int],
+        transaction_type: str,
+        owner_account_id: int,
         destination_account_id: Optional[int],
         amount: int,
         fee_amount: int,
         description: Optional[str],
-        idempotency_key: str,
-        request_hash: str,
+        idempotency_key: Optional[str],
+        business_date: date,
     ) -> Transaction:
         transaction = Transaction(
             transaction_key=str(uuid.uuid4()),
-            type_id=type_id,
-            requester_account_id=requester_account_id,
-            origin_account_id=origin_account_id,
+            type=transaction_type,
+            owner_account_id=owner_account_id,
             destination_account_id=destination_account_id,
             amount=amount,
             fee_amount=fee_amount,
             description=description,
             idempotency_key=idempotency_key,
-            request_hash=request_hash,
+            business_date=business_date,
         )
         context.db_session.add(transaction)
         context.db_session.flush()
@@ -131,7 +137,6 @@ class TransactionRepository:
         balance_after: int,
     ) -> LedgerEntry:
         entry = LedgerEntry(
-            entry_key=str(uuid.uuid4()),
             transaction_id=transaction_id,
             account_id=account_id,
             direction=direction,

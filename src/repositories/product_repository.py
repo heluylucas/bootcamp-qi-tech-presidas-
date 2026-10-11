@@ -3,18 +3,18 @@ from decimal import Decimal
 from typing import List, Optional
 
 from database import Context
-from models import Product, ProductPrice, ProductType
+from models import Product, ProductPrice
 
 
 class ProductRepository:
     @staticmethod
-    def list(context: Context, type_enumerator: Optional[str], max_risk: Optional[int]) -> List[Product]:
-        query = context.db_session.query(Product).join(ProductType, Product.type_id == ProductType.id)
+    def list(context: Context, product_type: Optional[str], maximum_risk_level: Optional[int]) -> List[Product]:
+        query = context.db_session.query(Product)
 
-        if type_enumerator is not None:
-            query = query.filter(ProductType.enumerator == type_enumerator)
-        if max_risk is not None:
-            query = query.filter(Product.risk_level <= max_risk)
+        if product_type is not None:
+            query = query.filter(Product.type == product_type)
+        if maximum_risk_level is not None:
+            query = query.filter(Product.risk_level <= maximum_risk_level)
 
         return query.order_by(Product.id).all()
 
@@ -27,8 +27,8 @@ class ProductRepository:
         # O último preço publicado até o dia pedido (RN-PRO-04).
         return (
             context.db_session.query(ProductPrice)
-            .filter(ProductPrice.product_id == product_id, ProductPrice.reference_date <= day)
-            .order_by(ProductPrice.reference_date.desc())
+            .filter(ProductPrice.product_id == product_id, ProductPrice.price_date <= day)
+            .order_by(ProductPrice.price_date.desc())
             .first()
         )
 
@@ -39,15 +39,15 @@ class ProductRepository:
         query = context.db_session.query(ProductPrice).filter(ProductPrice.product_id == product_id)
 
         if from_date is not None:
-            query = query.filter(ProductPrice.reference_date >= from_date)
+            query = query.filter(ProductPrice.price_date >= from_date)
         if to_date is not None:
-            query = query.filter(ProductPrice.reference_date <= to_date)
+            query = query.filter(ProductPrice.price_date <= to_date)
 
-        return query.order_by(ProductPrice.reference_date).all()
+        return query.order_by(ProductPrice.price_date).all()
 
     @staticmethod
     def create_price(context: Context, product_id: int, day: date, unit_price: Decimal) -> ProductPrice:
-        price = ProductPrice(product_id=product_id, reference_date=day, unit_price=unit_price)
+        price = ProductPrice(product_id=product_id, price_date=day, unit_price=unit_price)
         context.db_session.add(price)
         context.db_session.flush()
 

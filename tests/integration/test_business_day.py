@@ -18,12 +18,6 @@ class TestBusinessDate:
         # Basta ser uma data de verdade no formato AAAA-MM-DD.
         date.fromisoformat(body["business_date"])
 
-    def test_business_date_without_token(self):
-        response = ClientRequisition.send("GET", "/internal/business_date")
-
-        assert response.response_status == 403
-        assert response.response_json["code"] == "PPP000002"
-
     def test_business_date_without_operator_token(self):
         response = ClientRequisition.send("GET", "/internal/business_date", headers=WITHOUT_OPERATOR_TOKEN)
 

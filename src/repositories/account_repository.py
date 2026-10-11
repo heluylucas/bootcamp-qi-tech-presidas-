@@ -4,13 +4,13 @@ from typing import List, Optional
 from sqlalchemy import func
 
 from database import Context
-from models import Account, AccountStatus, AccountStatusEvent
+from models import Account, AccountStatusEvent
 
 
 class AccountRepository:
     @staticmethod
-    def create(context: Context, customer_id: int, status_id: int) -> Account:
-        account = Account(account_key=str(uuid.uuid4()), customer_id=customer_id, status_id=status_id)
+    def create(context: Context, customer_id: int, status: str) -> Account:
+        account = Account(account_key=str(uuid.uuid4()), customer_id=customer_id, status=status)
         context.db_session.add(account)
         context.db_session.flush()
 
@@ -36,49 +36,34 @@ class AccountRepository:
         )
 
     @staticmethod
-    def get_not_closed_by_customer(context: Context, customer_id: int) -> Optional[Account]:
-        # No máximo uma, pelo índice account_one_open_per_customer_idx.
-        return (
-            context.db_session.query(Account)
-            .join(AccountStatus, Account.status_id == AccountStatus.id)
-            .filter(Account.customer_id == customer_id, AccountStatus.enumerator != "CLOSED")
-            .first()
-        )
-
-    @staticmethod
     def count_not_closed(context: Context, customer_id: int) -> int:
         return (
             context.db_session.query(Account)
-            .join(AccountStatus, Account.status_id == AccountStatus.id)
-            .filter(Account.customer_id == customer_id, AccountStatus.enumerator != "CLOSED")
+            .filter(Account.customer_id == customer_id, Account.status != "CLOSED")
             .count()
         )
 
     @staticmethod
-    def update_status(context: Context, account: Account, status_id: int) -> Account:
-        account.status_id = status_id
+    def update_status(context: Context, account: Account, status: str) -> Account:
+        account.status = status
         account.updated_at = func.now()
         context.db_session.flush()
 
         return account
 
     @staticmethod
-    def get_status(context: Context, enumerator: str) -> Optional[AccountStatus]:
-        return context.db_session.query(AccountStatus).filter(AccountStatus.enumerator == enumerator).first()
-
-    @staticmethod
     def create_status_event(
         context: Context,
         account_id: int,
-        from_status_id: Optional[int],
-        to_status_id: int,
+        from_status: Optional[str],
+        to_status: str,
         reason: Optional[str],
         actor: str,
     ) -> AccountStatusEvent:
         event = AccountStatusEvent(
             account_id=account_id,
-            from_status_id=from_status_id,
-            to_status_id=to_status_id,
+            from_status=from_status,
+            to_status=to_status,
             reason=reason,
             actor=actor,
         )
@@ -100,15 +85,21 @@ class AccountRepository:
     def get_by_key_any_owner(context: Context, account_key: str) -> Optional[Account]:
         # Sem filtro de dono: só para o DESTINO de uma transferência, que pode
         # ser de outro cliente (RN-MOV-05). Nunca use para a conta do caminho.
-        return context.db_session.query(Account).filter(Account.account_key == account_key).first()
+        # A conta do banco (sem cliente) fica de fora: ela só recebe tarifa.
+        return (
+            context.db_session.query(Account)
+            .filter(Account.account_key == account_key, Account.customer_id.isnot(None))
+            .first()
+        )
 
     @staticmethod
     def get_by_key_any_owner_for_update(context: Context, account_key: str) -> Optional[Account]:
         # Sem filtro de dono: só para a rota do banco (RN-CON-11), que não é
         # aninhada em cliente. Travada, porque o status e o saldo lidos decidem a mudança.
+        # A conta do banco (sem cliente) fica de fora: ninguém a bloqueia nem encerra.
         return (
             context.db_session.query(Account)
-            .filter(Account.account_key == account_key)
+            .filter(Account.account_key == account_key, Account.customer_id.isnot(None))
             .populate_existing()
             .with_for_update()
             .first()
@@ -126,6 +117,17 @@ class AccountRepository:
             .with_for_update()
             .first()
         )
+
+    @staticmethod
+    def get_bank(context: Context) -> Account:
+        """A conta do próprio banco, a única sem cliente (seed do database.sql)."""
+        return context.db_session.query(Account).filter(Account.customer_id.is_(None)).one()
+
+    @staticmethod
+    def sum_customer_balances(context: Context) -> int:
+        """Soma dos saldos das contas de cliente, sem a conta do banco. Conta encerrada tem saldo 0."""
+        total = context.db_session.query(func.sum(Account.balance)).filter(Account.customer_id.isnot(None)).scalar()
+        return int(total or 0)
 
     @staticmethod
     def update_balance(context: Context, account: Account, balance: int) -> Account:

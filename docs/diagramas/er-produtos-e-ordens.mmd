@@ -1,86 +1,97 @@
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: "#eef3fb"
+    primaryBorderColor: "#2f5f9e"
+    primaryTextColor: "#10233f"
+    lineColor: "#2f5f9e"
+    secondaryColor: "#f7f9fd"
+    tertiaryColor: "#ffffff"
+    noteBkgColor: "#f7f9fd"
+    noteBorderColor: "#2f5f9e"
+    noteTextColor: "#10233f"
+  layout: elk
+  elk:
+    mergeEdges: false
+    nodePlacementStrategy: NETWORK_SIMPLEX
+---
 erDiagram
-    product_type ||--o{ product : "tipo"
     product ||--o{ product_price : "preço por dia"
-    customer ||--o{ investment_order : "envia"
-    account ||--o{ investment_order : "paga / recebe"
+    transaction ||--o| investment_order : "o pedido de dinheiro da ordem"
     product ||--o{ investment_order : "negociado"
-    transaction ||--o| investment_order : "reflexo no extrato da conta"
-    transaction ||--|{ ledger_entry : "débito na aplicação, crédito no resgate"
     investment_order |o--o| investment_order : "liquidação devolve"
-    customer ||--o{ position : "possui"
+    account ||--o{ position : "possui"
     product ||--o{ position : "em"
+    business_day ||--o{ transaction : "dia em que aconteceu"
+    business_day ||--o| revenue_accrual : "provisão gravada no fechamento"
 
-    product_type {
-        int id PK
-        string enumerator UK "PUBLIC_BOND, PRIVATE_BOND, FUND"
-    }
     product {
         int id PK
         char product_key UK
-        int type_id FK
+        varchar name
+        product_type type "ENUM: PUBLIC_BOND | PRIVATE_BOND | FUND"
+        varchar issuer
+        product_indexer indexer "ENUM: SELIC | CDI | PREFIXED | IPCA | QUOTA"
+        varchar rate_description
         smallint risk_level "1 a 5"
-        string liquidity "DAILY ou AT_MATURITY"
-        date maturity_date "vencimento fixo ou nulo"
         smallint term_months "prazo por aplicação ou nulo"
-        boolean tax_exempt "CHECK prazo >= 9 meses"
-        bigint min_application
+        bigint minimum_application_amount
         smallint cdi_percentage_bps
-        smallint admin_fee_bps
-        string external_code "nome na fonte externa"
+        smallint administration_fee_bps
+        varchar price_source_code "nome na fonte externa; nulo = emissão própria"
+        timestamptz created_at
     }
     product_price {
         int id PK
-        int product_id FK "UK com reference_date"
-        date reference_date
+        int product_id FK "UK com price_date"
+        date price_date
         numeric unit_price "NUMERIC(20,8)"
+        timestamptz created_at
     }
     business_day {
         int id PK
-        date reference_date UK "maior = data de movimento"
+        date business_date UK "maior = data de movimento"
+        timestamptz created_at
     }
     reference_rate {
         int id PK
-        string code "CDI ou SELIC, UK com data"
-        date reference_date
+        reference_rate_code code "ENUM: CDI | SELIC; UK com rate_date"
+        date rate_date
         int annual_rate_bps
+        timestamptz created_at
     }
     investment_order {
         int id PK
         char order_key UK
-        int customer_id FK "UK com idempotency_key"
-        int account_id FK
+        int transaction_id FK "UK; dono, lado, valor e chave vêm dela"
         int product_id FK
-        int transaction_id FK "UK, 1 ordem = 1 transação"
-        string side "APPLY ou REDEEM"
-        bigint amount
         numeric quantity "NUMERIC(24,8)"
-        numeric unit_price
-        bigint cost_amount
+        numeric unit_price "NUMERIC(20,8)"
+        bigint acquisition_cost_amount
+        boolean redeem_all "o cliente pediu resgate total"
         date maturity_date "só aplicação com prazo"
-        string source "CUSTOMER ou MATURITY"
-        int settled_order_id FK "UK, aplicação liquidada"
-        char idempotency_key
-        char request_hash
+        int matured_investment_order_id FK "UK; só na liquidação do vencimento"
         timestamptz created_at
-    }
-    transaction {
-        int id PK
-        int type_id FK "APPLY: INVESTMENT_APPLY, REDEEM: INVESTMENT_REDEEM"
-        int origin_account_id FK "só na aplicação"
-        int destination_account_id FK "só no resgate"
-        bigint amount "igual ao da ordem"
-    }
-    ledger_entry {
-        int id PK
-        int transaction_id FK
-        string direction "DEBIT ou CREDIT"
-        bigint balance_after
     }
     position {
         int id PK
-        int customer_id FK "UK com product_id"
+        int account_id FK "UK com product_id"
         int product_id FK
         numeric quantity ">= 0, zerada não some"
-        bigint invested_amount "custo médio"
+        bigint acquisition_cost_amount "custo médio"
+        timestamptz created_at
         timestamptz updated_at
+    }
+    revenue_accrual {
+        int id PK
+        date business_date FK "UK; o dia que fechou"
+        smallint calendar_days "até o próximo dia de movimento"
+        bigint customer_balance_amount "base do float"
+        bigint fund_equity_amount "base do fundo"
+        bigint own_issue_cost_amount "base do spread"
+        bigint float_amount
+        bigint fund_administration_fee_amount
+        bigint own_issue_spread_amount
+        timestamptz created_at
     }

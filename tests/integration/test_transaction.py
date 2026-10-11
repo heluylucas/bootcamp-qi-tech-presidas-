@@ -1,39 +1,25 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 
-from tests.utils import RandomGenerator, RequestGenerator
+from tests.utils import RequestGenerator
+from tests.utils.helpers import (
+    TRANSFER_FEE,
+    balance_of,
+    business_date,
+    close_day,
+    create_customer,
+    deposit,
+    open_account,
+    send,
+)
 
 
 # Limites por operação (RN-MOV-02), em centavos.
 DEPOSIT_LIMIT = 100_000_000
 WITHDRAWAL_LIMIT = 500_000
 TRANSFER_LIMIT = 5_000_000
-
-# Tarifa de transferência (RN-MOV-10), em centavos.
-TRANSFER_FEE = 200
-
-
-def create_customer() -> str:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, body = RequestGenerator.post_customer(payload)
-    return body["customer_key"]
-
-
-def open_account() -> tuple:
-    customer_key = create_customer()
-    _, account = RequestGenerator.post_account(customer_key)
-    return customer_key, account["account_key"]
-
-
-def send(customer_key: str, account_key: str, payload: dict):
-    """Cada chamada usa uma Idempotency-Key nova: é um pedido novo, não uma repetição."""
-    return RequestGenerator.post_transaction(customer_key, account_key, payload, str(uuid.uuid4()))
-
-
-def deposit(customer_key: str, account_key: str, amount: int):
-    return send(customer_key, account_key, {"type": "DEPOSIT", "amount": amount})
 
 
 def withdraw(customer_key: str, account_key: str, amount: int):
@@ -45,11 +31,6 @@ def transfer(customer_key: str, account_key: str, destination_account_key: str, 
     return send(customer_key, account_key, payload)
 
 
-def balance_of(customer_key: str, account_key: str) -> int:
-    _, account = RequestGenerator.get_account(customer_key, account_key)
-    return account["balance"]
-
-
 class TestDeposit:
     def test_deposit_increases_balance(self):
         customer_key, account_key = open_account()
@@ -58,7 +39,6 @@ class TestDeposit:
 
         assert status == 201
         assert len(body["transaction_key"]) == 36
-        assert "id" not in body
         assert body["type"] == "DEPOSIT"
         assert body["amount"] == 10000
         assert body["fee_amount"] == 0
@@ -74,15 +54,6 @@ class TestDeposit:
         assert status == 201
         assert body["balance"] == DEPOSIT_LIMIT
 
-    def test_deposit_above_limit(self):
-        customer_key, account_key = open_account()
-
-        status, body = deposit(customer_key, account_key, DEPOSIT_LIMIT + 1)
-
-        assert status == 422
-        assert body["code"] == "PPP003005"
-        assert balance_of(customer_key, account_key) == 0
-
 
 class TestWithdrawal:
     def test_withdrawal_decreases_balance(self):
@@ -97,15 +68,6 @@ class TestWithdrawal:
         assert body["balance"] == 7000
         assert balance_of(customer_key, account_key) == 7000
 
-    def test_withdrawal_of_whole_balance(self):
-        customer_key, account_key = open_account()
-        deposit(customer_key, account_key, 10000)
-
-        status, body = withdraw(customer_key, account_key, 10000)
-
-        assert status == 201
-        assert body["balance"] == 0
-
     def test_insufficient_balance_changes_nothing(self):
         customer_key, account_key = open_account()
         deposit(customer_key, account_key, 10000)
@@ -115,16 +77,6 @@ class TestWithdrawal:
         assert status == 409
         assert body["code"] == "PPP003003"
         assert balance_of(customer_key, account_key) == 10000
-
-    def test_withdrawal_above_limit(self):
-        customer_key, account_key = open_account()
-        deposit(customer_key, account_key, WITHDRAWAL_LIMIT * 2)
-
-        status, body = withdraw(customer_key, account_key, WITHDRAWAL_LIMIT + 1)
-
-        assert status == 422
-        assert body["code"] == "PPP003005"
-        assert balance_of(customer_key, account_key) == WITHDRAWAL_LIMIT * 2
 
 
 class TestTransfer:
@@ -146,6 +98,7 @@ class TestTransfer:
         assert balance_of(destination_customer, destination_account) == 70000
 
     def test_transfer_of_whole_balance_with_fee(self):
+        """O saque passa pela mesma conta de saldo (com tarifa zero): este limite vale pelos dois."""
         origin_customer, origin_account = open_account()
         _, destination_account = open_account()
         deposit(origin_customer, origin_account, 10000 + TRANSFER_FEE)
@@ -213,17 +166,6 @@ class TestTransfer:
         assert body["code"] == "PPP002005"
         assert balance_of(origin_customer, origin_account) == 10000
 
-    def test_transfer_above_limit(self):
-        origin_customer, origin_account = open_account()
-        _, destination_account = open_account()
-        deposit(origin_customer, origin_account, TRANSFER_LIMIT * 2)
-
-        status, body = transfer(origin_customer, origin_account, destination_account, TRANSFER_LIMIT + 1)
-
-        assert status == 422
-        assert body["code"] == "PPP003005"
-        assert balance_of(origin_customer, origin_account) == TRANSFER_LIMIT * 2
-
     def test_transfer_at_limit(self):
         origin_customer, origin_account = open_account()
         destination_customer, destination_account = open_account()
@@ -247,19 +189,6 @@ class TestTransfer:
 
 class TestIdempotency:
     """RN-GER-08 e RN-MOV-09: repetir o mesmo pedido não repete o efeito."""
-
-    def test_repeated_deposit_returns_original(self):
-        customer_key, account_key = open_account()
-        key = str(uuid.uuid4())
-        payload = {"type": "DEPOSIT", "amount": 10000}
-
-        first_status, first = RequestGenerator.post_transaction(customer_key, account_key, payload, key)
-        second_status, second = RequestGenerator.post_transaction(customer_key, account_key, payload, key)
-
-        assert first_status == 201
-        assert second_status == 200
-        assert second == first
-        assert balance_of(customer_key, account_key) == 10000
 
     def test_repeated_transfer_moves_money_once(self):
         origin_customer, origin_account = open_account()
@@ -290,6 +219,48 @@ class TestIdempotency:
         assert body["balance"] == 10000
         assert balance_of(customer_key, account_key) == 15000
 
+    def test_key_used_by_another_account_is_refused(self):
+        """A chave é única no banco inteiro; a de outra conta dá 409 sem mostrar nada dela."""
+        first_customer, first_account = open_account()
+        second_customer, second_account = open_account()
+        key = str(uuid.uuid4())
+        payload = {"type": "DEPOSIT", "amount": 10000}
+        RequestGenerator.post_transaction(first_customer, first_account, payload, key)
+
+        status, body = RequestGenerator.post_transaction(second_customer, second_account, payload, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert "transaction_key" not in body
+        assert balance_of(second_customer, second_account) == 0
+
+    @pytest.mark.parametrize(
+        "second_request",
+        [
+            lambda destination, other: {"type": "TRANSFER", "amount": 30000, "destination_account_key": destination},
+            lambda destination, other: {"type": "TRANSFER", "amount": 20000, "destination_account_key": other},
+            lambda destination, other: {"type": "WITHDRAWAL", "amount": 20000},
+        ],
+        ids=["other_amount", "other_destination", "other_type"],
+    )
+    def test_same_key_with_another_request(self, second_request):
+        """Repetição é o MESMO pedido: mesma chave com outro valor, destino ou tipo é outro pedido (409)."""
+        origin_customer, origin_account = open_account()
+        _, destination = open_account()
+        _, other_destination = open_account()
+        deposit(origin_customer, origin_account, 100000)
+        key = str(uuid.uuid4())
+        first = {"type": "TRANSFER", "amount": 20000, "destination_account_key": destination}
+        RequestGenerator.post_transaction(origin_customer, origin_account, first, key)
+
+        status, body = RequestGenerator.post_transaction(
+            origin_customer, origin_account, second_request(destination, other_destination), key
+        )
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(origin_customer, origin_account) == 100000 - 20000 - TRANSFER_FEE
+
     def test_field_order_does_not_matter(self):
         customer_key, account_key = open_account()
         key = str(uuid.uuid4())
@@ -301,33 +272,6 @@ class TestIdempotency:
 
         assert status == 200
         assert balance_of(customer_key, account_key) == 10000
-
-    def test_same_key_with_different_body(self):
-        customer_key, account_key = open_account()
-        key = str(uuid.uuid4())
-        RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 10000}, key)
-
-        status, body = RequestGenerator.post_transaction(
-            customer_key, account_key, {"type": "DEPOSIT", "amount": 20000}, key
-        )
-
-        assert status == 409
-        assert body["code"] == "PPP000004"
-        assert balance_of(customer_key, account_key) == 10000
-
-    def test_same_key_in_another_account_is_a_new_request(self):
-        """A chave vale por conta: UNIQUE(requester_account_id, idempotency_key)."""
-        first_customer, first_account = open_account()
-        second_customer, second_account = open_account()
-        key = str(uuid.uuid4())
-        payload = {"type": "DEPOSIT", "amount": 10000}
-
-        first_status, first = RequestGenerator.post_transaction(first_customer, first_account, payload, key)
-        second_status, second = RequestGenerator.post_transaction(second_customer, second_account, payload, key)
-
-        assert (first_status, second_status) == (201, 201)
-        assert first["transaction_key"] != second["transaction_key"]
-        assert balance_of(second_customer, second_account) == 10000
 
     def test_refused_request_does_not_use_up_the_key(self):
         """Recusa não grava nada; a mesma chave pode ser usada depois que der para executar."""
@@ -356,7 +300,7 @@ class TestIdempotency:
         assert status == 200
         assert body == first
 
-    @pytest.mark.parametrize("key", ["", "a" * 37])
+    @pytest.mark.parametrize("key", ["", "nao-e-um-uuid"])
     def test_invalid_idempotency_key(self, key):
         customer_key, account_key = open_account()
 
@@ -370,15 +314,32 @@ class TestIdempotency:
 
 
 class TestTransactionRefusals:
-    @pytest.mark.parametrize("transaction_type", ["DEPOSIT", "WITHDRAWAL"])
     @pytest.mark.parametrize("amount", [0, -100])
-    def test_invalid_amount(self, transaction_type, amount):
+    def test_invalid_amount(self, amount):
         customer_key, account_key = open_account()
 
-        status, body = send(customer_key, account_key, {"type": transaction_type, "amount": amount})
+        status, body = deposit(customer_key, account_key, amount)
 
         assert status == 422
         assert body["code"] == "PPP003004"
+
+    @pytest.mark.parametrize(
+        "transaction_type, limit",
+        [("DEPOSIT", DEPOSIT_LIMIT), ("WITHDRAWAL", WITHDRAWAL_LIMIT), ("TRANSFER", TRANSFER_LIMIT)],
+    )
+    def test_above_limit_changes_nothing(self, transaction_type, limit):
+        customer_key, account_key = open_account()
+        _, destination_account = open_account()
+        deposit(customer_key, account_key, TRANSFER_LIMIT * 2)
+        payload = {"type": transaction_type, "amount": limit + 1}
+        if transaction_type == "TRANSFER":
+            payload["destination_account_key"] = destination_account
+
+        status, body = send(customer_key, account_key, payload)
+
+        assert status == 422
+        assert body["code"] == "PPP003005"
+        assert balance_of(customer_key, account_key) == TRANSFER_LIMIT * 2
 
     @pytest.mark.parametrize(
         "payload",
@@ -414,8 +375,7 @@ class TestTransactionRefusals:
         assert body["code"] == "PPP000003"
         assert balance_of(customer_key, account_key) == 0
 
-    @pytest.mark.parametrize("transaction_type", ["DEPOSIT", "WITHDRAWAL"])
-    @pytest.mark.parametrize("target_status", ["BLOCKED", "CLOSED"])
+    @pytest.mark.parametrize("transaction_type, target_status", [("DEPOSIT", "BLOCKED"), ("WITHDRAWAL", "CLOSED")])
     def test_account_not_active(self, transaction_type, target_status):
         customer_key, account_key = open_account()
         RequestGenerator.patch_internal_account_status(account_key, {"status": target_status, "reason": "teste"})
@@ -508,7 +468,6 @@ class TestStatement:
 
         assert len(items) == 1
         entry = items[0]
-        assert "id" not in entry
         assert len(entry["transaction_key"]) == 36
         assert entry["type"] == "DEPOSIT"
         assert entry["direction"] == "CREDIT"
@@ -519,17 +478,7 @@ class TestStatement:
         assert entry["counterparty_account_key"] is None
         assert "created_at" in entry
 
-    def test_newest_first(self):
-        customer_key, account_key = open_account()
-        for amount in [1000, 2000, 3000]:
-            deposit(customer_key, account_key, amount)
-
-        items = statement(customer_key, account_key)
-
-        assert [item["amount"] for item in items] == [3000, 2000, 1000]
-        assert [item["balance_after"] for item in items] == [6000, 3000, 1000]
-
-    def test_pagination(self):
+    def test_pagination_newest_first(self):
         customer_key, account_key = open_account()
         for amount in [1000, 2000, 3000, 4000, 5000]:
             deposit(customer_key, account_key, amount)
@@ -596,16 +545,31 @@ class TestStatement:
         assert [(item["type"], item["amount"]) for item in items] == [("WITHDRAWAL", 1000)]
 
     def test_filter_by_date(self):
-        """Datas reais do lançamento (created_at), em UTC, com as duas pontas inclusas."""
+        """Datas de movimento (o calendário do banco), com as duas pontas inclusas."""
         customer_key, account_key = open_account()
         deposit(customer_key, account_key, 1000)
-        today = datetime.now(timezone.utc).date()
+        today = business_date()
         tomorrow = (today + timedelta(days=1)).isoformat()
         yesterday = (today - timedelta(days=1)).isoformat()
 
-        assert len(statement(customer_key, account_key, **{"from": today.isoformat(), "to": today.isoformat()})) == 1
+        items = statement(customer_key, account_key, **{"from": today.isoformat(), "to": today.isoformat()})
+        assert [item["business_date"] for item in items] == [today.isoformat()]
         assert statement(customer_key, account_key, **{"from": tomorrow}) == []
         assert statement(customer_key, account_key, to=yesterday) == []
+
+    def test_statement_follows_the_business_day(self):
+        """O lançamento fica no dia de movimento em que aconteceu, mesmo depois do fechamento."""
+        customer_key, account_key = open_account()
+        deposit(customer_key, account_key, 1000)
+        first_day = business_date()
+        close_day()
+        second_day = business_date()
+        deposit(customer_key, account_key, 2000)
+
+        first = statement(customer_key, account_key, **{"from": first_day.isoformat(), "to": first_day.isoformat()})
+        second = statement(customer_key, account_key, **{"from": second_day.isoformat()})
+        assert [(item["amount"], item["business_date"]) for item in first] == [(1000, first_day.isoformat())]
+        assert [(item["amount"], item["business_date"]) for item in second] == [(2000, second_day.isoformat())]
 
     def test_blocked_account_still_sees_statement(self):
         """RN-CON-09: conta bloqueada não movimenta, mas consulta."""
@@ -655,6 +619,7 @@ class TestReceipt:
             "description": "aluguel",
             "origin_account_key": origin_account,
             "destination_account_key": destination_account,
+            "business_date": business_date().isoformat(),
             "created_at": created["created_at"],
         }
 

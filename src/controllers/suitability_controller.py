@@ -3,16 +3,15 @@ from datetime import datetime, timezone
 from controllers.base_controller import BaseController
 from dtos.suitability_dto import assessment_to_dict, question_to_dict
 from errors import (
-    CustomerNotFound,
     IncompleteAnswers,
     InvalidOption,
     SuitabilityExpired,
     SuitabilityNotFound,
     SuitabilityRequired,
 )
-from models import Customer, SuitabilityAssessment
-from repositories import CustomerRepository, SuitabilityRepository
-from utils.dates import add_months
+from models import SuitabilityAssessment
+from models.suitability import profile_for_score
+from repositories import SuitabilityRepository
 
 
 # A trava de segurança (RN-SUI-04): quem escolhe estas opções é Conservador,
@@ -20,8 +19,6 @@ from utils.dates import add_months
 SAFETY_LOCK = {"Q3": 1, "Q5": 1}
 
 SAFE_PROFILE = "CONSERVATIVE"
-
-VALIDITY_MONTHS = 24
 
 
 class SuitabilityController(BaseController):
@@ -52,25 +49,20 @@ class SuitabilityController(BaseController):
 
             chosen[question.code] = option
 
-        score = sum(option.points for option in chosen.values())
-        profile = SuitabilityRepository.get_profile_for_score(self.context, score)
+        # O código da opção é a sua pontuação (RN-SUI-03).
+        score = sum(option.code for option in chosen.values())
 
-        # A trava só "força" quando muda o resultado: se os pontos já davam
-        # Conservador, o motivo do perfil foram os pontos, não a trava.
+        # A trava manda para Conservador, qualquer que seja a soma. Se ela mudou o resultado
+        # (perfil fora da faixa do score), a resposta mostra forced_by_rule = true.
         lock_triggered = any(chosen[code].code == option_code for code, option_code in SAFETY_LOCK.items())
-        forced_by_rule = lock_triggered and profile.enumerator != SAFE_PROFILE
 
-        if forced_by_rule:
-            profile = SuitabilityRepository.get_profile(self.context, SAFE_PROFILE)
+        profile = SAFE_PROFILE if lock_triggered else profile_for_score(score)
 
-        valid_until = add_months(self.now(), VALIDITY_MONTHS)
-        assessment = SuitabilityRepository.create_assessment(
-            self.context, customer.id, profile.id, score, forced_by_rule, valid_until
-        )
+        assessment = SuitabilityRepository.create_assessment(self.context, customer.id, profile, score)
 
-        # Na ordem do questionário, e não na ordem em que o cliente mandou.
-        for question in sorted(questions.values(), key=lambda question: question.position):
-            SuitabilityRepository.create_answer(self.context, assessment.id, question.id, chosen[question.code].id)
+        # Na ordem do questionário (a do código), e não na ordem em que o cliente mandou.
+        for code in sorted(chosen):
+            SuitabilityRepository.create_answer(self.context, assessment.id, chosen[code].id)
 
         self.session.commit()
         return assessment_to_dict(assessment)
@@ -109,11 +101,3 @@ class SuitabilityController(BaseController):
         # fato regulatório (RN-SUI-05, RN-GER-13), e a data de movimento pode
         # estar à frente do calendário. Único lugar do módulo que olha o relógio.
         return datetime.now(timezone.utc)
-
-    def get_customer(self, customer_key: str) -> Customer:
-        customer = CustomerRepository.get_by_key(self.context, customer_key)
-
-        if customer is None:
-            raise CustomerNotFound()
-
-        return customer

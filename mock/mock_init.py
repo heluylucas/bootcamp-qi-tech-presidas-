@@ -47,7 +47,8 @@ def treasury_price(annual_factor: Decimal, d: int) -> str:
     return to_text(100 * annual_factor ** (Decimal(d) / 252))
 
 
-def json_response(path: str, query: dict, body) -> dict:    return {
+def json_response(path: str, query: dict, body) -> dict:
+    return {
         "httpRequest": {"method": "GET", "path": path, "queryStringParameters": query},
         "httpResponse": {
             "statusCode": 200,

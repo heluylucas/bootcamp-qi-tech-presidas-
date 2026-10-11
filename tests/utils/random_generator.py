@@ -3,17 +3,6 @@ import random
 
 class RandomGenerator:
     @staticmethod
-    def generate_isbn():
-        """Um ISBN-13 com o formato certo: 978 e mais dez dígitos.
-
-        Só o formato — os treze dígitos que o schema cobra. O dígito
-        verificador não é calculado, porque esta API não confere a conta:
-        quem diz se o ISBN existe é o catálogo.
-        """
-        digits = "".join(str(random.randrange(10)) for _ in range(10))
-        return f"978{digits}"
-
-    @staticmethod
     def generate_cpf():
         """Um CPF que existe, já com a máscara 000.000.000-00.
 
@@ -57,20 +46,3 @@ class RandomGenerator:
             cpf_number = cpf_number + str(digit)
 
         return f"{cpf_number[0:3]}.{cpf_number[3:6]}.{cpf_number[6:9]}-{cpf_number[9:11]}"
-
-    @staticmethod
-    def generate_cnpj():
-        cnpj = [random.randrange(10) for _ in range(8)] + [0, 0, 0, 1]
-
-        for _ in range(2):
-            value = sum(v * (i % 8 + 2) for i, v in enumerate(reversed(cnpj)))
-            digit = 11 - value % 11
-            cnpj.append(digit if digit < 10 else 0)
-
-        cnpj_number = "".join(str(x) for x in cnpj)
-
-        cnpj_number = (
-            f"{cnpj_number[0:2]}.{cnpj_number[2:5]}.{cnpj_number[5:8]}/{cnpj_number[8:12]}-{cnpj_number[12:14]}"
-        )
-
-        return cnpj_number

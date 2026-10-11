@@ -8,15 +8,16 @@ from connectors.price_source_connector import CentralBankConnector, FundAdminCon
 from connectors.rest_connector import BaseConnectorResponse
 from controllers.base_controller import BaseController
 from controllers.investment_order_controller import InvestmentOrderController
+from controllers.revenue_controller import RevenueController
 from errors import BusinessDateMismatch, InvalidPriceSourceResponse, PriceSourceUnavailable
 from models import Product
 from repositories import BusinessDayRepository, ProductRepository, ReferenceRateRepository
 from utils.dates import next_business_day, parse_date
+from utils.money import EIGHT_PLACES
 
 
 CDI_SERIES = 4389
 SELIC_SERIES = 1178
-EIGHT_PLACES = Decimal("0.00000001")
 # NUMERIC(20,8): no máximo 12 dígitos antes da vírgula.
 MAX_PRICE = Decimal(10) ** 12
 
@@ -28,7 +29,7 @@ class BusinessDayController(BaseController):
     def get(self) -> dict:
         # O seed sempre grava a primeira linha (R2), então nunca vem None.
         business_day = BusinessDayRepository.get_current(self.context)
-        return {"business_date": business_day.reference_date.isoformat()}
+        return {"business_date": business_day.business_date.isoformat()}
 
     def close(self, payload: dict) -> dict:
         """Fecha a data de movimento e abre o próximo dia útil (RN-FEC-01 a 08)."""
@@ -39,7 +40,7 @@ class BusinessDayController(BaseController):
         # então a data atual é relida DEPOIS da trava: é aí que o segundo
         # clique descobre que o dia já foi fechado (RN-FEC-02).
         BusinessDayRepository.get_current_for_update(self.context)
-        if BusinessDayRepository.get_current(self.context).reference_date != close_date:
+        if BusinessDayRepository.get_current(self.context).business_date != close_date:
             raise BusinessDateMismatch()
 
         new_day = next_business_day(close_date)
@@ -47,11 +48,11 @@ class BusinessDayController(BaseController):
 
         # Daqui até as escritas só se pergunta e se confere: qualquer recusa
         # acontece antes de gravar a primeira linha (tudo ou nada, RN-FEC-06).
-        prices = self._fetch_fund_quotes(products, new_day)
-        prices.update(self._fetch_treasury_prices(products, new_day))
-        cdi_bps = self._fetch_rate(CDI_SERIES, new_day)
-        selic_bps = self._fetch_rate(SELIC_SERIES, new_day)
-        prices.update(self._own_issue_prices(products, close_date))
+        prices = self.fetch_fund_quotes(products, new_day)
+        prices.update(self.fetch_treasury_prices(products, new_day))
+        cdi_bps = self.fetch_rate(CDI_SERIES, new_day)
+        selic_bps = self.fetch_rate(SELIC_SERIES, new_day)
+        prices.update(self.own_issue_prices(products, close_date))
 
         # O UNIQUE de product_price, reference_rate e business_day é a rede
         # de segurança: se outro fechamento gravou o mesmo dia, recusa aqui.
@@ -60,9 +61,13 @@ class BusinessDayController(BaseController):
                 ProductRepository.create_price(self.context, product.id, new_day, prices[product.id])
             ReferenceRateRepository.create(self.context, "CDI", new_day, cdi_bps)
             ReferenceRateRepository.create(self.context, "SELIC", new_day, selic_bps)
+            # RN-REC-05 a 07: a provisão do dia que fecha, com a foto do fim dele. Vem antes da
+            # liquidação, que já mexe nos saldos do dia novo.
+            RevenueController().accrue(close_date, new_day)
+            # O dia novo existe antes da liquidação: as transações dela são desse dia.
+            BusinessDayRepository.create(self.context, new_day)
             # RN-FEC-09: o dinheiro das aplicações que vencem no novo dia volta antes de ele abrir.
             InvestmentOrderController().settle_maturities(new_day, prices)
-            BusinessDayRepository.create(self.context, new_day)
         except IntegrityError:
             raise BusinessDateMismatch()
 
@@ -77,25 +82,25 @@ class BusinessDayController(BaseController):
         self.session.commit()
         return response
 
-    def _fetch_fund_quotes(self, products: List[Product], day: date) -> Dict[int, Decimal]:
+    def fetch_fund_quotes(self, products: List[Product], day: date) -> Dict[int, Decimal]:
         """Administradora: a cota de cada fundo, já líquida da taxa de administração (RN-REC-04)."""
         quotes = {}
         for product in products:
-            if product.type.enumerator != "FUND":
+            if product.type != "FUND":
                 continue
 
-            cnpj_digits = "".join(character for character in product.external_code if character.isdigit())
+            cnpj_digits = "".join(character for character in product.price_source_code if character.isdigit())
             body = answer_of(FundAdminConnector().get_quote(cnpj_digits, day))
 
-            if field(body, "CNPJ_FUNDO") != product.external_code or field(body, "DT_COMPTC") != day.isoformat():
+            if field(body, "CNPJ_FUNDO") != product.price_source_code or field(body, "DT_COMPTC") != day.isoformat():
                 raise InvalidPriceSourceResponse()
 
             quotes[product.id] = positive_price(field(body, "VL_QUOTA"))
 
         return quotes
 
-    def _fetch_treasury_prices(self, products: List[Product], day: date) -> Dict[int, Decimal]:
-        """Tesouro: uma chamada traz todos os títulos; cada produto acha o seu pelo external_code."""
+    def fetch_treasury_prices(self, products: List[Product], day: date) -> Dict[int, Decimal]:
+        """Tesouro: uma chamada traz todos os títulos; cada produto acha o seu pelo price_source_code."""
         body = answer_of(TreasuryConnector().get_prices(day))
 
         if field(body, "date") != day.isoformat() or not isinstance(field(body, "bonds"), list):
@@ -104,16 +109,16 @@ class BusinessDayController(BaseController):
         published = {field(bond, "name"): field(bond, "unit_price") for bond in body["bonds"]}
         prices = {}
         for product in products:
-            if product.type.enumerator != "PUBLIC_BOND":
+            if product.type != "PUBLIC_BOND":
                 continue
-            if product.external_code not in published:
+            if product.price_source_code not in published:
                 raise InvalidPriceSourceResponse()
 
-            prices[product.id] = positive_price(published[product.external_code])
+            prices[product.id] = positive_price(published[product.price_source_code])
 
         return prices
 
-    def _fetch_rate(self, series: int, day: date) -> int:
+    def fetch_rate(self, series: int, day: date) -> int:
         """Banco Central: a taxa anual em % (texto "14.90"), que vira pontos-base (1490)."""
         body = answer_of(CentralBankConnector().get_rate(series, day))
 
@@ -126,14 +131,15 @@ class BusinessDayController(BaseController):
 
         return annual_rate_bps
 
-    def _own_issue_prices(self, products: List[Product], close_date: date) -> Dict[int, Decimal]:
+    def own_issue_prices(self, products: List[Product], close_date: date) -> Dict[int, Decimal]:
         """CDB e LCI: preço anterior × (1 + c × percentual do CDI), c = CDI do dia que fecha (RN-FEC-05)."""
         # Sempre existe: o seed grava a do primeiro dia e cada fechamento grava a do dia que abre.
         cdi_bps = ReferenceRateRepository.get_on(self.context, "CDI", close_date).annual_rate_bps
         daily_cdi = (1 + Decimal(cdi_bps) / 10000) ** (Decimal(1) / 252) - 1
         prices = {}
         for product in products:
-            if not product.own_issue:
+            # Emissão própria é o produto que nenhuma fonte externa publica: sem price_source_code.
+            if product.price_source_code is not None:
                 continue
 
             # Sempre existe: o seed grava o preço do dia em que o banco nasce.

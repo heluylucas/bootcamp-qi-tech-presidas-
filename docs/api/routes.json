@@ -1,0 +1,325 @@
+{
+  "groups": [
+    {
+      "id": "clientes",
+      "title": "Clientes",
+      "routes": [
+        {
+          "id": "criar-cliente",
+          "method": "POST",
+          "path": "/customer",
+          "title": "Cadastrar cliente",
+          "description": "Cadastra um cliente pessoa física. O CPF pode vir com ou sem pontuação e é guardado só com os dígitos; o cliente precisa ter 18 anos ou mais. A resposta traz a `customer_key`, que identifica o cliente em todas as outras rotas, e o CPF mascarado.",
+          "body": "post_customer.json",
+          "responses": [{"status": 201, "description": "Cliente cadastrado."}],
+          "errors": ["PPP001002", "PPP001003", "PPP001004"]
+        },
+        {
+          "id": "consultar-cliente",
+          "method": "GET",
+          "path": "/customer/{customer_key}",
+          "title": "Consultar cliente",
+          "description": "Devolve os dados do cliente. O CPF nunca sai completo: aparece como `***.456.789-**`.",
+          "responses": [{"status": 200, "description": "Dados do cliente."}],
+          "errors": ["PPP001001"]
+        }
+      ]
+    },
+    {
+      "id": "contas",
+      "title": "Contas",
+      "routes": [
+        {
+          "id": "abrir-conta",
+          "method": "POST",
+          "path": "/customer/{customer_key}/account",
+          "title": "Abrir conta",
+          "description": "Abre a conta corrente do cliente, que nasce `ACTIVE` e com saldo zero. Cada cliente tem no máximo uma conta não encerrada; para abrir outra, a anterior precisa estar `CLOSED`.",
+          "responses": [{"status": 201, "description": "Conta aberta."}],
+          "errors": ["PPP001001", "PPP002002"]
+        },
+        {
+          "id": "consultar-conta",
+          "method": "GET",
+          "path": "/customer/{customer_key}/account/{account_key}",
+          "title": "Consultar conta",
+          "description": "Devolve o status, o saldo (dinheiro na conta), o valor investido ao preço do dia e o capital total (saldo + investimentos), em centavos. Os dois últimos são calculados na hora e batem com o total de posições. Conta de outro cliente responde 404, igual a uma inexistente.",
+          "responses": [{"status": 200, "description": "Dados da conta."}],
+          "errors": ["PPP001001", "PPP002001"]
+        },
+        {
+          "id": "encerrar-conta",
+          "method": "PATCH",
+          "path": "/customer/{customer_key}/account/{account_key}",
+          "title": "Encerrar conta (cliente)",
+          "description": "O cliente encerra a própria conta, informando o motivo. Só encerra com saldo zero e sem investimentos. Bloquear e desbloquear são exclusivos do banco (rota interna); pedir isso aqui responde 403.",
+          "body": "patch_account.json",
+          "responses": [{"status": 200, "description": "Conta encerrada; um evento de status é gravado."}],
+          "errors": ["PPP001001", "PPP002001", "PPP002007", "PPP002003", "PPP002004", "PPP002006"]
+        },
+        {
+          "id": "historico-status",
+          "method": "GET",
+          "path": "/customer/{customer_key}/account/{account_key}/status_events",
+          "title": "Histórico de status da conta",
+          "description": "Toda mudança de status da conta, da abertura em diante, com o motivo e quem fez (`CUSTOMER` ou `BANK`). Nada é apagado.",
+          "responses": [{"status": 200, "description": "Eventos, do mais antigo para o mais novo."}],
+          "errors": ["PPP001001", "PPP002001"]
+        }
+      ]
+    },
+    {
+      "id": "movimentacoes",
+      "title": "Movimentações e extrato",
+      "routes": [
+        {
+          "id": "movimentar",
+          "method": "POST",
+          "path": "/customer/{customer_key}/account/{account_key}/transaction",
+          "title": "Depositar, sacar ou transferir",
+          "description": "Cria uma movimentação de dinheiro na conta. Na transferência, a tarifa de R$ 2,00 sai da conta de origem e entra na conta do banco; o destino recebe o valor inteiro. Limites por operação: depósito até R$ 1.000.000,00, saque até R$ 5.000,00, transferência até R$ 50.000,00. A resposta traz o saldo da conta logo depois da operação.",
+          "idempotent": true,
+          "body": "post_transaction.json",
+          "responses": [
+            {"status": 201, "description": "Movimentação feita."},
+            {"status": 200, "description": "Repetição do mesmo pedido (mesma chave, mesma conta, mesmo corpo): devolve a resposta original e não move o dinheiro de novo."}
+          ],
+          "errors": ["PPP001001", "PPP002001", "PPP003002", "PPP002005", "PPP003007", "PPP003003", "PPP000004", "PPP003004", "PPP003005", "PPP003006"]
+        },
+        {
+          "id": "extrato",
+          "method": "GET",
+          "path": "/customer/{customer_key}/account/{account_key}/transactions",
+          "title": "Extrato",
+          "description": "Os lançamentos da conta, do mais novo para o mais antigo, em páginas. Cada linha é um efeito no saldo: débito ou crédito, valor, saldo logo depois e a outra conta envolvida, quando há. Uma transferência aparece como dois lançamentos na origem (valor e tarifa) e um no destino. `from` e `to` são datas de movimento (o calendário do banco): cada lançamento fica no dia de movimento em que a transação aconteceu (`business_date`), mesmo depois de o dia fechar. Conta bloqueada ou encerrada continua podendo consultar.",
+          "query": "get_transactions.json",
+          "responses": [{"status": 200, "description": "Uma página do extrato."}],
+          "errors": ["PPP001001", "PPP002001", "PPP000005"]
+        },
+        {
+          "id": "comprovante",
+          "method": "GET",
+          "path": "/customer/{customer_key}/account/{account_key}/transaction/{transaction_key}",
+          "title": "Comprovante",
+          "description": "O comprovante de uma movimentação, para a conta de origem ou de destino. Não mostra saldo: o destino não pode ver o saldo da origem. Mostra o dia de movimento da transação (`business_date`). Transação que não envolve a conta responde 404.",
+          "responses": [{"status": 200, "description": "Comprovante."}],
+          "errors": ["PPP001001", "PPP002001", "PPP003001"]
+        }
+      ]
+    },
+    {
+      "id": "suitability",
+      "title": "Perfil do investidor",
+      "routes": [
+        {
+          "id": "perguntas",
+          "method": "GET",
+          "path": "/suitability_questions",
+          "title": "Perguntas do questionário",
+          "description": "As 7 perguntas do questionário de perfil (suitability), na ordem (Q1 a Q7), cada uma com 4 opções. O código da opção (1 a 4) é também a pontuação dela.",
+          "responses": [{"status": 200, "description": "Perguntas e opções."}],
+          "errors": []
+        },
+        {
+          "id": "responder-perfil",
+          "method": "POST",
+          "path": "/customer/{customer_key}/suitability",
+          "title": "Responder o questionário",
+          "description": "Recebe uma resposta para cada uma das 7 perguntas e devolve o perfil: Conservador (7 a 13 pontos), Moderado (14 a 20) ou Arrojado (21 a 28). Quem responde a opção 1 na Q3 ou na Q5 é Conservador qualquer que seja a soma (`forced_by_rule = true` quando isso muda o resultado). O perfil vale 24 meses; responder de novo cria uma avaliação nova e guarda a anterior.",
+          "body": "post_suitability.json",
+          "responses": [{"status": 201, "description": "Avaliação criada."}],
+          "errors": ["PPP001001", "PPP004002", "PPP004003"]
+        },
+        {
+          "id": "perfil-atual",
+          "method": "GET",
+          "path": "/customer/{customer_key}/suitability",
+          "title": "Perfil atual",
+          "description": "A avaliação mais recente do cliente, com as respostas que levaram ao perfil.",
+          "responses": [{"status": 200, "description": "Avaliação vigente."}],
+          "errors": ["PPP001001", "PPP004001"]
+        },
+        {
+          "id": "historico-perfil",
+          "method": "GET",
+          "path": "/customer/{customer_key}/suitabilities",
+          "title": "Histórico de perfis",
+          "description": "Todas as avaliações do cliente, da mais nova para a mais antiga.",
+          "responses": [{"status": 200, "description": "Avaliações."}],
+          "errors": ["PPP001001"]
+        }
+      ]
+    },
+    {
+      "id": "produtos",
+      "title": "Produtos e preços",
+      "routes": [
+        {
+          "id": "listar-produtos",
+          "method": "GET",
+          "path": "/products",
+          "title": "Catálogo de produtos",
+          "description": "Os produtos de investimento: títulos do Tesouro, CDB e LCI do banco e o fundo FGV Quant Capital. Dá para filtrar por tipo e por risco máximo, por exemplo para mostrar só o que cabe no perfil do cliente.",
+          "query": "get_products.json",
+          "responses": [{"status": 200, "description": "Produtos."}],
+          "errors": []
+        },
+        {
+          "id": "consultar-produto",
+          "method": "GET",
+          "path": "/product/{product_key}",
+          "title": "Consultar produto",
+          "description": "O produto e o preço do dia (o último publicado até a data de movimento). O preço sai como texto com 8 casas decimais.",
+          "responses": [{"status": 200, "description": "Produto com o preço do dia."}],
+          "errors": ["PPP005001"]
+        },
+        {
+          "id": "historico-precos",
+          "method": "GET",
+          "path": "/product/{product_key}/prices",
+          "title": "Histórico de preços",
+          "description": "Os preços publicados do produto, um por data de movimento, do mais antigo para o mais novo.",
+          "query": "get_product_prices.json",
+          "responses": [{"status": 200, "description": "Preços."}],
+          "errors": ["PPP005001"]
+        }
+      ]
+    },
+    {
+      "id": "carteira",
+      "title": "Carteira sugerida",
+      "routes": [
+        {
+          "id": "sugestao-carteira",
+          "method": "GET",
+          "path": "/customer/{customer_key}/portfolio_suggestion",
+          "title": "Sugestão de carteira",
+          "description": "Divide um valor entre os produtos da carteira-modelo do perfil do cliente, com o peso de cada um. É só simulação: não olha saldo e não grava nada. Os valores somam exatamente o pedido; os centavos que sobram do arredondamento vão para o produto de maior peso.",
+          "query": "get_portfolio_suggestion.json",
+          "responses": [{"status": 200, "description": "Sugestão."}],
+          "errors": ["PPP001001", "PPP004005", "PPP004004", "PPP006001"]
+        }
+      ]
+    },
+    {
+      "id": "investimentos",
+      "title": "Ordens e posição",
+      "routes": [
+        {
+          "id": "ordem",
+          "method": "POST",
+          "path": "/customer/{customer_key}/account/{account_key}/investment_order",
+          "title": "Aplicar ou resgatar",
+          "description": "A ordem é feita na conta do caminho, como as movimentações; conta de outro cliente responde 404. Aplicação (`APPLY`): debita a conta e compra cotas ao preço do dia (cotas = valor ÷ preço, truncadas em 8 casas). Exige perfil válido e produto dentro do risco do perfil. Resgate (`REDEEM`): vende cotas ao preço do dia e credita a conta; pode ser por valor ou total (`redeem_all`), e não depende do perfil. Produto com prazo (a LCI) só é resgatado no vencimento da aplicação. A resposta do resgate traz o custo das cotas vendidas, o resultado e a rentabilidade.",
+          "idempotent": true,
+          "body": "post_investment_order.json",
+          "responses": [
+            {"status": 201, "description": "Ordem executada."},
+            {"status": 200, "description": "Repetição do mesmo pedido: devolve a ordem original sem aplicar ou resgatar de novo."}
+          ],
+          "errors": ["PPP001001", "PPP002001", "PPP002005", "PPP004005", "PPP004004", "PPP005001", "PPP007003", "PPP007002", "PPP003003", "PPP007004", "PPP007005", "PPP003004", "PPP000004"]
+        },
+        {
+          "id": "consultar-ordem",
+          "method": "GET",
+          "path": "/customer/{customer_key}/account/{account_key}/investment_order/{order_key}",
+          "title": "Consultar ordem",
+          "description": "A ordem, com o mesmo corpo da resposta de criação. Ordem de outra conta ou de outro cliente responde 404.",
+          "responses": [{"status": 200, "description": "Ordem."}],
+          "errors": ["PPP001001", "PPP002001", "PPP007001"]
+        },
+        {
+          "id": "listar-ordens",
+          "method": "GET",
+          "path": "/customer/{customer_key}/account/{account_key}/investment_orders",
+          "title": "Histórico de ordens",
+          "description": "As ordens da conta, da mais nova para a mais antiga, em páginas, com filtro opcional por produto (produto inexistente devolve lista vazia).",
+          "query": "get_investment_orders.json",
+          "responses": [{"status": 200, "description": "Uma página de ordens."}],
+          "errors": ["PPP001001", "PPP002001"]
+        },
+        {
+          "id": "posicao",
+          "method": "GET",
+          "path": "/customer/{customer_key}/account/{account_key}/positions",
+          "title": "Posição e capital total",
+          "description": "Cada investimento ao preço do dia (valor atual, custo, resultado e rentabilidade) e o total: quanto o cliente tem nesta conta (caixa + investimentos) e a divisão entre os dois, em pontos-base. É calculado na hora da consulta. Posições zeradas só aparecem com `include_closed=true`.",
+          "query": "get_positions.json",
+          "responses": [{"status": 200, "description": "Posições e total."}],
+          "errors": ["PPP001001", "PPP002001"]
+        }
+      ]
+    },
+    {
+      "id": "interno",
+      "title": "Operação interna",
+      "routes": [
+        {
+          "id": "status-conta-banco",
+          "method": "PATCH",
+          "path": "/internal/account/{account_key}/status",
+          "title": "Bloquear, desbloquear ou encerrar conta (banco)",
+          "description": "A operação do banco muda o status de qualquer conta de cliente. Bloquear e encerrar exigem motivo; encerrar exige saldo zero e nenhum investimento. Um evento de status é gravado com `actor = BANK`.",
+          "body": "patch_internal_account.json",
+          "responses": [{"status": 200, "description": "Status alterado."}],
+          "errors": ["PPP002001", "PPP002003", "PPP002004", "PPP002006"]
+        },
+        {
+          "id": "data-movimento",
+          "method": "GET",
+          "path": "/internal/business_date",
+          "title": "Data de movimento",
+          "description": "O \"hoje\" do banco. Só avança pelo fechamento do dia.",
+          "responses": [{"status": 200, "description": "Data de movimento atual."}],
+          "errors": []
+        },
+        {
+          "id": "fechamento-dia",
+          "method": "POST",
+          "path": "/internal/day_close",
+          "title": "Fechar o dia",
+          "description": "Busca os preços do dia (Tesouro e administradora do fundo) e as taxas CDI e Selic nas fontes externas, calcula o preço do CDB e da LCI, grava a provisão de receita do dia que fecha (a foto do fim do dia e o que o banco ganharia com ela até o próximo dia; a de sexta vale 3 dias), paga as aplicações da LCI que vencem (transações do dia novo) e abre o próximo dia útil. É tudo ou nada: se uma fonte falhar, nada é gravado e a data não anda. `close_date` precisa ser a data de movimento atual, então um clique duplo não fecha dois dias.",
+          "body": "post_day_close.json",
+          "responses": [{"status": 201, "description": "Dia fechado; a resposta traz a nova data, os preços e as taxas."}],
+          "errors": ["PPP000006", "PPP005006", "PPP005007"]
+        },
+        {
+          "id": "receita",
+          "method": "GET",
+          "path": "/internal/revenue",
+          "title": "Receita do banco",
+          "description": "Quanto o banco recebeu de tarifas no período (a parte realizada, inclusive no dia ainda aberto) e quanto estima ter ganho com a taxa do fundo, o spread do CDB e da LCI e o float. O período é em datas de movimento. As estimativas são as provisões que o fechamento gravou para cada dia fechado: base do fim do dia × taxa do dia × dias corridos até o próximo dia de movimento / 365, truncado em centavos (a de sexta vale 3 dias). O dia aberto ainda não tem provisão. Cada dia aparece em `daily`, e o valor é a soma deles. Nada disso movimenta dinheiro. Sem datas, usa o mês da data de movimento atual.",
+          "query": "get_revenue.json",
+          "responses": [{"status": 200, "description": "Receita no período."}],
+          "errors": ["PPP000005"]
+        }
+      ]
+    },
+    {
+      "id": "saude",
+      "title": "Saúde",
+      "routes": [
+        {
+          "id": "raiz",
+          "method": "GET",
+          "path": "/",
+          "title": "Identificação do serviço",
+          "description": "Nome do serviço e o processo que respondeu. Não exige token.",
+          "public": true,
+          "responses": [{"status": 200, "description": "Serviço no ar."}],
+          "errors": []
+        },
+        {
+          "id": "health-check",
+          "method": "GET",
+          "path": "/health_check",
+          "title": "Health check",
+          "description": "Confere que a API e o banco de dados estão respondendo. Não exige token. Responde sem corpo.",
+          "public": true,
+          "responses": [{"status": 204, "description": "Tudo no ar."}],
+          "errors": []
+        }
+      ]
+    }
+  ]
+}

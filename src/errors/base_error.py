@@ -164,8 +164,8 @@ class MissingIdempotencyKey(QIException):
     def __init__(self) -> None:
         title = "Missing Idempotency Key"
         http_status = 400
-        description = "This route moves money and requires the Idempotency-Key header."
-        translation = "Esta operação exige o cabeçalho Idempotency-Key."
+        description = "This route moves money and requires the Idempotency-Key header with a UUID."
+        translation = "Esta operação exige o cabeçalho Idempotency-Key com um UUID."
         super().__init__(title, self.code, http_status, description, translation)
 
 
@@ -175,6 +175,6 @@ class IdempotencyKeyReused(QIException):
     def __init__(self) -> None:
         title = "Idempotency Key Reused"
         http_status = 409
-        description = "This Idempotency-Key was already used with a different request body."
-        translation = "Esta Idempotency-Key já foi usada com um pedido diferente."
+        description = "This Idempotency-Key was already used by another request."
+        translation = "Esta Idempotency-Key já foi usada em outro pedido."
         super().__init__(title, self.code, http_status, description, translation)

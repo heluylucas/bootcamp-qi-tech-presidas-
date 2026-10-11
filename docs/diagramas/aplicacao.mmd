@@ -4,19 +4,20 @@ sequenceDiagram
     participant API as API (controller)
     participant DB as PostgreSQL
 
-    C->>API: POST /customer/{ck}/investment_order<br/>side=APPLY, product_key, amount, Idempotency-Key
-    API->>DB: busca cliente, conta não encerrada e produto
-    Note over API: sem conta → 409 PPP007006<br/>produto inexistente → 404 PPP005001
+    C->>API: POST /customer/{ck}/account/{ak}/investment_order<br/>side=APPLY, product_key, amount, Idempotency-Key
+    API->>DB: busca cliente, a conta do caminho (dele) e produto
+    Note over API: conta inexistente ou de outro cliente → 404 PPP002001<br/>conta não ativa → 409 PPP002005<br/>produto inexistente → 404 PPP005001
     API->>DB: busca a suitability_assessment mais recente
     Note over API: sem perfil / vencido → 409 PPP004005 / PPP004004<br/>risco acima do perfil → 422 PPP007003<br/>abaixo da aplicação mínima → 422 PPP007002
-    API->>DB: preço do dia: maior reference_date ≤ data de movimento
-    API->>DB: FOR UPDATE na conta, depois na position<br/>(cria com quantity 0 se não existir)
-    API->>DB: procura investment_order (customer_id, idempotency_key)
-    Note over API: já existe → 200 original ou 409 PPP000004
+    API->>DB: preço do dia: maior price_date ≤ data de movimento
+    API->>DB: FOR UPDATE na conta, depois na position
+    API->>DB: procura transaction pela idempotency_key (única no banco)
+    Note over API: da mesma conta e pedido igual (lado, produto, valor) → 200 original<br/>de outra conta ou pedido diferente → 409 PPP000004
     Note over API: conta ACTIVE? balance ≥ amount?<br/>senão → 409 (nada escrito)
     Note over API: quantity = amount / unit_price<br/>Decimal, truncada em 8 casas
-    API->>DB: INSERT transaction INVESTMENT_APPLY + ledger_entry DEBIT<br/>UPDATE account.balance
-    API->>DB: INSERT investment_order EXECUTED<br/>(maturity_date = data de movimento + term_months, se tiver prazo)
-    API->>DB: UPDATE position: + quantity, + invested_amount
+    API->>DB: cria a position com quantity 0, se não existir
+    API->>DB: INSERT transaction INVESTMENT_APPLY (com a chave) + ledger_entry DEBIT<br/>UPDATE account.balance
+    API->>DB: INSERT investment_order ligada à transação<br/>(maturity_date = data de movimento + term_months, se tiver prazo)
+    API->>DB: UPDATE position: + quantity, + acquisition_cost_amount
     API->>DB: COMMIT: débito, ordem e posição juntos (tudo ou nada)
     API-->>C: 201 order_key, quantity, unit_price

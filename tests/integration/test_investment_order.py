@@ -5,71 +5,47 @@ from decimal import ROUND_DOWN, Decimal
 
 import pytest
 
-from tests.integration.test_day_close import close_day
-from tests.utils import RandomGenerator, RequestGenerator
+from tests.utils import RequestGenerator
+from tests.utils.helpers import (
+    CDB,
+    CONSERVATIVE,
+    FUND,
+    LCI,
+    MODERATE,
+    answer_profile,
+    apply,
+    balance_of,
+    business_date,
+    close_day,
+    create_customer,
+    investor,
+    product,
+    product_key,
+)
 
-
-# Todas as respostas iguais: 1 dá Conservador (risco até 2), 2 dá Moderado (até 3).
-CONSERVATIVE, MODERATE = 1, 2
-
-CDB = "CDB Triple P Bank Liquidez"  # risco 2, mínimo R$ 50,00
-LCI = "LCI Triple P Bank 12 meses"  # risco 2, mínimo R$ 100,00, prazo de 12 meses
-FUND = "FGV Quant Capital FIM"  # risco 3, mínimo R$ 100,00
 
 EIGHT_PLACES = Decimal("0.00000001")
 
 
-def product_key(name: str) -> str:
-    _, body = RequestGenerator.get_products()
-    return next(product["product_key"] for product in body["items"] if product["name"] == name)
-
-
 def unit_price(name: str) -> Decimal:
-    _, product = RequestGenerator.get_product(product_key(name))
-    return Decimal(product["price"]["unit_price"])
+    return Decimal(product(name)["price"]["unit_price"])
 
 
-def business_date() -> date:
-    _, body = RequestGenerator.get_business_date()
-    return date.fromisoformat(body["business_date"])
-
-
-def create_customer() -> str:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, body = RequestGenerator.post_customer(payload)
-    return body["customer_key"]
-
-
-def answer_profile(customer_key: str, option: int) -> None:
-    answers = [{"question_code": f"Q{number}", "option_code": option} for number in range(1, 8)]
-    RequestGenerator.post_suitability(customer_key, {"answers": answers})
-
-
-def investor(option: int = MODERATE, balance: int = 1_000_000) -> tuple:
-    """Cliente com perfil, conta ativa e saldo. Devolve (customer_key, account_key)."""
-    customer_key = create_customer()
-    answer_profile(customer_key, option)
-    _, account = RequestGenerator.post_account(customer_key)
-    deposit = {"type": "DEPOSIT", "amount": balance}
-    RequestGenerator.post_transaction(customer_key, account["account_key"], deposit, str(uuid.uuid4()))
-    return customer_key, account["account_key"]
-
-
-def apply(customer_key: str, name: str, amount: int, idempotency_key: str = None):
-    payload = {"product_key": product_key(name), "side": "APPLY", "amount": amount}
-    return RequestGenerator.post_investment_order(customer_key, payload, idempotency_key or str(uuid.uuid4()))
-
-
-def redeem(customer_key: str, name: str, amount: int = None, idempotency_key: str = None):
+def redeem(customer_key: str, account_key: str, name: str, amount: int = None, idempotency_key: str = None):
     """Sem amount, é o resgate total (redeem_all)."""
     payload = {"product_key": product_key(name), "side": "REDEEM"}
     payload.update({"amount": amount} if amount is not None else {"redeem_all": True})
-    return RequestGenerator.post_investment_order(customer_key, payload, idempotency_key or str(uuid.uuid4()))
+    return RequestGenerator.post_investment_order(customer_key, account_key, payload, idempotency_key or str(uuid.uuid4()))
 
 
-def balance_of(customer_key: str, account_key: str) -> int:
-    _, account = RequestGenerator.get_account(customer_key, account_key)
-    return account["balance"]
+def closed_account() -> tuple:
+    """Cliente com perfil e a conta já encerrada (vazia). Devolve (customer_key, account_key)."""
+    customer_key = create_customer()
+    answer_profile(customer_key, MODERATE)
+    _, account = RequestGenerator.post_account(customer_key)
+    closing = {"status": "CLOSED", "reason": "Pedido do cliente"}
+    RequestGenerator.patch_account(customer_key, account["account_key"], closing)
+    return customer_key, account["account_key"]
 
 
 def plus_months(day: date, months: int) -> date:
@@ -83,12 +59,11 @@ class TestApply:
         customer_key, account_key = investor()
         price = unit_price(CDB)
 
-        status, body = apply(customer_key, CDB, 10000)
+        status, body = apply(customer_key, account_key, CDB, 10000)
 
         assert status == 201
         assert len(body["order_key"]) == 36
         assert len(body["transaction_key"]) == 36
-        assert "id" not in body
         assert body["product_key"] == product_key(CDB)
         assert body["side"] == "APPLY"
         assert body["amount"] == 10000
@@ -102,32 +77,33 @@ class TestApply:
 
     def test_lci_records_maturity_date(self):
         """RN-ORD-17: aplicação em produto com prazo vence na data de movimento + 12 meses."""
-        customer_key, _ = investor(CONSERVATIVE)
+        customer_key, account_key = investor(CONSERVATIVE)
 
-        status, body = apply(customer_key, LCI, 10000)
+        status, body = apply(customer_key, account_key, LCI, 10000)
 
         assert status == 201
         assert body["maturity_date"] == plus_months(business_date(), 12).isoformat()
 
     def test_minimum_application_is_accepted(self):
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
 
-        status, _ = apply(customer_key, CDB, 5000)
+        status, _ = apply(customer_key, account_key, CDB, 5000)
 
         assert status == 201
 
     def test_whole_balance_can_be_applied(self):
         customer_key, account_key = investor(balance=10000)
 
-        status, _ = apply(customer_key, CDB, 10000)
+        status, _ = apply(customer_key, account_key, CDB, 10000)
 
         assert status == 201
         assert balance_of(customer_key, account_key) == 0
 
-    def test_moderate_can_apply_in_fund(self):
-        customer_key, _ = investor(MODERATE)
+    def test_product_at_profile_risk_limit_is_accepted(self):
+        """O fundo tem risco 3, o máximo do Moderado: risco igual ao limite passa."""
+        customer_key, account_key = investor(MODERATE)
 
-        status, _ = apply(customer_key, FUND, 10000)
+        status, _ = apply(customer_key, account_key, FUND, 10000)
 
         assert status == 201
 
@@ -137,8 +113,8 @@ class TestApplyIdempotency:
         customer_key, account_key = investor()
         key = str(uuid.uuid4())
 
-        first_status, first = apply(customer_key, CDB, 10000, key)
-        second_status, second = apply(customer_key, CDB, 10000, key)
+        first_status, first = apply(customer_key, account_key, CDB, 10000, key)
+        second_status, second = apply(customer_key, account_key, CDB, 10000, key)
 
         assert first_status == 201
         assert second_status == 200
@@ -148,19 +124,88 @@ class TestApplyIdempotency:
     def test_same_key_with_different_body(self):
         customer_key, account_key = investor()
         key = str(uuid.uuid4())
-        apply(customer_key, CDB, 10000, key)
+        apply(customer_key, account_key, CDB, 10000, key)
 
-        status, body = apply(customer_key, CDB, 20000, key)
+        status, body = apply(customer_key, account_key, CDB, 20000, key)
 
         assert status == 409
         assert body["code"] == "PPP000004"
         assert balance_of(customer_key, account_key) == 1_000_000 - 10000
 
-    def test_missing_idempotency_key(self):
-        customer_key, _ = investor()
+    def test_same_key_with_another_product(self):
+        customer_key, account_key = investor()
+        key = str(uuid.uuid4())
+        apply(customer_key, account_key, CDB, 10000, key)
+
+        status, body = apply(customer_key, account_key, FUND, 10000, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 - 10000
+
+    def test_key_already_used_in_a_deposit_is_refused(self):
+        """A mesma chave não serve para dois pedidos, nem em rotas diferentes."""
+        customer_key, account_key = investor()
+        key = str(uuid.uuid4())
+        RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 5000}, key)
+
+        status, body = apply(customer_key, account_key, CDB, 10000, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 + 5000
+
+    def test_key_of_an_order_is_refused_in_the_transaction_route(self):
+        customer_key, account_key = investor()
+        key = str(uuid.uuid4())
+        apply(customer_key, account_key, CDB, 10000, key)
+
+        status, body = RequestGenerator.post_transaction(
+            customer_key, account_key, {"type": "DEPOSIT", "amount": 5000}, key
+        )
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 - 10000
+
+    def test_key_of_an_application_is_refused_in_a_redemption(self):
+        customer_key, account_key = investor()
+        key = str(uuid.uuid4())
+        apply(customer_key, account_key, CDB, 10000, key)
+
+        status, body = redeem(customer_key, account_key, CDB, 4000, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 - 10000
+
+    def test_key_used_by_another_customer_is_refused(self):
+        first_customer, first_account = investor()
+        second_customer, second_account = investor()
+        key = str(uuid.uuid4())
+        apply(first_customer, first_account, CDB, 10000, key)
+
+        status, body = apply(second_customer, second_account, CDB, 10000, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert "order_key" not in body
+        assert balance_of(second_customer, second_account) == 1_000_000
+
+    def test_invalid_idempotency_key(self):
+        customer_key, account_key = investor()
         payload = {"product_key": product_key(CDB), "side": "APPLY", "amount": 10000}
 
-        status, body = RequestGenerator.post_investment_order(customer_key, payload, None)
+        status, body = RequestGenerator.post_investment_order(customer_key, account_key, payload, "nao-e-um-uuid")
+
+        assert status == 400
+        assert body["code"] == "PPP000003"
+
+    def test_missing_idempotency_key(self):
+        customer_key, account_key = investor()
+        payload = {"product_key": product_key(CDB), "side": "APPLY", "amount": 10000}
+
+        status, body = RequestGenerator.post_investment_order(customer_key, account_key, payload, None)
 
         assert status == 400
         assert body["code"] == "PPP000003"
@@ -168,25 +213,44 @@ class TestApplyIdempotency:
 
 class TestApplyRefusals:
     def test_customer_not_found(self):
-        status, body = apply(str(uuid.uuid4()), CDB, 10000)
+        status, body = apply(str(uuid.uuid4()), str(uuid.uuid4()), CDB, 10000)
 
         assert status == 404
         assert body["code"] == "PPP001001"
 
-    def test_without_account(self):
+    def test_account_not_found(self):
         customer_key = create_customer()
         answer_profile(customer_key, MODERATE)
 
-        status, body = apply(customer_key, CDB, 10000)
+        status, body = apply(customer_key, str(uuid.uuid4()), CDB, 10000)
+
+        assert status == 404
+        assert body["code"] == "PPP002001"
+
+    def test_account_of_another_customer(self):
+        """R8: a conta de outro cliente responde igual a uma que não existe, e nada é debitado."""
+        owner, owner_account = investor()
+        stranger, _ = investor()
+
+        status, body = apply(stranger, owner_account, CDB, 10000)
+
+        assert status == 404
+        assert body["code"] == "PPP002001"
+        assert balance_of(owner, owner_account) == 1_000_000
+
+    def test_closed_account(self):
+        customer_key, account_key = closed_account()
+
+        status, body = apply(customer_key, account_key, CDB, 10000)
 
         assert status == 409
-        assert body["code"] == "PPP007006"
+        assert body["code"] == "PPP002005"
 
     def test_blocked_account(self):
         customer_key, account_key = investor()
         RequestGenerator.patch_internal_account_status(account_key, {"status": "BLOCKED", "reason": "Suspeita de fraude"})
 
-        status, body = apply(customer_key, CDB, 10000)
+        status, body = apply(customer_key, account_key, CDB, 10000)
 
         assert status == 409
         assert body["code"] == "PPP002005"
@@ -194,18 +258,19 @@ class TestApplyRefusals:
 
     def test_without_profile(self):
         customer_key = create_customer()
-        RequestGenerator.post_account(customer_key)
+        _, account = RequestGenerator.post_account(customer_key)
+        account_key = account["account_key"]
 
-        status, body = apply(customer_key, CDB, 10000)
+        status, body = apply(customer_key, account_key, CDB, 10000)
 
         assert status == 409
         assert body["code"] == "PPP004005"
 
     def test_product_not_found(self):
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
         payload = {"product_key": str(uuid.uuid4()), "side": "APPLY", "amount": 10000}
 
-        status, body = RequestGenerator.post_investment_order(customer_key, payload, str(uuid.uuid4()))
+        status, body = RequestGenerator.post_investment_order(customer_key, account_key, payload, str(uuid.uuid4()))
 
         assert status == 404
         assert body["code"] == "PPP005001"
@@ -214,7 +279,7 @@ class TestApplyRefusals:
         """RN-ORD-04: o fundo tem risco 3; o Conservador vai até 2."""
         customer_key, account_key = investor(CONSERVATIVE)
 
-        status, body = apply(customer_key, FUND, 10000)
+        status, body = apply(customer_key, account_key, FUND, 10000)
 
         assert status == 422
         assert body["code"] == "PPP007003"
@@ -222,9 +287,9 @@ class TestApplyRefusals:
 
     def test_below_minimum_application(self):
         """RN-ORD-05: R$ 49,99, um centavo abaixo do mínimo do CDB."""
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
 
-        status, body = apply(customer_key, CDB, 4999)
+        status, body = apply(customer_key, account_key, CDB, 4999)
 
         assert status == 422
         assert body["code"] == "PPP007002"
@@ -232,7 +297,7 @@ class TestApplyRefusals:
     def test_insufficient_balance(self):
         customer_key, account_key = investor(balance=9999)
 
-        status, body = apply(customer_key, CDB, 10000)
+        status, body = apply(customer_key, account_key, CDB, 10000)
 
         assert status == 409
         assert body["code"] == "PPP003003"
@@ -240,9 +305,9 @@ class TestApplyRefusals:
 
     @pytest.mark.parametrize("amount", [0, -100])
     def test_invalid_amount(self, amount):
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
 
-        status, body = apply(customer_key, CDB, amount)
+        status, body = apply(customer_key, account_key, CDB, amount)
 
         assert status == 422
         assert body["code"] == "PPP003004"
@@ -279,9 +344,9 @@ class TestApplyRefusals:
         ],
     )
     def test_malformed_payload(self, payload):
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
 
-        status, body = RequestGenerator.post_investment_order(customer_key, payload, str(uuid.uuid4()))
+        status, body = RequestGenerator.post_investment_order(customer_key, account_key, payload, str(uuid.uuid4()))
 
         assert status == 400
         assert body["code"] == "PPP000001"
@@ -291,7 +356,7 @@ def investor_with_fund_quote_up() -> tuple:
     """Aplica R$ 1.500,00 no fundo com a cota a 1,23456789 e fecha o dia com a cota a 1,24."""
     assert close_day(fund="1.23456789")[0] == 201
     customer_key, account_key = investor(MODERATE, balance=150000)
-    status, applied = apply(customer_key, FUND, 150000)
+    status, applied = apply(customer_key, account_key, FUND, 150000)
     assert status == 201
     assert applied["quantity"] == "1215.00001105"
     assert close_day(fund="1.24")[0] == 201
@@ -299,11 +364,11 @@ def investor_with_fund_quote_up() -> tuple:
 
 
 class TestRedeem:
-    def test_partial_redeem_takes_average_cost(self):
+    def test_partial_redeem_credits_account_at_average_cost(self):
         """RN-ORD-12, 13 e 16: resgata R$ 500,00 com a cota a 1,24."""
         customer_key, account_key = investor_with_fund_quote_up()
 
-        status, body = redeem(customer_key, FUND, 50000)
+        status, body = redeem(customer_key, account_key, FUND, 50000)
 
         assert status == 201
         assert body["side"] == "REDEEM"
@@ -312,7 +377,7 @@ class TestRedeem:
         assert body["unit_price"] == "1.24000000"
         assert body["quantity"] == "403.22580645"
         # floor(150000 × 403,22580645 / 1215,00001105): o custo médio da parte que saiu.
-        assert body["cost_amount"] == 49780
+        assert body["acquisition_cost_amount"] == 49780
         assert body["result_amount"] == 220
         assert body["return_bps"] == 44
         assert body["maturity_date"] is None
@@ -321,42 +386,32 @@ class TestRedeem:
     def test_redeem_all_zeroes_position(self):
         """RN-ORD-12 e 14: o total resgata o que sobrou; depois disso não há mais o que resgatar."""
         customer_key, account_key = investor_with_fund_quote_up()
-        redeem(customer_key, FUND, 50000)
+        redeem(customer_key, account_key, FUND, 50000)
 
-        status, body = redeem(customer_key, FUND)
+        status, body = redeem(customer_key, account_key, FUND)
 
         assert status == 201
         assert body["quantity"] == "811.77420460"
         # floor(811,7742046 × 1,24 = 1006,6000137) em centavos; sai todo o custo que restava (150000 − 49780).
         assert body["amount"] == 100660
-        assert body["cost_amount"] == 100220
+        assert body["acquisition_cost_amount"] == 100220
         assert body["result_amount"] == 440
         assert body["return_bps"] == 43
         assert balance_of(customer_key, account_key) == 50000 + 100660
 
-        status, body = redeem(customer_key, FUND)
+        status, body = redeem(customer_key, account_key, FUND)
         assert status == 409
         assert body["code"] == "PPP007004"
-
-    def test_partial_redeem_credits_account(self):
-        customer_key, account_key = investor()
-        apply(customer_key, CDB, 10000)
-
-        status, body = redeem(customer_key, CDB, 4000)
-
-        assert status == 201
-        assert body["amount"] == 4000
-        assert balance_of(customer_key, account_key) == 1_000_000 - 10000 + 4000
 
 
 class TestRedeemIdempotency:
     def test_same_key_and_body_returns_original_without_crediting_again(self):
         customer_key, account_key = investor()
-        apply(customer_key, CDB, 10000)
+        apply(customer_key, account_key, CDB, 10000)
         key = str(uuid.uuid4())
 
-        first_status, first = redeem(customer_key, CDB, 4000, key)
-        second_status, second = redeem(customer_key, CDB, 4000, key)
+        first_status, first = redeem(customer_key, account_key, CDB, 4000, key)
+        second_status, second = redeem(customer_key, account_key, CDB, 4000, key)
 
         assert first_status == 201
         assert second_status == 200
@@ -365,48 +420,83 @@ class TestRedeemIdempotency:
 
     def test_same_key_with_different_body(self):
         customer_key, account_key = investor()
-        apply(customer_key, CDB, 10000)
+        apply(customer_key, account_key, CDB, 10000)
         key = str(uuid.uuid4())
-        redeem(customer_key, CDB, 4000, key)
+        redeem(customer_key, account_key, CDB, 4000, key)
 
-        status, body = redeem(customer_key, CDB, 5000, key)
+        status, body = redeem(customer_key, account_key, CDB, 5000, key)
 
         assert status == 409
         assert body["code"] == "PPP000004"
         assert balance_of(customer_key, account_key) == 1_000_000 - 10000 + 4000
 
+    def test_partial_redeem_key_reused_in_redeem_all(self):
+        """O resgate total não manda valor: o que diferencia os dois pedidos é o redeem_all gravado."""
+        customer_key, account_key = investor()
+        apply(customer_key, account_key, CDB, 10000)
+        key = str(uuid.uuid4())
+        redeem(customer_key, account_key, CDB, 4000, key)
+
+        status, body = redeem(customer_key, account_key, CDB, None, key)
+
+        assert status == 409
+        assert body["code"] == "PPP000004"
+        assert balance_of(customer_key, account_key) == 1_000_000 - 10000 + 4000
+
+    def test_repeated_redeem_all_returns_original(self):
+        customer_key, account_key = investor()
+        apply(customer_key, account_key, CDB, 10000)
+        key = str(uuid.uuid4())
+        _, first = redeem(customer_key, account_key, CDB, None, key)
+
+        status, body = redeem(customer_key, account_key, CDB, None, key)
+
+        assert status == 200
+        assert body == first
+
 
 class TestRedeemRefusals:
     def test_customer_not_found(self):
-        status, body = redeem(str(uuid.uuid4()), CDB, 4000)
+        status, body = redeem(str(uuid.uuid4()), str(uuid.uuid4()), CDB, 4000)
 
         assert status == 404
         assert body["code"] == "PPP001001"
 
-    def test_without_account(self):
-        customer_key = create_customer()
+    def test_account_of_another_customer(self):
+        owner, owner_account = investor()
+        apply(owner, owner_account, CDB, 10000)
+        stranger, _ = investor()
 
-        status, body = redeem(customer_key, CDB, 4000)
+        status, body = redeem(stranger, owner_account, CDB, 4000)
+
+        assert status == 404
+        assert body["code"] == "PPP002001"
+        assert balance_of(owner, owner_account) == 1_000_000 - 10000
+
+    def test_closed_account(self):
+        customer_key, account_key = closed_account()
+
+        status, body = redeem(customer_key, account_key, CDB, 4000)
 
         assert status == 409
-        assert body["code"] == "PPP007006"
+        assert body["code"] == "PPP002005"
 
     def test_blocked_account(self):
         customer_key, account_key = investor()
-        apply(customer_key, CDB, 10000)
+        apply(customer_key, account_key, CDB, 10000)
         RequestGenerator.patch_internal_account_status(account_key, {"status": "BLOCKED", "reason": "Suspeita de fraude"})
 
-        status, body = redeem(customer_key, CDB, 4000)
+        status, body = redeem(customer_key, account_key, CDB, 4000)
 
         assert status == 409
         assert body["code"] == "PPP002005"
         assert balance_of(customer_key, account_key) == 1_000_000 - 10000
 
     def test_product_not_found(self):
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
         payload = {"product_key": str(uuid.uuid4()), "side": "REDEEM", "amount": 4000}
 
-        status, body = RequestGenerator.post_investment_order(customer_key, payload, str(uuid.uuid4()))
+        status, body = RequestGenerator.post_investment_order(customer_key, account_key, payload, str(uuid.uuid4()))
 
         assert status == 404
         assert body["code"] == "PPP005001"
@@ -414,9 +504,9 @@ class TestRedeemRefusals:
     @pytest.mark.parametrize("amount", [4000, None], ids=["by_amount", "redeem_all"])
     def test_without_position(self, amount):
         """RN-ORD-10: nunca aplicou neste produto."""
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
 
-        status, body = redeem(customer_key, CDB, amount)
+        status, body = redeem(customer_key, account_key, CDB, amount)
 
         assert status == 409
         assert body["code"] == "PPP007004"
@@ -424,9 +514,9 @@ class TestRedeemRefusals:
     def test_more_than_position(self):
         """Um centavo a mais do que foi aplicado, no mesmo preço, passa da quantidade."""
         customer_key, account_key = investor()
-        apply(customer_key, CDB, 10000)
+        apply(customer_key, account_key, CDB, 10000)
 
-        status, body = redeem(customer_key, CDB, 10001)
+        status, body = redeem(customer_key, account_key, CDB, 10001)
 
         assert status == 409
         assert body["code"] == "PPP007004"
@@ -436,9 +526,9 @@ class TestRedeemRefusals:
     def test_lci_before_maturity(self, amount):
         """RN-ORD-11: a LCI aplicada hoje só vence daqui a 12 meses."""
         customer_key, account_key = investor(CONSERVATIVE)
-        apply(customer_key, LCI, 10000)
+        apply(customer_key, account_key, LCI, 10000)
 
-        status, body = redeem(customer_key, LCI, amount)
+        status, body = redeem(customer_key, account_key, LCI, amount)
 
         assert status == 422
         assert body["code"] == "PPP007005"
@@ -446,10 +536,10 @@ class TestRedeemRefusals:
 
     @pytest.mark.parametrize("amount", [0, -100])
     def test_invalid_amount(self, amount):
-        customer_key, _ = investor()
-        apply(customer_key, CDB, 10000)
+        customer_key, account_key = investor()
+        apply(customer_key, account_key, CDB, 10000)
 
-        status, body = redeem(customer_key, CDB, amount)
+        status, body = redeem(customer_key, account_key, CDB, amount)
 
         assert status == 422
         assert body["code"] == "PPP003004"
@@ -457,37 +547,47 @@ class TestRedeemRefusals:
 
 class TestGetOrder:
     def test_returns_the_same_as_creation(self):
-        customer_key, _ = investor()
-        _, applied = apply(customer_key, CDB, 10000)
-        _, redeemed = redeem(customer_key, CDB, 4000)
+        customer_key, account_key = investor()
+        _, applied = apply(customer_key, account_key, CDB, 10000)
+        _, redeemed = redeem(customer_key, account_key, CDB, 4000)
 
-        apply_status, apply_body = RequestGenerator.get_investment_order(customer_key, applied["order_key"])
-        redeem_status, redeem_body = RequestGenerator.get_investment_order(customer_key, redeemed["order_key"])
+        apply_status, apply_body = RequestGenerator.get_investment_order(customer_key, account_key, applied["order_key"])
+        redeem_status, redeem_body = RequestGenerator.get_investment_order(customer_key, account_key, redeemed["order_key"])
 
         assert (apply_status, apply_body) == (200, applied)
         assert (redeem_status, redeem_body) == (200, redeemed)
 
     def test_order_not_found(self):
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
 
-        status, body = RequestGenerator.get_investment_order(customer_key, str(uuid.uuid4()))
+        status, body = RequestGenerator.get_investment_order(customer_key, account_key, str(uuid.uuid4()))
 
         assert status == 404
         assert body["code"] == "PPP007001"
 
     def test_order_of_another_customer(self):
         """R8: responde igual a uma ordem que não existe."""
-        owner, _ = investor()
-        _, order = apply(owner, CDB, 10000)
-        stranger, _ = investor()
+        owner, owner_account = investor()
+        _, order = apply(owner, owner_account, CDB, 10000)
+        stranger, stranger_account = investor()
 
-        status, body = RequestGenerator.get_investment_order(stranger, order["order_key"])
+        status, body = RequestGenerator.get_investment_order(stranger, stranger_account, order["order_key"])
 
         assert status == 404
         assert body["code"] == "PPP007001"
 
+    def test_account_of_another_customer(self):
+        owner, owner_account = investor()
+        _, order = apply(owner, owner_account, CDB, 10000)
+        stranger, _ = investor()
+
+        status, body = RequestGenerator.get_investment_order(stranger, owner_account, order["order_key"])
+
+        assert status == 404
+        assert body["code"] == "PPP002001"
+
     def test_customer_not_found(self):
-        status, body = RequestGenerator.get_investment_order(str(uuid.uuid4()), str(uuid.uuid4()))
+        status, body = RequestGenerator.get_investment_order(str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4()))
 
         assert status == 404
         assert body["code"] == "PPP001001"
@@ -495,12 +595,12 @@ class TestGetOrder:
 
 class TestListOrders:
     def test_newest_first_in_pages(self):
-        customer_key, _ = investor()
+        customer_key, account_key = investor()
         for amount in (5000, 6000, 7000):
-            apply(customer_key, CDB, amount)
+            apply(customer_key, account_key, CDB, amount)
 
-        status, first = RequestGenerator.get_investment_orders(customer_key, {"limit": "2"})
-        _, second = RequestGenerator.get_investment_orders(customer_key, {"limit": "2", "page": "2"})
+        status, first = RequestGenerator.get_investment_orders(customer_key, account_key, {"limit": "2"})
+        _, second = RequestGenerator.get_investment_orders(customer_key, account_key, {"limit": "2", "page": "2"})
 
         assert status == 200
         assert [order["amount"] for order in first["items"]] == [7000, 6000]
@@ -509,44 +609,46 @@ class TestListOrders:
         assert (second["page"], second["total"]) == (2, 3)
 
     def test_default_page_and_limit(self):
-        customer_key, _ = investor()
-        _, order = apply(customer_key, CDB, 10000)
+        customer_key, account_key = investor()
+        _, order = apply(customer_key, account_key, CDB, 10000)
 
-        status, body = RequestGenerator.get_investment_orders(customer_key)
+        status, body = RequestGenerator.get_investment_orders(customer_key, account_key)
 
         assert status == 200
         assert body == {"items": [order], "page": 1, "limit": 20, "total": 1}
 
     def test_filter_by_product(self):
-        customer_key, _ = investor()
-        apply(customer_key, CDB, 10000)
-        _, fund_order = apply(customer_key, FUND, 10000)
+        customer_key, account_key = investor()
+        apply(customer_key, account_key, CDB, 10000)
+        _, fund_order = apply(customer_key, account_key, FUND, 10000)
 
-        status, body = RequestGenerator.get_investment_orders(customer_key, {"product_key": product_key(FUND)})
+        status, body = RequestGenerator.get_investment_orders(customer_key, account_key, {"product_key": product_key(FUND)})
 
         assert status == 200
         assert body["items"] == [fund_order]
         assert body["total"] == 1
 
     def test_unknown_product_lists_nothing(self):
-        customer_key, _ = investor()
-        apply(customer_key, CDB, 10000)
+        customer_key, account_key = investor()
+        apply(customer_key, account_key, CDB, 10000)
 
-        status, body = RequestGenerator.get_investment_orders(customer_key, {"product_key": str(uuid.uuid4())})
+        status, body = RequestGenerator.get_investment_orders(customer_key, account_key, {"product_key": str(uuid.uuid4())})
 
         assert status == 200
         assert (body["items"], body["total"]) == ([], 0)
 
-    def test_customer_without_orders(self):
-        customer_key = create_customer()
+    def test_account_of_another_customer(self):
+        owner, owner_account = investor()
+        apply(owner, owner_account, CDB, 10000)
+        stranger, _ = investor()
 
-        status, body = RequestGenerator.get_investment_orders(customer_key)
+        status, body = RequestGenerator.get_investment_orders(stranger, owner_account)
 
-        assert status == 200
-        assert body == {"items": [], "page": 1, "limit": 20, "total": 0}
+        assert status == 404
+        assert body["code"] == "PPP002001"
 
     def test_customer_not_found(self):
-        status, body = RequestGenerator.get_investment_orders(str(uuid.uuid4()))
+        status, body = RequestGenerator.get_investment_orders(str(uuid.uuid4()), str(uuid.uuid4()))
 
         assert status == 404
         assert body["code"] == "PPP001001"
@@ -557,9 +659,9 @@ class TestListOrders:
         ids=["page_zero", "page_text", "limit_zero", "limit_above_max", "limit_decimal", "unknown_param"],
     )
     def test_invalid_query(self, query_params):
-        customer_key = create_customer()
+        customer_key, account_key = investor()
 
-        status, body = RequestGenerator.get_investment_orders(customer_key, query_params)
+        status, body = RequestGenerator.get_investment_orders(customer_key, account_key, query_params)
 
         assert status == 400
         assert body["code"] == "PPP000001"
@@ -568,9 +670,9 @@ class TestListOrders:
 class TestPositions:
     def test_current_value_and_return(self):
         """RN-POS-01: 1215,00001105 cotas a 1,24 valem floor(1506,6000137) = R$ 1.506,60."""
-        customer_key, _ = investor_with_fund_quote_up()
+        customer_key, account_key = investor_with_fund_quote_up()
 
-        status, body = RequestGenerator.get_positions(customer_key)
+        status, body = RequestGenerator.get_positions(customer_key, account_key)
 
         assert status == 200
         assert body["items"] == [
@@ -579,55 +681,126 @@ class TestPositions:
                 "quantity": "1215.00001105",
                 "unit_price": "1.24000000",
                 "current_amount": 150660,
-                "invested_amount": 150000,
+                "acquisition_cost_amount": 150000,
                 "result_amount": 660,
                 "return_bps": 44,
             }
         ]
-        assert body["total"] == {"current_amount": 150660, "invested_amount": 150000, "result_amount": 660, "return_bps": 44}
+        # Aplicou o saldo inteiro: nada em caixa, tudo investido.
+        assert body["total"] == {
+            "investments_amount": 150660,
+            "acquisition_cost_amount": 150000,
+            "result_amount": 660,
+            "return_bps": 44,
+            "cash_amount": 0,
+            "net_worth_amount": 150660,
+            "cash_bps": 0,
+            "investments_bps": 10000,
+        }
 
     def test_total_adds_up_every_product(self):
-        customer_key, _ = investor()
-        apply(customer_key, CDB, 10000)
-        apply(customer_key, FUND, 20000)
+        customer_key, account_key = investor()
+        apply(customer_key, account_key, CDB, 10000)
+        apply(customer_key, account_key, FUND, 20000)
 
-        status, body = RequestGenerator.get_positions(customer_key)
+        status, body = RequestGenerator.get_positions(customer_key, account_key)
 
         assert status == 200
         assert len(body["items"]) == 2
         total = body["total"]
-        assert total["current_amount"] == sum(item["current_amount"] for item in body["items"])
-        assert total["invested_amount"] == 30000
-        assert total["result_amount"] == total["current_amount"] - 30000
+        assert total["investments_amount"] == sum(item["current_amount"] for item in body["items"])
+        assert total["acquisition_cost_amount"] == 30000
+        assert total["result_amount"] == total["investments_amount"] - 30000
 
     def test_closed_position_only_when_asked(self):
         """RN-POS-03: a posição zerada some da lista, mas continua existindo (RN-ORD-14)."""
-        customer_key, _ = investor()
-        apply(customer_key, CDB, 10000)
-        redeem(customer_key, CDB)
+        customer_key, account_key = investor()
+        apply(customer_key, account_key, CDB, 10000)
+        redeem(customer_key, account_key, CDB)
 
-        _, default = RequestGenerator.get_positions(customer_key)
-        status, with_closed = RequestGenerator.get_positions(customer_key, {"include_closed": "true"})
+        _, default = RequestGenerator.get_positions(customer_key, account_key)
+        status, with_closed = RequestGenerator.get_positions(customer_key, account_key, {"include_closed": "true"})
 
         assert default["items"] == []
-        assert default["total"] == {"current_amount": 0, "invested_amount": 0, "result_amount": 0, "return_bps": 0}
         assert status == 200
         assert len(with_closed["items"]) == 1
         closed = with_closed["items"][0]
-        assert (closed["quantity"], closed["current_amount"], closed["invested_amount"]) == ("0.00000000", 0, 0)
+        assert (closed["quantity"], closed["current_amount"], closed["acquisition_cost_amount"]) == ("0.00000000", 0, 0)
         assert closed["return_bps"] == 0
 
+    def test_capital_split_between_cash_and_investments(self):
+        """O capital no banco é o caixa (saldo da conta) mais os investimentos ao preço do dia."""
+        customer_key, account_key = investor(balance=1_000_000)
+        apply(customer_key, account_key, CDB, 250000)
+
+        status, body = RequestGenerator.get_positions(customer_key, account_key)
+
+        total = body["total"]
+        cash = balance_of(customer_key, account_key)
+        net_worth = cash + total["investments_amount"]
+        assert status == 200
+        assert total["cash_amount"] == cash == 750000
+        assert total["net_worth_amount"] == net_worth
+        # Pontos-base inteiros, arredondados para baixo; o investido completa os 10.000.
+        assert total["cash_bps"] == cash * 10000 // net_worth
+        assert total["cash_bps"] + total["investments_bps"] == 10000
+
+    def test_account_shows_the_same_capital(self):
+        """A consulta da conta traz o mesmo capital da posição: saldo + investimentos ao preço do dia."""
+        customer_key, account_key = investor(balance=1_000_000)
+        apply(customer_key, account_key, CDB, 250000)
+
+        _, positions = RequestGenerator.get_positions(customer_key, account_key)
+        status, account = RequestGenerator.get_account(customer_key, account_key)
+
+        assert status == 200
+        assert account["balance"] == 750000
+        assert account["investments_amount"] == positions["total"]["investments_amount"]
+        assert account["net_worth_amount"] == account["balance"] + account["investments_amount"]
+        assert account["net_worth_amount"] == positions["total"]["net_worth_amount"]
+
+    def test_only_cash(self):
+        customer_key, account_key = investor(balance=50000)
+
+        _, body = RequestGenerator.get_positions(customer_key, account_key)
+
+        assert body["total"]["cash_amount"] == 50000
+        assert body["total"]["net_worth_amount"] == 50000
+        assert (body["total"]["cash_bps"], body["total"]["investments_bps"]) == (10000, 0)
+
+    def test_empty_account_has_nothing(self):
+        customer_key = create_customer()
+        _, account = RequestGenerator.post_account(customer_key)
+
+        status, body = RequestGenerator.get_positions(customer_key, account["account_key"])
+
+        assert status == 200
+        assert body["items"] == []
+        total = body["total"]
+        assert (total["cash_amount"], total["net_worth_amount"]) == (0, 0)
+        assert (total["cash_bps"], total["investments_bps"]) == (0, 0)
+
+    def test_account_of_another_customer(self):
+        owner, owner_account = investor()
+        apply(owner, owner_account, CDB, 10000)
+        stranger, _ = investor()
+
+        status, body = RequestGenerator.get_positions(stranger, owner_account)
+
+        assert status == 404
+        assert body["code"] == "PPP002001"
+
     def test_customer_not_found(self):
-        status, body = RequestGenerator.get_positions(str(uuid.uuid4()))
+        status, body = RequestGenerator.get_positions(str(uuid.uuid4()), str(uuid.uuid4()))
 
         assert status == 404
         assert body["code"] == "PPP001001"
 
     @pytest.mark.parametrize("query_params", [{"include_closed": "yes"}, {"page": "1"}], ids=["not_boolean", "unknown_param"])
     def test_invalid_query(self, query_params):
-        customer_key = create_customer()
+        customer_key, account_key = investor()
 
-        status, body = RequestGenerator.get_positions(customer_key, query_params)
+        status, body = RequestGenerator.get_positions(customer_key, account_key, query_params)
 
         assert status == 400
         assert body["code"] == "PPP000001"
@@ -637,7 +810,7 @@ class TestCloseAccountWithPosition:
     def test_open_position_blocks_closing(self):
         """RN-CON-08: saldo zero não basta; a conta precisa estar sem investimento."""
         customer_key, account_key = investor(balance=10000)
-        apply(customer_key, CDB, 10000)
+        apply(customer_key, account_key, CDB, 10000)
 
         status, body = RequestGenerator.patch_account(customer_key, account_key, {"status": "CLOSED", "reason": "Pedido do cliente"})
 
@@ -648,8 +821,8 @@ class TestCloseAccountWithPosition:
 
     def test_closes_after_redeeming_and_withdrawing_everything(self):
         customer_key, account_key = investor(balance=10000)
-        apply(customer_key, CDB, 10000)
-        redeem(customer_key, CDB)
+        apply(customer_key, account_key, CDB, 10000)
+        redeem(customer_key, account_key, CDB)
         withdrawal = {"type": "WITHDRAWAL", "amount": balance_of(customer_key, account_key)}
         RequestGenerator.post_transaction(customer_key, account_key, withdrawal, str(uuid.uuid4()))
 

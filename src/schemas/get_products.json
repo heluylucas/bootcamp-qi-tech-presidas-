@@ -7,7 +7,7 @@
       "type": "string",
       "enum": ["PUBLIC_BOND", "PRIVATE_BOND", "FUND"]
     },
-    "max_risk": {
+    "maximum_risk_level": {
       "type": "string",
       "pattern": "^[1-5]$"
     }

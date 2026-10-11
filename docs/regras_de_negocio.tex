@@ -431,8 +431,8 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   \tb{..._key} UUID (gerado no repository, com \tb{uuid4}). Só a \tb{key} sai.
   \item[RN-GER-03 \dec] \textbf{Datas.} Tudo em \tb{TIMESTAMPTZ}, gravado em UTC e devolvido no
   formato ISO 8601. Exemplo: \tb{2026-10-01T13:02:11Z}. Datas sem hora (nascimento, data do
-  preço) em \tb{DATE}. Os \tb{created_at} guardam a hora \emph{real} (auditoria); as regras da
-  simulação que perguntam ``que dia é hoje?'' usam a data de movimento (RN-GER-13).
+  preço) em \tb{DATE}. Os \tb{created_at} guardam a hora \emph{real} da máquina, só como registro
+  técnico; o dia em que algo aconteceu é o do calendário do banco, a data de movimento (RN-GER-13).
   \item[RN-GER-04 \obr] \textbf{Nada é apagado.} Não existe rota \tb{DELETE}. Encerrar, bloquear e
   refazer perfil são mudanças de estado ou linhas novas.
   \item[RN-GER-05 \obr] \textbf{Formato de erro único.} Todo erro devolve
@@ -444,13 +444,19 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   cliente, a resposta é 404 --- idêntica à de uma \tb{key} inexistente.
   \item[RN-GER-08 \obr] \textbf{Idempotência.} Toda rota que movimenta dinheiro
   (\tb{POST .../transaction} e \tb{POST .../investment_order}) exige o cabeçalho
-  \tb{Idempotency-Key} (um UUID criado pelo cliente da API):
+  \tb{Idempotency-Key} (um UUID criado pelo cliente da API, um por pedido; o servidor nunca gera):
   \begin{itemize}
-    \item mesma chave + mesmo corpo $\to$ devolve a resposta original, \textbf{sem} movimentar de novo;
-    \item mesma chave + corpo diferente $\to$ 409 (\tb{PPP000004});
+    \item a chave é \textbf{única no banco inteiro}: mora só em \tb{transaction.idempotency_key}
+          (\tb{UUID UNIQUE}). A ordem de investimento usa a chave da sua transação;
+    \item mesma chave, mesma conta e \textbf{pedido idêntico ao gravado} $\to$ devolve a resposta
+          original (200), \textbf{sem} movimentar de novo. ``Idêntico'' é comparado com as colunas já
+          gravadas, sem hash: na transação, tipo, valor, destino e descrição; na ordem, lado,
+          produto e valor (ou \tb{redeem_all});
+    \item chave já usada por outra conta, ou com pedido diferente (outro tipo, valor, destino ou
+          produto) $\to$ 409 (\tb{PPP000004}), sem mostrar nada do pedido original (R8);
     \item a checagem acontece \emph{depois} de travar as linhas envolvidas (RN-GER-12), para que
           um reenvio simultâneo receba a resposta original, e não um falso ``saldo insuficiente'';
-    \item sem o cabeçalho $\to$ 400 (\tb{PPP000003}).
+    \item sem o cabeçalho, ou fora do formato UUID $\to$ 400 (\tb{PPP000003}).
   \end{itemize}
   \item[RN-GER-09 \dec] \textbf{Nomes de rota.} Em inglês, substantivos, identificados pela
   \tb{key}; singular para o item (\tb{/account/\{key\}}) e plural para listas
@@ -465,10 +471,13 @@ Nível 3 & \textbf{Incrementos} da Seção~\ref{sec:incrementos}, escolhidos pel
   \emph{deadlock}).
   \item[RN-GER-13 \dec] \textbf{Data de movimento.} O banco tem um calendário próprio, guardado
   em \tb{business_day} (uma linha por dia aberto, nunca alterada; a data atual é a maior
-  \tb{reference_date}). Ela nasce com a data real em que o banco é criado e \textbf{só avança} pelo
+  \tb{business_date}). Ela nasce com a data real em que o banco é criado e \textbf{só avança} pelo
   fechamento do dia (\tb{POST /internal/day_close}, Seção~\ref{sec:fechamento}), que pula sábado e
-  domingo. É ela o ``hoje'' das regras da simulação: vencimento de título, preço do dia e taxas de
-  referência. Idade mínima (RN-CLI-05) e validade do perfil (RN-SUI-05) usam o relógio real,
+  domingo. A data de movimento é a \textbf{data real simulada}: em produção as duas coincidem; no
+  simulador, o fechamento a faz andar. Por isso é ela o ``hoje'' do banco: vencimento de título,
+  preço do dia, taxas de referência e o \textbf{dia de cada transação} (\tb{transaction.business_date},
+  gravado na criação com a data de movimento atual), que o extrato (RN-MOV-12) e a receita (RN-REC-02
+  e 09) usam. Idade mínima (RN-CLI-05) e validade do perfil (RN-SUI-05) usam o relógio real,
   porque são fatos regulatórios e a data de movimento pode estar à frente do calendário. É assim que um banco real trabalha (data contábil e
   virada de data), e é o que permite mostrar ``aplica no dia $t$, resgata no dia $t+n$'' em
   segundos, na frente da banca.
@@ -603,6 +612,12 @@ tem estado é a conta.
   também uma conta que o banco bloqueou: ela só fecha vazia, então nenhum dinheiro sai por esse
   caminho. O encerramento é em uma etapa: as conferências automáticas (saldo zero, nenhuma
   posição) fazem o papel da confirmação do banco.
+  \item[RN-CON-12 \dec] \textbf{Formato da conta.} Toda resposta de conta (abrir, consultar, mudar
+  status) traz \tb{\{"account_key", "status", "balance", "investments_amount", "net_worth_amount",
+  "created_at", "updated_at"\}}. \tb{balance} é só o dinheiro na conta corrente;
+  \tb{investments_amount} é o valor das posições da conta ao preço do dia (o mesmo
+  \tb{investments_amount} do total de posições, RN-POS-06); \tb{net_worth_amount} = \tb{balance} +
+  \tb{investments_amount}. Os dois últimos são calculados na leitura, nunca gravados.
 \end{regras}
 
 % =====================================================================
@@ -670,26 +685,30 @@ E o \tb{balance_after} do último lançamento é igual ao saldo atual. Ou seja: 
   existir (404, \tb{PPP003002}) e estar \tb{ACTIVE} (409, \tb{PPP003007}). O destino pode ser de
   outro cliente --- é assim que se paga alguém.
   \item[RN-MOV-06 \obr] Origem igual a destino $\to$ 422 (\tb{PPP003006}).
-  \item[RN-MOV-07 \obr] \textbf{Atomicidade:} débito, crédito, tarifa, atualização dos dois saldos
-  e a linha de \tb{transaction} acontecem na mesma transação de banco. O \tb{commit} é a última
-  linha antes do \tb{return}; qualquer erro no meio desfaz tudo.
+  \item[RN-MOV-07 \obr] \textbf{Atomicidade:} débito, crédito, tarifa (que entra na conta do
+  banco, RN-REC-02), atualização dos saldos e a linha de \tb{transaction} acontecem na mesma
+  transação de banco. O \tb{commit} é a última linha antes do \tb{return}; qualquer erro no meio
+  desfaz tudo.
   \item[RN-MOV-08 \obr] \textbf{Concorrência:} antes de verificar saldo, as contas envolvidas são
-  travadas com \tb{FOR UPDATE}, em ordem crescente de \tb{id}. Duas transferências simultâneas
-  da mesma conta nunca gastam o mesmo dinheiro duas vezes.
+  travadas com \tb{FOR UPDATE}, em ordem crescente de \tb{id}. Na transferência entram a origem,
+  o destino e a conta do banco (que tem o menor \tb{id}, então é sempre a primeira). Duas
+  transferências simultâneas da mesma conta nunca gastam o mesmo dinheiro duas vezes.
   \item[RN-MOV-09 \obr] \textbf{Idempotência} conforme RN-GER-08. No banco:
-  \tb{UNIQUE(requester_account_id, idempotency_key)} em \tb{transaction}, junto com um
-  \tb{request_hash} (hash do corpo) para detectar ``mesma chave, corpo diferente''.
+  \tb{idempotency_key UUID UNIQUE} em \tb{transaction} (nula só nas transações que o próprio banco
+  cria, como a liquidação no vencimento).
   \item[RN-MOV-10 \dec] Tarifa de transferência fixa de \rs 2,00 (200 centavos), guardada numa
   constante do controller. O valor cobrado fica registrado em \tb{transaction.fee_amount} e no
   lançamento \tb{FEE} --- se a tarifa mudar amanhã, o histórico não muda.
   \item[RN-MOV-11 \dec] Descrição opcional (\tb{description}, até 140 caracteres) aparece no extrato.
   \item[RN-MOV-12 \obr] \textbf{Extrato:} lista os lançamentos da conta, do mais novo para o mais
-  antigo, paginado, com filtros opcionais \tb{from}, \tb{to} (datas) e \tb{type}. Cada linha
-  mostra: \tb{transaction_key}, tipo, direção, categoria, valor, \tb{balance_after}, descrição,
-  contraparte (a \tb{account_key} da outra conta, quando houver) e data.
+  antigo, paginado, com filtros opcionais \tb{from}, \tb{to} e \tb{type}. As datas são do
+  calendário do banco: o \tb{business_date} da transação, com as duas pontas inclusas (RN-GER-13).
+  Cada linha mostra: \tb{transaction_key}, tipo, direção, categoria, valor, \tb{balance_after},
+  descrição, contraparte (a \tb{account_key} da outra conta, quando houver), o dia de movimento
+  (\tb{business_date}) e a hora real do registro (\tb{created_at}).
   \item[RN-MOV-13 \obr] \textbf{Comprovante:} \tb{GET .../transaction/\{transaction_key\}} devolve
-  uma transação da qual essa conta participa (origem ou destino). Transação que não envolve a
-  conta $\to$ 404 (R8).
+  uma transação da qual essa conta participa (origem ou destino), com o seu dia de movimento
+  (\tb{business_date}). Transação que não envolve a conta $\to$ 404 (R8).
   \item[RN-MOV-14 \obr] Nenhuma transação é apagada ou editada. Um estorno, se existir um dia, será
   uma transação nova no sentido contrário (\ext).
 \end{regras}
@@ -710,8 +729,9 @@ segue a mesma lógica.
 
 \subsection{O questionário proposto \dec}
 
-Sete perguntas, cada opção vale de 1 a 4 pontos. As perguntas e opções moram em tabelas do banco
-(seed), não no código.
+Sete perguntas, cada opção vale de 1 a 4 pontos: o código da opção \emph{é} a pontuação (a opção
+(N) vale N pontos), sem uma coluna de pontos separada. As perguntas e opções moram em tabelas do
+banco (seed), não no código, e o questionário segue a ordem do código da pergunta (Q1 a Q7).
 
 \begin{longtable}{@{}P{0.9cm}P{4.6cm}P{10.2cm}@{}}
 \toprule
@@ -750,11 +770,13 @@ Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1
   \item[RN-SUI-03 \dec] Perfil = faixa da soma dos pontos (tabela acima).
   \item[RN-SUI-04 \dec] \textbf{Trava de segurança:} quem responde (1) na Q3 (``resgataria tudo'')
   ou (1) na Q5 (``preciso a qualquer momento'') é \textbf{Conservador}, qualquer que seja a soma. A
-  resposta guarda o motivo: \tb{forced_by_rule = true} quando a trava \textbf{mudou} o perfil (pelos
+  resposta mostra o motivo: \tb{forced_by_rule = true} quando a trava \textbf{mudou} o perfil (pelos
   pontos seria Moderado ou Arrojado). Se os pontos já davam Conservador, \tb{forced_by_rule = false}.
-  \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until} \tb{TIMESTAMPTZ} = hora real
-  da resposta + 24 meses, não a data de movimento, ver RN-GER-13). Vencido (hora real depois de
-  \tb{valid_until}), o cliente não faz novas aplicações nem pede sugestão até refazer (409, \tb{PPP004004}).
+  Não é gravado: é calculado como ``o perfil gravado está fora da faixa do \tb{score}''.
+  \item[RN-SUI-05 \dec] O perfil vale por \textbf{24 meses} (\tb{valid_until} = \tb{created_at} da
+  avaliação, a hora real da resposta, + 24 meses; não a data de movimento, ver RN-GER-13). É
+  calculado, não gravado. Vencido (hora real depois de \tb{valid_until}), o cliente não faz novas
+  aplicações nem pede sugestão até refazer (409, \tb{PPP004004}).
   \item[RN-SUI-06 \obr] Refazer o questionário cria uma avaliação \textbf{nova}; as antigas continuam
   guardadas (R4). O perfil atual é sempre a avaliação mais recente.
   \item[RN-SUI-07 \dec] Cada avaliação guarda as respostas escolhidas (\tb{suitability_answer}),
@@ -769,9 +791,8 @@ Q7 & Como você descreve seu conhecimento financeiro? \emph{(conhecimento)} & (1
 \subsection{O modelo genérico de produto}
 
 Todo produto, seja título ou fundo, é descrito pelos mesmos campos: nome, tipo, emissor,
-indexador, nível de risco (1 a 5), liquidez (\tb{DAILY} = resgate a qualquer dia;
-\tb{AT_MATURITY} = só no vencimento), vencimento fixo \emph{ou} prazo (RN-PRO-09), isenção de IR
-e aplicação mínima. O valor
+indexador, nível de risco (1 a 5), prazo (RN-PRO-09: sem prazo, o resgate é a qualquer dia;
+com prazo, só no vencimento de cada aplicação) e aplicação mínima. O valor
 do investimento é sempre \textbf{quantidade $\times$ preço unitário do dia}. Para o \fundo{} o
 preço unitário é o \textbf{valor da cota}; para os títulos, é o preço unitário do papel.
 
@@ -807,7 +828,7 @@ D+0. Liquidez com prazo real fica como \ext.}
   situação real e sem teste pela API; o motivo está nas alternativas descartadas. O número da
   regra e o código não são reaproveitados.
   \item[RN-PRO-04 \dec] O preço do dia é o registro de \tb{product_price} com a maior
-  \tb{reference_date} menor ou igual à \textbf{data de movimento} (RN-GER-13). Ele sempre existe:
+  \tb{price_date} menor ou igual à \textbf{data de movimento} (RN-GER-13). Ele sempre existe:
   o seed grava o preço do dia em que o banco nasce, e o fechamento só abre um dia novo depois de
   gravar o preço de todos os produtos (RN-FEC-06). Por isso não há erro de ``sem preço'' (o antigo
   \tb{PPP005003} foi removido). Num dia sem preço novo (fim de semana), vale o último publicado.
@@ -822,18 +843,13 @@ D+0. Liquidez com prazo real fica como \ext.}
   preço de ontem. O \fundo{} tem uma onda de seno, para mostrar ganho \emph{e} perda.
   \item[RN-PRO-07 \obr] Preço unitário em \tb{NUMERIC(20,8)}, nunca \tb{FLOAT} (R6).
   \item[RN-PRO-08 \dec] O catálogo pode ser filtrado por tipo e por risco máximo
-  (\tb{GET /products?max_risk=2}) --- útil para mostrar ``o que cabe no meu perfil''.
-  \item[RN-PRO-09 \obr] \textbf{Vencimento fixo ou prazo.} Título de mercado (Tesouro) é um papel
-  só, com vencimento fixo em \tb{maturity_date}, que todos compram. Título de emissão própria
-  vendido como oferta (LCI) tem \tb{term_months}: \textbf{cada aplicação é uma emissão nova} e
-  vence em data de movimento da aplicação $+$ prazo (\tb{add_months}). Um produto tem um ou
-  outro, nunca os dois (\tb{CHECK} no banco). A LCI do MVP é vendida sempre com prazo de 12 meses.
-  \textbf{Prazo mínimo das letras isentas:} produto com \tb{tax_exempt = true} (LCI, LCA) precisa
-  de \tb{term_months} $\ge 9$. A Resolução CMN 5.119/2024 subiu o prazo mínimo da LCA de 90 dias
-  para 9 meses (e o da LCI para 12); a Resolução CMN 5.168/2024 baixou o da LCI sem correção por
-  índice de preços para 9 meses. O motivo: as letras isentas estavam sendo usadas como captação de
-  curtíssimo prazo com benefício fiscal. A regra fica num \tb{CHECK} do banco, então nem o seed
-  nem um \tb{UPDATE} manual conseguem gravar uma letra isenta de prazo curto.
+  (\tb{GET /products?maximum_risk_level=2}) --- útil para mostrar ``o que cabe no meu perfil''.
+  \item[RN-PRO-09 \obr] \textbf{Prazo.} Um produto tem prazo (\tb{term_months}) ou não. Sem prazo
+  (Tesouro, CDB, fundo), o resgate pode ser em qualquer dia. Com prazo (a LCI, 12 meses),
+  \textbf{cada aplicação é uma emissão nova}: vence em data de movimento da aplicação $+$ prazo
+  (\tb{add_months}), só pode ser resgatada no vencimento e é paga pelo fechamento do dia
+  (RN-FEC-09). O vencimento fixo dos títulos do Tesouro (o ano que está no nome) não é gravado:
+  nenhuma regra o usa, porque nenhum vence no horizonte da simulação.
 \end{regras}
 
 \subsection{Parâmetros do seed \dec}
@@ -843,7 +859,7 @@ Números fictícios usados pelo \tb{database.sql}. Mudou algum? Mude aqui e no s
 \begingroup\small
 \begin{longtable}{@{}P{3.3cm}P{2.6cm}P{2.1cm}P{3.4cm}P{4.6cm}@{}}
 \toprule
-\textbf{Produto} & \textbf{Emissor} & \textbf{Vencimento} & \textbf{\tb{external_code}} & \textbf{Preço no dia $d$} \\
+\textbf{Produto} & \textbf{Emissor} & \textbf{Vencimento} & \textbf{\tb{price_source_code}} & \textbf{Preço no dia $d$} \\
 \midrule
 \endhead
 Tesouro Selic 2031 & Tesouro Nacional & 01/03/2031 & \tb{TESOURO SELIC 2031} & $100 \times 1{,}15^{\,d/252}$ \\
@@ -874,10 +890,10 @@ Tesouro IPCA+ 2035 & Tesouro Nacional & 15/05/2035 & \tb{TESOURO IPCA+ 2035} & $
         com prejuízo. O deslocamento de 15 dias úteis põe outubro de 2026 (época da
         apresentação) numa subida, com pico perto de 30/10; em novembro a cota cai.
   \item Preços arredondados em 8 casas (\tb{NUMERIC(20,8)}, RN-PRO-07).
-  \item LCI: \tb{term_months = 12}, \tb{tax_exempt = true}, \tb{maturity_date} nulo. CDB: sem
+  \item LCI: \tb{term_months = 12}, \tb{maturity_date} nulo. CDB: sem
         prazo e sem vencimento (simplificação, ver ``Do MVP à produção'').
-  \item CDB e LCI: \tb{own_issue = true}, \tb{cdi_percentage_bps} \tb{9500} e \tb{9300}. Fundo:
-        \tb{admin_fee_bps = 100}.
+  \item CDB e LCI: emissão própria (sem \tb{price_source_code}: nenhuma fonte externa publica o preço
+        deles), \tb{cdi_percentage_bps} \tb{9500} e \tb{9300}. Fundo: \tb{administration_fee_bps = 100}.
 \end{itemize}
 
 \subsection{Fechamento do dia e fontes externas de preço}\label{sec:fechamento}
@@ -915,31 +931,34 @@ produção, mudando só o endereço.
   diferente da pedida, título ou fundo faltando, taxa ausente) $\to$ 502 (\tb{PPP005007}). Nos dois
   casos nada é gravado e a data de movimento não muda.
   \item[RN-FEC-07 \dec] \textbf{O que é gravado}, num \tb{commit} só: um preço por produto em
-  \tb{product_price}, o CDI e a Selic em \tb{reference_rate}, a liquidação do que venceu
-  (RN-FEC-09) e a nova linha de \tb{business_day}.
+  \tb{product_price}, o CDI e a Selic em \tb{reference_rate}, a provisão de receita do dia que fecha
+  em \tb{revenue_accrual} (RN-REC-05 a 07, gravada antes da liquidação, com a foto do fim do dia), a
+  nova linha de \tb{business_day} e a liquidação do que venceu (RN-FEC-09), cujas transações já são
+  do dia novo.
   Resposta 201: \tb{\{"business_date", "prices": [\{"product_key", "name", "unit_price"\}],
   "rates": [\{"code", "annual_rate_bps"\}]\}}.
   \item[RN-FEC-08 \dec] \textbf{Simplificações do MVP.} As chamadas externas acontecem com a trava
   da data segurada (no máximo 5 s por serviço), então fechamentos simultâneos ficam em fila. Ordens
-  não travam a data de movimento: uma ordem que começou antes do fechamento usa o preço do dia em
-  que começou.
+  e as movimentações não travam a data de movimento: uma operação que começou antes do fechamento
+  usa o preço e o dia de movimento de quando começou.
   \item[RN-FEC-09 \dec] \textbf{Liquidação no vencimento.} No fechamento, depois de gravar os
   preços do novo dia e antes de abri-lo, na mesma transação (tudo ou nada, RN-FEC-06), o banco
   devolve o dinheiro de cada aplicação de produto com prazo cujo \tb{maturity_date} (gravado na
   ordem, RN-ORD-17) seja $\le$ novo dia e que ainda não tenha sido liquidada. Como funciona:
   \begin{itemize}
-    \item \textbf{O resgate.} Cada aplicação vira uma ordem \tb{REDEEM} com
-    \tb{source = MATURITY}, a quantidade da aplicação inteira, ao preço do novo dia, com transação
+    \item \textbf{O resgate.} Cada aplicação vira uma ordem de resgate (a resposta da API mostra
+    \tb{source = MATURITY}, calculado de \tb{matured_investment_order_id} preenchido), com a quantidade da
+    aplicação inteira, ao preço do novo dia, com transação
     \tb{INVESTMENT_REDEEM} e crédito na conta que pagou a aplicação. O cálculo é o mesmo do resgate
-    do cliente (RN-ORD-12, RN-ORD-13, RN-ORD-16). Como a LCI é \tb{AT_MATURITY} e a RN-ORD-11
+    do cliente (RN-ORD-12, RN-ORD-13, RN-ORD-16). Como a LCI tem prazo e a RN-ORD-11
     proíbe resgate antecipado, cada aplicação continua inteira até vencer: não é preciso escolher
     ``qual lote'' resgatar.
-    \item \textbf{Liquidada uma vez só.} A ordem de liquidação guarda em \tb{settled_order_id} a
+    \item \textbf{Liquidada uma vez só.} A ordem de liquidação guarda em \tb{matured_investment_order_id} a
     aplicação que ela devolveu. ``Ainda não liquidada'' é ``nenhuma ordem aponta para ela'', e o
     \tb{UNIQUE} da coluna impede liquidar a mesma aplicação duas vezes.
-    \item \textbf{Chave de idempotência determinística.} Não há cliente mandando chave; a
-    liquidação usa \tb{uuid5(NAMESPACE_URL, "maturity:\{order_key\}")}, uma por aplicação, e assim
-    cumpre os \tb{UNIQUE} de \tb{transaction} e \tb{investment_order}.
+    \item \textbf{Sem chave de idempotência.} Não há pedido de cliente para repetir: a transação
+    da liquidação grava \tb{idempotency_key} nula. Quem impede pagar duas vezes é o \tb{UNIQUE} de
+    \tb{matured_investment_order_id}.
     \item \textbf{Travas.} Em ordem crescente de \tb{account_id}, e em cada uma conta depois
     posição: a mesma ordem das ordens do cliente (RN-GER-12), então liquidação e aplicação
     simultâneas não fazem \emph{deadlock}.
@@ -1042,18 +1061,26 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
 
 \begin{itemize}
   \item \textbf{Ordem} (\tb{investment_order}): o pedido de aplicar (\tb{APPLY}) ou resgatar
-  (\tb{REDEEM}) um produto. No simulador ela é executada na hora (status \tb{EXECUTED}).
-  \item \textbf{Posição} (\tb{position}): uma linha por cliente e produto, com a quantidade atual
-  e o custo investido (\tb{invested_amount}).
-  \item O dinheiro sempre passa pela \textbf{conta ativa do cliente}: a aplicação gera uma
-  transação \tb{INVESTMENT_APPLY} (débito) e o resgate uma \tb{INVESTMENT_REDEEM} (crédito).
+  (\tb{REDEEM}) um produto. No simulador ela é executada na hora (a API mostra o status
+  \tb{EXECUTED}, que não é gravado: não existe outro).
+  \item \textbf{Toda ordem é o anexo de uma transação.} O dinheiro sempre passa pela \textbf{conta
+  ativa do cliente}: a aplicação gera uma transação \tb{INVESTMENT_APPLY} (débito) e o resgate uma
+  \tb{INVESTMENT_REDEEM} (crédito). A transação guarda o dono (a conta), o lado (pelo tipo), o
+  valor e a chave de idempotência; a ordem guarda só o que é de investimento: produto, cotas,
+  preço, custo, vencimento, \tb{redeem_all} e a aplicação liquidada.
+  \item \textbf{Posição} (\tb{position}): uma linha por \textbf{conta} e produto, com a quantidade
+  atual e o custo investido (\tb{acquisition_cost_amount}). É da conta, como o saldo: a conta só encerra
+  com todas as posições zeradas (RN-CON-08).
 \end{itemize}
 
 \subsection{Regras de aplicação}
 
 \begin{regras}
-  \item[RN-ORD-01 \obr] O cliente precisa existir (404) e ter uma conta \tb{ACTIVE} (409,
-  \tb{PPP007006} se não tiver conta; \tb{PPP002005} se ela estiver bloqueada).
+  \item[RN-ORD-01 \obr] A ordem é feita na conta do caminho
+  (\tb{/customer/\{ck\}/account/\{ak\}/investment_order}), como as movimentações: o cliente precisa
+  existir (404, \tb{PPP001001}), a conta precisa ser dele (404, \tb{PPP002001}, igual a uma
+  inexistente, R8) e estar \tb{ACTIVE} (409, \tb{PPP002005}, se bloqueada ou encerrada). O dinheiro
+  sai dessa conta na aplicação e volta para ela no resgate.
   \item[RN-ORD-02 \obr] Precisa ter perfil de suitability válido (409, \tb{PPP004005} ou
   \tb{PPP004004}).
   \item[RN-ORD-03 \obr] O produto precisa existir (404, \tb{PPP005001}). O preço do dia sempre
@@ -1069,8 +1096,8 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   (ou cria) a posição; (c) grava a transação \tb{INVESTMENT_APPLY} + lançamento de débito e
   atualiza o saldo; (d) grava a ordem com a quantidade e o preço usados; (e) soma quantidade e
   custo na posição. Qualquer falha desfaz tudo.
-  \item[RN-ORD-08 \obr] \textbf{Idempotência} conforme RN-GER-08, com
-  \tb{UNIQUE(customer_id, idempotency_key)} em \tb{investment_order}.
+  \item[RN-ORD-08 \obr] \textbf{Idempotência} conforme RN-GER-08: a chave é a da transação da
+  ordem. Uma chave já usada num depósito, por exemplo, não tem ordem para devolver $\to$ 409.
   \item[RN-ORD-17 \dec] \textbf{Vencimento da aplicação.} Aplicação em produto com prazo
   (RN-PRO-09) grava na ordem o próprio \tb{maturity_date} $=$ data de movimento $+$
   \tb{term_months}. É por ele que a RN-ORD-11 e a liquidação (RN-FEC-09) olham.
@@ -1083,23 +1110,24 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   sempre pode tirar o dinheiro (princípio de proteção ao cliente).
   \item[RN-ORD-10 \obr] Precisa existir posição com quantidade suficiente; senão $\to$ 409
   (\tb{PPP007004}).
-  \item[RN-ORD-11 \dec] Produto com liquidez \tb{AT_MATURITY} só pode ser resgatado quando a data
-  de movimento chega ao vencimento (o do produto ou, se ele tem prazo, o da aplicação,
-  RN-ORD-17). Antes $\to$ 422 (\tb{PPP007005}).
+  \item[RN-ORD-11 \dec] Produto com prazo (RN-PRO-09) só pode ser resgatado quando a data de
+  movimento chega ao vencimento da aplicação (RN-ORD-17). Antes $\to$ 422 (\tb{PPP007005}).
   \item[RN-ORD-12 \dec] O resgate pode ser por valor (\tb{amount}) ou total
   (\tb{redeem_all: true}). Por valor: \tb{quantidade = valor / preço}, truncada em 8 casas. Total:
   quantidade = toda a posição e valor = \tb{floor(quantidade} $\times$ \tb{preço)} em centavos.
-  \item[RN-ORD-13 \dec] \textbf{Custo médio:} no resgate parcial, o \tb{invested_amount} diminui na
+  A ordem grava \tb{redeem_all}: o pedido total não traz valor, e é essa coluna que diferencia, na
+  repetição idempotente, um resgate total de um parcial com a mesma chave.
+  \item[RN-ORD-13 \dec] \textbf{Custo médio:} no resgate parcial, o \tb{acquisition_cost_amount} diminui na
   mesma proporção da quantidade resgatada. Isso permite calcular o ganho da parte que ficou.
-  O custo que sai é \tb{floor(invested_amount} $\times$ \tb{quantidade resgatada / quantidade da
-  posição)} em centavos; no resgate total, sai o \tb{invested_amount} inteiro.
+  O custo que sai é \tb{floor(acquisition_cost_amount} $\times$ \tb{quantidade resgatada / quantidade da
+  posição)} em centavos; no resgate total, sai o \tb{acquisition_cost_amount} inteiro.
   \item[RN-ORD-14 \obr] Posição que zera \textbf{não é apagada} (R4); fica com quantidade 0.
   \item[RN-ORD-15 \obr] Mesma atomicidade e idempotência da aplicação, com a transação
   \tb{INVESTMENT_REDEEM} creditando a conta.
-  \item[RN-ORD-16 \dec] \textbf{Rentabilidade no resgate:} a ordem guarda em \tb{cost_amount} o
-  custo que saiu da posição (RN-ORD-13); na aplicação, \tb{cost_amount} = \tb{amount}. A resposta
-  do resgate traz, além da quantidade e do preço, o \tb{cost_amount}, o \textbf{resultado}
-  (\tb{result_amount} = \tb{amount} $-$ \tb{cost_amount}, pode ser negativo) e a
+  \item[RN-ORD-16 \dec] \textbf{Rentabilidade no resgate:} a ordem guarda em \tb{acquisition_cost_amount} o
+  custo que saiu da posição (RN-ORD-13); na aplicação, \tb{acquisition_cost_amount} = \tb{amount}. A resposta
+  do resgate traz, além da quantidade e do preço, o \tb{acquisition_cost_amount}, o \textbf{resultado}
+  (\tb{result_amount} = \tb{amount} $-$ \tb{acquisition_cost_amount}, pode ser negativo) e a
   \textbf{rentabilidade} (\tb{return_bps} = resultado $\times$ 10000 / custo, truncada em direção
   ao zero; 0 se o custo for 0). Como o custo fica gravado na ordem, a repetição idempotente e o
   \tb{GET} da ordem devolvem os mesmos números, mesmo que a posição já tenha mudado.
@@ -1108,7 +1136,7 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
 \subsection{Posição e rentabilidade}
 
 \begin{regras}
-  \item[RN-POS-01 \dec] \tb{GET /customer/\{key\}/positions} devolve, por produto: quantidade,
+  \item[RN-POS-01 \dec] \tb{GET /customer/\{ck\}/account/\{ak\}/positions} devolve, por produto da conta: quantidade,
   preço do dia, \textbf{valor atual} (\tb{floor(quantidade} $\times$ \tb{preço)}), custo
   investido, \textbf{resultado} (valor atual $-$ custo) e \textbf{rentabilidade} (resultado /
   custo, em pontos-base). E um total consolidado.
@@ -1116,10 +1144,20 @@ Sobra 1 centavo, que vai para a Selic (maior peso): 25.001. Soma final: 100.001.
   \item[RN-POS-03 \dec] Posições com quantidade 0 não aparecem na lista, a menos que se peça
   \tb{?include_closed=true}.
   \item[RN-POS-04 \dec] \textbf{Formato da resposta.} \tb{\{"items": [\{"product_key", "quantity",
-  "unit_price", "current_amount", "invested_amount", "result_amount", "return_bps"\}], "total":
-  \{"current_amount", "invested_amount", "result_amount", "return_bps"\}\}}. Quantidade e preço
+  "unit_price", "current_amount", "acquisition_cost_amount", "result_amount", "return_bps"\}], "total":
+  \{"investments_amount", "acquisition_cost_amount", "result_amount", "return_bps", "cash_amount",
+  "net_worth_amount", "cash_bps", "investments_bps"\}\}}. Quantidade e preço
   como texto com 8 casas (R6); valores em centavos. O total soma valor atual e custo de todos os
   itens listados e calcula resultado e rentabilidade sobre as somas (sem lista, tudo 0).
+  \item[RN-POS-06 \dec] \textbf{Capital total no banco.} O total também traz o caixa
+  (\tb{cash_amount} = saldo da conta), o capital total
+  (\tb{net_worth_amount} = caixa + \tb{investments_amount}, a soma do valor atual das posições) e a divisão entre os dois em
+  pontos-base: \tb{cash_bps} = \tb{floor(caixa} $\times$ \tb{10000 / capital)} e
+  \tb{investments_bps} = 10000 $-$ \tb{cash_bps}, para a soma fechar sempre em 100\% (sem capital,
+  os dois são 0). É calculado na leitura, nunca gravado: o valor dos investimentos muda a cada
+  fechamento do dia. A consulta da conta faz o mesmo cálculo (RN-CON-12), então os dois números batem.
+  O total chama \tb{investments_amount}, e não \tb{current_amount}, porque soma várias posições: o
+  nome do item fica para o valor de um produto só.
   \item[RN-POS-05 \dec] \textbf{Histórico de ordens} (\tb{GET .../investment_orders}): a mais nova
   primeiro, paginado (RN-GER-11), com filtro opcional por \tb{product_key}. Filtrar por um produto
   que não existe devolve a lista vazia (200), não 404: o filtro só restringe a busca. Cada item tem o
@@ -1155,10 +1193,10 @@ o cliente; a recomendação leva o dinheiro para onde o banco ganha.}
 \textbf{Fonte} & \textbf{Como funciona} & \textbf{Onde aparece no sistema} & \textbf{Tipo} \\
 \midrule
 \endhead
-Tarifa de transferência & \rs 2,00 por transferência, cobrados da conta de origem. & Lançamentos \tb{FEE} em \tb{ledger_entry}. & Realizada (valor exato) \\
-Taxa de administração do fundo & 1\% ao ano sobre o patrimônio do \fundo, descontada todo dia do valor da cota. & \tb{product.admin_fee_bps}; a cota publicada já é líquida. & Estimada \\
-Spread dos títulos próprios & O banco paga 95\% do CDI no CDB e 93\% na LCI e aplica o dinheiro captado em títulos públicos, que rendem cerca de 100\% do CDI. & \tb{product.own_issue} e \tb{product.cdi_percentage_bps}; CDI em \tb{reference_rate}. & Estimada \\
-Float & O saldo parado na conta corrente não rende nada para o cliente; o banco o aplica em títulos públicos. & Soma de \tb{account.balance} $\times$ Selic de \tb{reference_rate}. & Estimada \\
+Tarifa de transferência & \rs 2,00 por transferência, cobrados da conta de origem e creditados na conta do banco. & Lançamentos \tb{FEE} de crédito na conta do banco (\tb{ledger_entry}). & Realizada (valor exato) \\
+Taxa de administração do fundo & 1\% ao ano sobre o patrimônio do \fundo, descontada todo dia do valor da cota. & \tb{product.administration_fee_bps}; a cota publicada já é líquida. & Estimada \\
+Spread dos títulos próprios & O banco paga 95\% do CDI no CDB e 93\% na LCI e aplica o dinheiro captado em títulos públicos, que rendem cerca de 100\% do CDI. & Produtos sem \tb{price_source_code} (emissão própria) e \tb{product.cdi_percentage_bps}; CDI em \tb{reference_rate}. & Estimada \\
+Float & O saldo parado na conta corrente não rende nada para o cliente; o banco o aplica em títulos públicos. & Saldo das contas de cliente no fim de cada dia fechado, gravado na provisão (\tb{revenue_accrual}), $\times$ Selic do dia (\tb{reference_rate}). & Estimada \\
 Tesouro Direto & Sem taxa para o cliente: é o produto de atração. & --- & Nenhuma \\
 \bottomrule
 \end{longtable}
@@ -1172,30 +1210,42 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
 
 \begin{regras}
   \item[RN-REC-01 \dec] \textbf{Realizada vs.\ estimada.} O relatório de receita separa sempre o que
-  foi cobrado (tarifas) do que é estimativa (fundo, spread, float). Estimativas nunca gravam linhas
-  nem alteram saldos.
-  \item[RN-REC-02 \dec] \textbf{Tarifas.} Receita de tarifa no período $=$ soma dos
-  \tb{ledger_entry} com \tb{category = FEE} e \tb{created_at} no período. Não existe uma ``conta de
-  receitas'' com saldo (ver Seção~\ref{sec:decisoes}): o próprio extrato já é o registro da receita.
-  \item[RN-REC-03 \obr] \textbf{Conservação do dinheiro.} Para o sistema inteiro:
-  $\Sigma$ saldos $=\ \Sigma$ depósitos $-\ \Sigma$ saques $-\ \Sigma$ tarifas $-\ \Sigma$
-  aplicações $+\ \Sigma$ resgates. É o que a rota de reconciliação confere, e é o que prova que a
-  tarifa saiu de algum lugar e foi para o banco, sem sumir.
-  \item[RN-REC-04 \dec] \textbf{Taxa de administração.} Só o fundo tem \tb{admin_fee_bps}
+  foi cobrado (tarifas) do que é estimativa (fundo, spread, float). Estimativas nunca movimentam
+  dinheiro nem alteram saldos: a provisão de cada dia (RN-REC-05) é só um registro, gravado uma vez
+  no fechamento e nunca alterado (R4).
+  \item[RN-REC-02 \dec] \textbf{Tarifas.} A tarifa sai da conta de origem e \textbf{entra na conta do
+  banco}: uma conta do seed, sem cliente (\tb{customer_id} nulo), que nenhuma rota de cliente
+  alcança, que não pode ser destino de transferência nem ter o status mudado. Receita de tarifa no
+  período $=$ soma dos créditos \tb{FEE} na conta do banco cujas transações têm o dia de movimento
+  (\tb{business_date}) no período, inclusive o dia ainda aberto.
+  \item[RN-REC-03 \obr] \textbf{Conservação do dinheiro.} Para o sistema inteiro, com a conta do
+  banco incluída: $\Sigma$ saldos $=\ \Sigma$ depósitos $-\ \Sigma$ saques $-\ \Sigma$ aplicações
+  $+\ \Sigma$ resgates. A tarifa não aparece na conta porque não sai do sistema: só muda de conta.
+  Equivalente: $\Sigma$ saldos $=\ \Sigma$ créditos $-\ \Sigma$ débitos de \tb{ledger_entry}.
+  \item[RN-REC-04 \dec] \textbf{Taxa de administração.} Só o fundo tem \tb{administration_fee_bps}
   (\tb{100} = 1\% ao ano). A cota publicada é \emph{líquida}, como no mercado: a administradora
   (no simulador, o mock e o seed) já desconta a taxa, com o fator $(1 - \text{taxa})$ ao ano da
   fórmula da RN-PRO-06.
-  \item[RN-REC-05 \dec] \textbf{Estimativa da taxa de administração} no período $=$ patrimônio do
-  fundo na data de movimento $\times$ taxa $\times$ dias corridos $/ 365$, com patrimônio $=
-  \Sigma$ \tb{position.quantity} $\times$ cota do dia. É uma aproximação linear, suficiente para o
-  relatório.
-  \item[RN-REC-06 \dec] \textbf{Títulos próprios.} CDB e LCI têm \tb{own_issue = true} e guardam o
-  percentual do CDI que pagam em \tb{cdi_percentage_bps} (\tb{9500} = 95\%). Spread estimado $=
-  \Sigma$ \tb{position.invested_amount} nesses produtos $\times$ CDI $\times$ (1 $-$ percentual
-  pago) $\times$ dias $/ 365$.
-  \item[RN-REC-07 \dec] \textbf{Float} estimado $= \Sigma$ \tb{account.balance} das contas
-  \tb{ACTIVE} e \tb{BLOCKED} agora $\times$ Selic $\times$ dias $/ 365$. Saldo em conta corrente não
-  é remunerado para o cliente.
+  \item[RN-REC-05 \dec] \textbf{Provisão diária, gravada no fechamento.} Ao fechar o dia $D$
+  (RN-FEC-07), o banco grava em \tb{revenue_accrual} a foto do fim de $D$ (as três bases) e o que
+  ganharia com ela até o próximo dia de movimento: \tb{calendar_days} $=$ próximo dia $- D$ (a provisão
+  de sexta vale sexta, sábado e domingo, porque o dinheiro continua aplicado no fim de semana). Uma
+  linha por dia fechado, nunca alterada; o dia aberto ainda não tem. Cada valor é base $\times$ taxa
+  anual $\times$ \tb{calendar_days} $/ 365$, truncado em centavos: uma aproximação linear (juros
+  simples), suficiente para o relatório. As bases vêm do estado de agora (uma soma por tabela), não
+  do histórico. \textbf{Taxa de administração:} base $=$ patrimônio do fundo $=$ $\Sigma$
+  \tb{position.quantity} $\times$ cota de $D$, em centavos para baixo; taxa $=$
+  \tb{administration_fee_bps}.
+  \item[RN-REC-06 \dec] \textbf{Títulos próprios.} CDB e LCI são emissão própria (sem
+  \tb{price_source_code}) e guardam o percentual do CDI que pagam em \tb{cdi_percentage_bps}
+  (\tb{9500} = 95\%). Base $=$ $\Sigma$ \tb{position.acquisition_cost_amount} nesses produtos no fim de
+  $D$. Spread $=$ $\Sigma$ por produto do custo $\times$ CDI de $D$ $\times$ (1 $-$ percentual pago)
+  $\times$ \tb{calendar_days} $/ 365$. O valor fica gravado porque depende do percentual de cada
+  produto, que a base somada não guarda.
+  \item[RN-REC-07 \dec] \textbf{Float.} Base $=$ $\Sigma$ \tb{account.balance} das contas de cliente
+  (sem a conta do banco) no fim de $D$; conta encerrada tem saldo 0, então não há filtro por status.
+  Valor $=$ base $\times$ Selic de $D$ $\times$ \tb{calendar_days} $/ 365$. Saldo em conta corrente
+  não é remunerado para o cliente.
   \item[RN-REC-08 \dec] \textbf{Taxas de referência (histórico).} CDI e Selic anuais ficam em
   \tb{reference_rate}, \textbf{uma linha por taxa e por data}, nunca alterada (R4): o seed grava a
   primeira e cada fechamento do dia grava as do novo dia, vindas do Banco Central (RN-FEC-04).
@@ -1204,19 +1254,24 @@ mas não grava nem movimenta nada. Separar as duas coisas é o que torna o núme
   só: o CDB rende pelo mesmo número que o relatório usa, e cada preço de CDB pode ser refeito com
   o CDI gravado do dia.
   \item[RN-REC-09 \dec] \textbf{Relatório.} \tb{GET /internal/revenue?from=\&to=} devolve as
-  duas partes, em centavos. O período filtra pelo \tb{created_at} (hora real) dos lançamentos.
-  Sem datas, usa o mês corrente. \tb{from} depois de \tb{to}, ou
+  duas partes e o total, em centavos. O período é em \textbf{datas de movimento}. A tarifa inclui o
+  dia aberto; as estimativas são as provisões dos dias \textbf{fechados} do período (RN-REC-05), e
+  \tb{days} é quantos foram contados. Cada estimativa traz o valor (a soma) e o detalhe por dia
+  (\tb{daily}: data, \tb{calendar_days}, base, taxa e valor do dia), para a conta ser conferida.
+  Sem datas, usa o mês da data de movimento atual. \tb{from} depois de \tb{to}, ou
   intervalo maior que 366 dias $\to$ 400 (\tb{PPP000005}). A rota é interna (não pertence a
   nenhum cliente) e fica protegida pelo \tb{OPERATOR-TOKEN} (RN-GER-14); num banco real ela
   exigiria login por funcionário com perfil de administrador, o que está fora do escopo.
   \item[RN-REC-10 \dec] Tesouro Direto não tem taxa para o cliente.
 \end{regras}
 
-\subsection{Exemplo: um mês de operação}
+\subsection{Exemplo: quatro semanas de operação}
 
-Premissas fictícias: 2.000 transferências no mês; \rs 5 milhões no fundo; \rs 3 milhões em CDB
+Premissas fictícias: 2.000 transferências no período; \rs 5 milhões no fundo; \rs 3 milhões em CDB
 a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI de 14,9\% e Selic de 15\% ao ano
-(os mesmos do seed); 30 dias.
+(os mesmos do seed); quatro semanas fechadas, de segunda a domingo (28 dias corridos, 20 dias de
+movimento), com os mesmos saldos e taxas o tempo todo. Cada provisão é truncada em centavos: as 16 de
+segunda a quinta valem 1 dia, e as 4 de sexta valem 3.
 
 \begin{center}
 \begin{tabular}{@{}llr@{}}
@@ -1224,14 +1279,17 @@ a 95\% do CDI; \rs 2 milhões parados em conta corrente; CDI de 14,9\% e Selic d
 \textbf{Fonte} & \textbf{Conta} & \textbf{Receita} \\
 \midrule
 Tarifas (realizada) & $2.000 \times \rs 2{,}00$ & \rs 4.000,00 \\
-Taxa de administração & $5.000.000 \times 1\% \times 30/365$ & \rs 4.109,59 \\
-Spread do CDB & $3.000.000 \times 14{,}9\% \times 5\% \times 30/365$ & \rs 1.836,99 \\
-Float & $2.000.000 \times 15\% \times 30/365$ & \rs 24.657,53 \\
+Taxa de administração & $16 \times \rs 136{,}98 + 4 \times \rs 410{,}95$ & \rs 3.835,48 \\
+Spread do CDB & $16 \times \rs 61{,}23 + 4 \times \rs 183{,}69$ & \rs 1.714,44 \\
+Float & $16 \times \rs 821{,}91 + 4 \times \rs 2.465{,}75$ & \rs 23.013,56 \\
 \midrule
-\textbf{Total} & & \textbf{\rs 34.604,11} \\
+\textbf{Total} & & \textbf{\rs 32.563,48} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+Um dia de provisão do fundo, por exemplo: $5.000.000 \times 1\% / 365 = \rs 136{,}986$, truncado em
+\rs 136,98; na sexta, $\times\ 3$ antes de truncar, \rs 410,95.
 
 A lição do exemplo, boa para a apresentação: a maior receita não é a tarifa que o cliente vê, e sim
 o float, que ele não vê. E a taxa de administração cresce junto com o patrimônio que a carteira
@@ -1242,8 +1300,16 @@ sugerida leva para o fundo.
 % =====================================================================
 
 Convenções: toda tabela tem \tb{id SERIAL PRIMARY KEY}; tabelas de entidade têm
-\tb{..._key CHAR(36) NOT NULL UNIQUE}, \tb{created_at} e (quando mudam) \tb{updated_at}. Tabelas
-de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colunas que importam.
+\tb{..._key CHAR(36) NOT NULL UNIQUE}, \tb{created_at} e (quando mudam) \tb{updated_at}. Listas
+fixas de valores são \textbf{tipos ENUM nativos} do Postgres (\tb{CREATE TYPE ... AS ENUM}): o banco
+recusa qualquer valor fora da lista, sem tabela de enumerador nem \emph{join}. São nove:
+\tb{account_status}, \tb{status_actor}, \tb{transaction_type}, \tb{entry_direction},
+\tb{entry_category}, \tb{investor_profile}, \tb{product_type}, \tb{product_indexer} e
+\tb{reference_rate_code}. Regras fixas ligadas a um valor da lista (a faixa de pontos e o risco
+máximo de cada perfil, RN-SUI-03) ficam no código, como a tarifa e os limites de valor. O que pode ser calculado a partir de outras colunas não é gravado.
+Abaixo, as colunas e restrições; os diagramas ER (\tb{docs/diagramas/er-*.mmd}) mostram
+\textbf{todas} as colunas, e o \tb{scripts/check_er.py} confere que eles batem com o
+\tb{database.sql}.
 
 \subsection{Núcleo bancário}
 
@@ -1253,12 +1319,10 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \midrule
 \endhead
 \tb{customer} & \tb{customer_key}; \tb{name TEXT NOT NULL}; \tb{document_number CHAR(14) NOT NULL UNIQUE}; \tb{birth_date DATE NOT NULL}; \tb{created_at}. \\
-\tb{account_status} & Enumerador: \tb{ACTIVE}, \tb{BLOCKED}, \tb{CLOSED}. \\
-\tb{account} & \tb{account_key}; \tb{customer_id} FK $\to$ customer (NOT NULL); \tb{status_id} FK $\to$ account_status; \tb{balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0)}; \tb{created_at}, \tb{updated_at}. Índice único parcial \tb{UNIQUE(customer_id) WHERE status <> CLOSED} para o banco também barrar a segunda conta (rede de segurança). \\
-\tb{account_status_event} & \tb{account_id} FK; \tb{from_status_id} FK (nulo no nascimento); \tb{to_status_id} FK NOT NULL; \tb{reason VARCHAR(255)}; \tb{actor VARCHAR(8) NOT NULL} (\tb{CUSTOMER}/\tb{BANK}, com \tb{CHECK}, RN-CON-05); \tb{created_at}. \\
-\tb{transaction_type} & Enumerador: \tb{DEPOSIT}, \tb{WITHDRAWAL}, \tb{TRANSFER}, \tb{INVESTMENT_APPLY}, \tb{INVESTMENT_REDEEM}. \\
-\tb{transaction} & \tb{transaction_key}; \tb{type_id} FK; \tb{requester_account_id} FK NOT NULL (quem pediu); \tb{origin_account_id} FK (nulo no depósito e no resgate); \tb{destination_account_id} FK (nulo no saque e na aplicação); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{fee_amount BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0)}; \tb{description VARCHAR(140)}; \tb{idempotency_key CHAR(36) NOT NULL}; \tb{request_hash CHAR(64) NOT NULL}; \tb{created_at}. \tb{UNIQUE(requester_account_id, idempotency_key)}. \\
-\tb{ledger_entry} & \tb{entry_key}; \tb{transaction_id} FK NOT NULL; \tb{account_id} FK NOT NULL; \tb{direction} (\tb{DEBIT}/\tb{CREDIT}, com \tb{CHECK}); \tb{category} (\tb{PRINCIPAL}/\tb{FEE}); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{balance_after BIGINT NOT NULL CHECK (balance_after >= 0)}; \tb{created_at}. Índice em \tb{(account_id, created_at)} para o extrato. \\
+\tb{account} & \tb{account_key}; \tb{customer_id} FK $\to$ customer (nulo só na conta do banco, RN-REC-02); \tb{status account_status NOT NULL}; \tb{balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0)}; \tb{created_at}, \tb{updated_at}. Índice único parcial \tb{UNIQUE(customer_id) WHERE status <> 'CLOSED'} para o banco também barrar a segunda conta (rede de segurança). O seed cria a conta do banco primeiro, com o menor \tb{id}. \\
+\tb{account_status_event} & \tb{account_id} FK; \tb{from_status account_status} (nulo no nascimento); \tb{to_status account_status NOT NULL}; \tb{reason VARCHAR(255)}; \tb{actor status_actor NOT NULL} (\tb{CUSTOMER}/\tb{BANK}, RN-CON-05); \tb{created_at}. \\
+\tb{transaction} & O \emph{pedido} que mexe em dinheiro. \tb{transaction_key}; \tb{type transaction_type NOT NULL}; \tb{owner_account_id} FK NOT NULL (a dona do pedido: quem pediu; no depósito e no resgate, a que recebe); \tb{destination_account_id} FK (só e sempre na transferência: \tb{CHECK ((type = 'TRANSFER') = (destination_account_id IS NOT NULL))} e \tb{CHECK (destination_account_id <> owner_account_id)}); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{fee_amount BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0)}; \tb{description VARCHAR(140)}; \tb{idempotency_key UUID UNIQUE} (do cliente, única no banco inteiro; nula nas transações que o banco cria, RN-GER-08); \tb{business_date DATE NOT NULL} FK $\to$ \tb{business_day(business_date)} (o dia de movimento em que a transação aconteceu, RN-GER-13; índice para o extrato e a receita); \tb{created_at}. \\
+\tb{ledger_entry} & O \emph{extrato}: um efeito em um saldo. \tb{transaction_id} FK NOT NULL; \tb{account_id} FK NOT NULL; \tb{direction entry_direction} (\tb{DEBIT}/\tb{CREDIT}); \tb{category entry_category} (\tb{PRINCIPAL}/\tb{FEE}); \tb{amount BIGINT NOT NULL CHECK (amount > 0)}; \tb{balance_after BIGINT NOT NULL CHECK (balance_after >= 0)}; \tb{created_at}. Índice em \tb{(account_id, created_at)} para o extrato. Sem \tb{key}: o lançamento nunca sai sozinho na API. \\
 \bottomrule
 \end{longtable}
 
@@ -1269,48 +1333,48 @@ de enumerador têm \tb{id} e \tb{enumerator} (texto único). Abaixo, só as colu
 \textbf{Tabela} & \textbf{Colunas principais e restrições} \\
 \midrule
 \endhead
-\tb{suitability_question} & \tb{code} (Q1..Q7) UNIQUE; \tb{text}; \tb{dimension} (objetivo, situação financeira, conhecimento); \tb{position} (ordem de exibição). \\
-\tb{suitability_option} & \tb{question_id} FK; \tb{code} (1..4); \tb{text}; \tb{points SMALLINT}. \tb{UNIQUE(question_id, code)}. \\
-\tb{investor_profile} & Enumerador com dados: \tb{CONSERVATIVE}, \tb{MODERATE}, \tb{AGGRESSIVE}; \tb{min_score}, \tb{max_score}, \tb{max_risk_level}. \\
-\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{profile_id} FK; \tb{score SMALLINT}; \tb{forced_by_rule BOOLEAN}; \tb{valid_until TIMESTAMPTZ} (hora real + 24 meses); \tb{created_at}. (Uma linha por vez que o cliente responde; nunca é editada.) \\
-\tb{suitability_answer} & \tb{assessment_id} FK; \tb{question_id} FK; \tb{option_id} FK. \tb{UNIQUE(assessment_id, question_id)}. \\
-\tb{product_type} & Enumerador: \tb{PUBLIC_BOND}, \tb{PRIVATE_BOND}, \tb{FUND}. \\
-\tb{product} & \tb{product_key}; \tb{name}; \tb{type_id} FK; \tb{issuer}; \tb{indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{liquidity} (\tb{DAILY}/\tb{AT_MATURITY}); \tb{maturity_date DATE} (vencimento fixo; nulo no fundo, no CDB e na LCI); \tb{term_months SMALLINT CHECK (> 0)} (prazo da oferta, RN-PRO-09); \tb{tax_exempt BOOLEAN NOT NULL DEFAULT false}; \tb{CHECK (maturity_date IS NULL OR term_months IS NULL)}; \tb{CHECK (NOT tax_exempt OR term_months >= 9)}; \tb{min_application BIGINT}; \tb{own_issue BOOLEAN NOT NULL DEFAULT false}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{admin_fee_bps SMALLINT} (só no fundo); \tb{external_code VARCHAR(40)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo na emissão própria). \\
-\tb{business_day} & \tb{reference_date DATE NOT NULL UNIQUE}; \tb{created_at}. Uma linha por dia aberto, nunca alterada; a data de movimento é a maior \tb{reference_date} (RN-GER-13). \\
-\tb{reference_rate} & \tb{code} (\tb{CDI}, \tb{SELIC}); \tb{reference_date DATE NOT NULL}; \tb{annual_rate_bps INTEGER CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(code, reference_date)}. Histórico das taxas (RN-REC-08). \\
-\tb{product_price} & \tb{product_id} FK; \tb{reference_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, reference_date)}. \\
-\tb{model_portfolio} & \tb{profile_id} FK UNIQUE; \tb{name}. \\
-\tb{model_portfolio_item} & \tb{model_portfolio_id} FK; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(model_portfolio_id, product_id)}. A soma de 10.000 é conferida por um teste. \\
-\tb{investment_order} & \tb{order_key}; \tb{customer_id} FK; \tb{account_id} FK; \tb{product_id} FK; \tb{side} (\tb{APPLY}/\tb{REDEEM}); \tb{amount BIGINT CHECK (> 0)}; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{maturity_date DATE} (só na aplicação em produto com prazo, RN-ORD-17); \tb{source} (\tb{CUSTOMER}/\tb{MATURITY}, padrão \tb{CUSTOMER}: quem pediu, o cliente ou a liquidação do fechamento, RN-FEC-09); \tb{settled_order_id INTEGER UNIQUE} FK $\to$ \tb{investment_order} (na liquidação, a aplicação devolvida; o \tb{UNIQUE} impede liquidar duas vezes); \tb{transaction_id} FK $\to$ transaction (o movimento de dinheiro); \tb{status} (\tb{EXECUTED}); \tb{idempotency_key}; \tb{request_hash}; \tb{created_at}. \tb{UNIQUE(customer_id, idempotency_key)}. \\
-\tb{position} & \tb{customer_id} FK; \tb{product_id} FK; \tb{quantity NUMERIC(24,8) NOT NULL CHECK (>= 0)}; \tb{invested_amount BIGINT NOT NULL CHECK (>= 0)}; \tb{updated_at}. \tb{UNIQUE(customer_id, product_id)}. \\
+\tb{suitability_question} & \tb{code} (Q1..Q7) UNIQUE, que também dá a ordem do questionário; \tb{text}; \tb{dimension} (objetivo, situação financeira, conhecimento). \\
+\tb{suitability_option} & \tb{suitability_question_id} FK; \tb{code SMALLINT CHECK (1..4)}, que também é a pontuação; \tb{text}. \tb{UNIQUE(suitability_question_id, code)}. \\
+\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{investor_profile investor_profile NOT NULL} (\tb{CONSERVATIVE}/\tb{MODERATE}/\tb{AGGRESSIVE}); \tb{score SMALLINT}; \tb{created_at}. Uma linha por vez que o cliente responde; nunca é editada. \tb{valid_until} (\tb{created_at} + 24 meses) e \tb{forced_by_rule} (perfil fora da faixa do \tb{score}) são calculados (RN-SUI-04, RN-SUI-05), assim como o risco máximo do perfil, lido das regras no código (RN-SUI-03). \\
+\tb{suitability_answer} & \tb{suitability_assessment_id} FK; \tb{suitability_option_id} FK (a pergunta vem da opção). \tb{UNIQUE(suitability_assessment_id, suitability_option_id)}. \\
+\tb{product} & \tb{product_key}; \tb{name}; \tb{type product_type}; \tb{issuer}; \tb{indexer product_indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{term_months SMALLINT CHECK (> 0)} (prazo de cada aplicação; nulo = resgate a qualquer dia, RN-PRO-09); \tb{minimum_application_amount BIGINT}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{administration_fee_bps SMALLINT} (só no fundo); \tb{price_source_code VARCHAR(50)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo é emissão própria, CDB e LCI). \\
+\tb{business_day} & \tb{business_date DATE NOT NULL UNIQUE}; \tb{created_at}. Uma linha por dia aberto, nunca alterada; a data de movimento é a maior \tb{business_date} (RN-GER-13). \\
+\tb{revenue_accrual} & A provisão diária (RN-REC-05 a 07). \tb{business_date DATE NOT NULL UNIQUE} FK $\to$ \tb{business_day(business_date)} (o dia que fechou); \tb{calendar_days SMALLINT CHECK (> 0)} (até o próximo dia de movimento); as bases \tb{customer_balance_amount}, \tb{fund_equity_amount} e \tb{own_issue_cost_amount}; os valores \tb{float_amount}, \tb{fund_administration_fee_amount} e \tb{own_issue_spread_amount} (todos \tb{BIGINT CHECK (>= 0)}); \tb{created_at}. Uma linha por dia fechado, nunca alterada; sem \tb{key}, porque nunca sai sozinha na API. As taxas não se repetem aqui: estão em \tb{reference_rate} e \tb{product}. \\
+\tb{reference_rate} & \tb{code reference_rate_code} (\tb{CDI}, \tb{SELIC}); \tb{rate_date DATE NOT NULL}; \tb{annual_rate_bps INTEGER CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(code, rate_date)}. Histórico das taxas (RN-REC-08). \\
+\tb{product_price} & \tb{product_id} FK; \tb{price_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, price_date)}. \\
+\tb{model_portfolio_item} & A carteira-modelo de cada perfil. \tb{investor_profile investor_profile NOT NULL}; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(investor_profile, product_id)}. A soma de 10.000 é conferida por um teste. \\
+\tb{investment_order} & O \emph{anexo} da transação de investimento: dono, lado (pelo tipo da transação), valor e chave de idempotência ficam na transação. \tb{order_key}; \tb{transaction_id} FK NOT NULL UNIQUE (1 ordem = 1 transação); \tb{product_id} FK; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{acquisition_cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{redeem_all BOOLEAN NOT NULL DEFAULT false} (o cliente pediu resgate total, RN-ORD-12); \tb{maturity_date DATE} (só na aplicação em produto com prazo, RN-ORD-17); \tb{matured_investment_order_id INTEGER UNIQUE} FK $\to$ \tb{investment_order} (só na liquidação do vencimento: a aplicação devolvida; o \tb{UNIQUE} impede liquidar duas vezes); \tb{created_at}. \\
+\tb{position} & \tb{account_id} FK; \tb{product_id} FK; \tb{quantity NUMERIC(24,8) NOT NULL CHECK (>= 0)}; \tb{acquisition_cost_amount BIGINT NOT NULL CHECK (>= 0)}; \tb{created_at}, \tb{updated_at}. \tb{UNIQUE(account_id, product_id)}. \\
 \bottomrule
 \end{longtable}
 
 \subsection{Como as tabelas se relacionam}
 
 \begin{itemize}
-  \item \textbf{customer 1:N account} --- ``um cliente tem várias contas'' (ao longo do tempo); só uma não encerrada.
+  \item \textbf{customer 1:N account} --- ``um cliente tem várias contas'' (ao longo do tempo); só uma não encerrada. A conta do banco não tem cliente.
+  \item \textbf{A conta é a dona de tudo que envolve dinheiro}: \textbf{account 1:N transaction} (o pedido), \textbf{account 1:N ledger_entry} (o extrato) e \textbf{account 1:N position}. Para chegar ao cliente: transação $\to$ conta $\to$ cliente.
   \item \textbf{account 1:N account_status_event} --- a trilha de estados.
-  \item \textbf{account 1:N ledger_entry} e \textbf{transaction 1:N ledger_entry} --- cada pedido gera lançamentos em uma ou duas contas.
+  \item \textbf{transaction 1:N ledger_entry} --- cada pedido gera de 1 a 4 lançamentos (a transferência gera 4: débito do principal e da tarifa na origem, crédito do principal no destino e da tarifa no banco).
+  \item \textbf{transaction 1:0..1 investment_order} --- a ordem é o anexo do pedido de investimento.
+  \item \textbf{investment_order 1:0..1 investment_order} --- a liquidação no vencimento aponta para a aplicação que devolveu (\tb{matured_investment_order_id}).
   \item \textbf{customer 1:N suitability_assessment 1:N suitability_answer N:1 suitability_option N:1 suitability_question}.
-  \item \textbf{investor_profile 1:1 model_portfolio 1:N model_portfolio_item N:1 product} --- carteira-modelo é um N:N entre perfil e produto, com o peso na tabela do meio.
+  \item \textbf{model_portfolio_item N:1 product}, com o perfil numa coluna ENUM --- a carteira-modelo liga cada perfil aos seus produtos, com o peso na linha.
   \item \textbf{product 1:N product_price}.
-  \item \textbf{customer N:N product} via \textbf{position} (com a quantidade na tabela do meio) e via \textbf{investment_order} (histórico).
-  \item \textbf{investment_order 1:1 transaction} --- toda ordem aponta para o movimento de dinheiro que ela gerou.
-  \item \textbf{investment_order 1:0..1 investment_order} --- a liquidação no vencimento aponta para a aplicação que devolveu (\tb{settled_order_id}).
 \end{itemize}
 
-O diagrama no formato \emph{mermaid} (que o modelo de RFC usa) está no Apêndice~\ref{ap:mermaid}.
+Os diagramas estão em \tb{docs/diagramas/er-nucleo.mmd}, \tb{er-perfil-e-carteira.mmd} e
+\tb{er-produtos-e-ordens.mmd}, com o PNG gerado ao lado de cada um.
 
 \subsection{O que o seed (\tb{database.sql}) precisa inserir}
 
 \begin{enumerate}
-  \item Enumeradores: \tb{account_status}, \tb{transaction_type}, \tb{product_type}, \tb{investor_profile}.
+  \item Os tipos ENUM (entre eles, o perfil do investidor, \tb{investor_profile}).
+  \item A conta do banco, sem cliente, que recebe as tarifas (RN-REC-02).
   \item As 7 perguntas e 28 opções do questionário.
   \item A primeira data de movimento (\tb{business_day} = data real em que o banco nasce).
   \item As taxas de referência (CDI e Selic, com a data de hoje) e os 6 produtos com o preço de
         hoje pelas fórmulas da RN-PRO-06 (a cota do fundo já líquida da taxa de administração).
-  \item As 3 carteiras-modelo e seus itens.
+  \item Os itens das 3 carteiras-modelo.
 \end{enumerate}
 
 Lembrete da Aula 3: o \tb{database.sql} só roda quando o banco nasce. Mudou o schema?
@@ -1338,14 +1402,14 @@ GET & \rota|/customer/{ck}| & Lê cliente (CPF mascarado). & 200; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Contas}} \\
 POST & \rota|/customer/{ck}/account| & Abre a conta corrente. & 201 \tb{account_key}; 404 cliente; 409 já tem conta não encerrada. \\
-GET & \rota|/customer/{ck}/account/{ak}| & Saldo e status. & 200; 404 (inexistente ou de outro cliente). \\
+GET & \rota|/customer/{ck}/account/{ak}| & Status, saldo, valor investido e capital total. & 200; 404 (inexistente ou de outro cliente). \\
 PATCH & \rota|/customer/{ck}/account/{ak}| & Cliente encerra a conta (RN-CON-11). \tb{status}, \tb{reason}. & 200; 400 status fora do enum; 403 bloquear ou desbloquear (só o banco); 404; 409 transição proibida ou conta não vazia; 422 sem motivo. \\
 GET & \rota|/customer/{ck}/account/{ak}/status_events| & Histórico de status, com quem fez (\tb{actor}). & 200; 404. \\
 PATCH & \rota|/internal/account/{ak}/status| & Banco bloqueia, desbloqueia ou encerra (RN-CON-11). \tb{status}, \tb{reason}. Exige \tb{OPERATOR-TOKEN}. & 200; 400 schema; 403 sem token de operador; 404; 409 transição proibida ou conta não vazia; 422 sem motivo. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Movimentações}} \\
 POST & \rota|/customer/{ck}/account/{ak}/transaction| & Depósito, saque ou transferência. \tb{type}, \tb{amount}, \tb{destination_account_key} (só transferência), \tb{description}. \textbf{Idem.} & 201 \tb{transaction_key} e saldo; 200 repetição idempotente; 400 schema/sem chave; 404 conta ou destino; 409 conta/destino não ativos, saldo insuficiente, chave reutilizada; 422 valor inválido, acima do limite, origem = destino. \\
-GET & \rota|/customer/{ck}/account/{ak}/transactions| & Extrato. Query: \tb{page}, \tb{limit}, \tb{from}, \tb{to}, \tb{type}. & 200 lista paginada; 400 filtro inválido; 404. \\
+GET & \rota|/customer/{ck}/account/{ak}/transactions| & Extrato. Query: \tb{page}, \tb{limit}, \tb{from}, \tb{to} (datas de movimento), \tb{type}. & 200 lista paginada; 400 filtro inválido; 404. \\
 GET & \rota|/customer/{ck}/account/{ak}/transaction/{transaction_key}| & Comprovante. & 200; 404 (inexistente ou não envolve a conta). \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Suitability}} \\
@@ -1355,25 +1419,25 @@ GET & \rota|/customer/{ck}/suitability| & Perfil atual. & 200; 404 cliente ou se
 GET & \rota|/customer/{ck}/suitabilities| & Histórico de avaliações. & 200; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Produtos e preços}} \\
-GET & \rota|/products| & Catálogo. Query: \tb{type}, \tb{max_risk}. & 200. \\
+GET & \rota|/products| & Catálogo. Query: \tb{type}, \tb{maximum_risk_level}. & 200. \\
 GET & \rota|/product/{product_key}| & Detalhe + preço do dia. & 200; 404. \\
 GET & \rota|/product/{product_key}/prices| & Histórico de preços. Query: \tb{from}, \tb{to}. & 200; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Data de movimento e fechamento do dia}} \\
 GET & \rota|/internal/business_date| & Data de movimento atual. Exige \tb{OPERATOR-TOKEN}. & 200 \tb{\{business_date\}}; 403 sem token de operador. \\
-POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, buscando preços e taxas lá fora. \tb{close_date}. Exige \tb{OPERATOR-TOKEN}. & 201 nova data, preços e taxas; 400 schema; 403 sem token de operador; 409 \tb{close_date} não é a data atual; 502 fonte externa fora do ar ou com resposta inválida (nada gravado). \\
+POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, buscando preços e taxas lá fora e gravando a provisão de receita do dia. \tb{close_date}. Exige \tb{OPERATOR-TOKEN}. & 201 nova data, preços e taxas; 400 schema; 403 sem token de operador; 409 \tb{close_date} não é a data atual; 502 fonte externa fora do ar ou com resposta inválida (nada gravado). \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Carteira sugerida}} \\
 GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 400 \tb{amount} ausente ou inválido; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Ordens e posição}} \\
-POST & \rota|/customer/{ck}/investment_order| & Aplica ou resgata. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço (no resgate, também custo, resultado e rentabilidade); 200 repetição idempotente; 400 schema/sem chave; 404 cliente ou produto; 409 sem conta ativa, conta bloqueada, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; 422 valor $\le 0$, abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
-GET & \rota|/customer/{ck}/investment_orders| & Histórico de ordens, a mais nova primeiro (RN-POS-05). Query: \tb{page}, \tb{limit}, \tb{product_key}. & 200 \tb{\{items, page, limit, total\}} (produto inexistente: lista vazia); 400 query inválida; 404 cliente. \\
-GET & \rota|/customer/{ck}/investment_order/{order_key}| & Detalhe da ordem. & 200; 404 (inclusive de outro cliente). \\
-GET & \rota|/customer/{ck}/positions| & Posição consolidada e rentabilidade (RN-POS-04). Query: \tb{include_closed}. & 200; 400 query inválida; 404. \\
+POST & \rota|/customer/{ck}/account/{ak}/investment_order| & Aplica ou resgata na conta. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço (no resgate, também custo, resultado e rentabilidade); 200 repetição idempotente; 400 schema/sem chave; 404 cliente, conta (inclusive de outro cliente) ou produto; 409 conta bloqueada ou encerrada, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; 422 valor $\le 0$, abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
+GET & \rota|/customer/{ck}/account/{ak}/investment_orders| & Histórico de ordens da conta, a mais nova primeiro (RN-POS-05). Query: \tb{page}, \tb{limit}, \tb{product_key}. & 200 \tb{\{items, page, limit, total\}} (produto inexistente: lista vazia); 400 query inválida; 404 cliente ou conta. \\
+GET & \rota|/customer/{ck}/account/{ak}/investment_order/{order_key}| & Detalhe da ordem. & 200; 404 (inclusive de outra conta ou de outro cliente). \\
+GET & \rota|/customer/{ck}/account/{ak}/positions| & Posição da conta, rentabilidade e capital total, com a divisão entre caixa e investimentos (RN-POS-04, RN-POS-06). Query: \tb{include_closed}. & 200; 400 query inválida; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Receita}} \\
-GET & \rota|/internal/revenue| & Receita realizada e estimada. Query: \tb{from}, \tb{to}. Exige \tb{OPERATOR-TOKEN}. & 200; 400 período inválido; 403 sem token de operador. \\
+GET & \rota|/internal/revenue| & Receita realizada e estimada (as provisões dos dias fechados), em datas de movimento. Query: \tb{from}, \tb{to}. Exige \tb{OPERATOR-TOKEN}. & 200; 400 período inválido; 403 sem token de operador. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Incrementos (\ext)}} \\
 POST & \rota|/customer/{ck}/portfolio_application| & Aplica a carteira sugerida inteira numa só transação. \tb{amount}. \textbf{Idem.} & 201 lista de ordens; mesmos erros da ordem. \\
@@ -1413,7 +1477,7 @@ HTTP/1.1 409 Conflict
 PPP000001 & 400 & Invalid Payload & Corpo ou query string fora do schema (campo faltando, tipo ou formato errado, enum inválido, parâmetro desconhecido). \\
 PPP000002 & 403 & Forbidden & Sem \tb{INTERNAL-TOKEN} (repositório-base). \\
 PPP000003 & 400 & Missing Idempotency Key & Rota de dinheiro sem \tb{Idempotency-Key}. \\
-PPP000004 & 409 & Idempotency Key Reused & Mesma chave com corpo diferente. \\
+PPP000004 & 409 & Idempotency Key Reused & Chave já usada em outro pedido: de outra conta, ou com tipo, valor, destino ou produto diferentes. \\
 PPP000005 & 400 & Invalid Query Parameter & Parâmetros com formato certo que se contradizem (ex.: \tb{from} depois de \tb{to}, período maior que 366 dias). \\
 PPP000006 & 409 & Business Date Mismatch & \tb{close_date} do fechamento não é a data de movimento atual. \\
 PPP000007 & 403 & Operator Only & Rota \tb{/internal/...} sem \tb{OPERATOR-TOKEN} ou com valor errado (RN-GER-14). \\
@@ -1456,7 +1520,6 @@ PPP007002 & 422 & Below Minimum Application & Valor menor que o mínimo do produ
 PPP007003 & 422 & Product Not Suitable & Risco do produto acima do perfil. \\
 PPP007004 & 409 & Insufficient Position & Resgate maior que a posição. \\
 PPP007005 & 422 & Redemption Not Allowed & Resgate antes do vencimento (liquidez no vencimento). \\
-PPP007006 & 409 & No Active Account & Cliente sem conta ativa para liquidar a ordem. \\
 \bottomrule
 \end{longtable}
 \endgroup
@@ -1489,13 +1552,15 @@ segundo espera a trava do passo 2, conta uma conta e recebe 409.
   \item Schema valida corpo e cabeçalho \tb{Idempotency-Key}.
   \item Busca a conta de origem pela \tb{key} \emph{e} confere que é do cliente do caminho.
   \item Busca a conta de destino; confere que não é a mesma da origem.
-  \item \textbf{Trava as duas contas} (\tb{FOR UPDATE}) em ordem crescente de \tb{id}.
-  \item Procura transação com (conta de origem, chave). Se existir e o hash do corpo for igual,
-        devolve a resposta original (200) e \textbf{para aqui}. Se o hash for diferente, 409.
+  \item \textbf{Trava as três contas} (\tb{FOR UPDATE}) em ordem crescente de \tb{id}: origem,
+        destino e a conta do banco, que recebe a tarifa (e, com o menor \tb{id}, é a primeira).
+  \item Procura a transação com a chave (única no banco). Se for da mesma conta e o pedido for
+        idêntico ao gravado (tipo, valor, destino, descrição), devolve a resposta original (200)
+        e \textbf{para aqui}. Se for de outra conta ou de outro pedido, 409.
   \item Confere status \tb{ACTIVE} nas duas e saldo da origem $\ge$ valor + tarifa (lidos
         \emph{depois} da trava).
-  \item Grava a \tb{transaction}; grava 3 lançamentos (débito principal, débito tarifa, crédito);
-        atualiza os 2 saldos.
+  \item Grava a \tb{transaction}; grava 4 lançamentos (débito principal e débito tarifa na
+        origem, crédito principal no destino, crédito tarifa no banco); atualiza os 3 saldos.
   \item \tb{commit} (libera as travas); responde 201 com \tb{transaction_key} e saldo novo.
 \end{enumerate}
 \textbf{Falhas:}
@@ -1509,22 +1574,26 @@ segundo espera a trava do passo 2, conta uma conta e recebe 409.
         devolve a mesma resposta, sem debitar de novo. Se o reenvio chega enquanto o original
         ainda roda, ele espera a trava no passo 4 e depois cai no mesmo caso. Por isso a checagem
         vem depois da trava: antes dela, o reenvio veria o saldo já debitado e receberia um falso
-        ``saldo insuficiente''. O \tb{UNIQUE(requester_account_id, idempotency_key)} fica como
-        rede de segurança.
+        ``saldo insuficiente''. O \tb{UNIQUE} de \tb{idempotency_key} fica como rede de
+        segurança: dois pedidos de contas diferentes com a mesma chave, ao mesmo tempo, passam os
+        dois pela busca (cada um trava só a sua conta) e o banco recusa o segundo, que vira 409.
 \end{itemize}
 
 \subsection{Responder o suitability}
 \textbf{Feliz:} (1) busca cliente; (2) confere 7 respostas, uma por pergunta, opções válidas; (3)
-soma pontos; (4) aplica a trava da Q3/Q5; (5) escolhe o perfil pela faixa; (6) grava avaliação +
-7 respostas, \tb{valid_until} = hora real + 24 meses; (7) \tb{commit}; (8) 201.\\
+soma os códigos das opções (o código é a pontuação); (4) se a trava da Q3/Q5 disparou, o perfil
+é Conservador; (5) senão, o perfil sai da faixa; (6) grava avaliação + 7 respostas (a validade e o
+\tb{forced_by_rule} são calculados depois, não gravados); (7) \tb{commit}; (8) 201.\\
 \textbf{Falhas:} passo 1 $\to$ 404; passo 2 $\to$ 422 \tb{PPP004002}/\tb{PPP004003}.
 
 \subsection{Aplicação}
 \textbf{Feliz:} (1) schema e \tb{Idempotency-Key}; (2) busca cliente, conta ativa, perfil
 válido, produto; (3) confere risco $\le$ perfil e valor $\ge$ mínimo; (4) busca preço
-do dia; (5) trava a conta e depois a posição (cria a posição com quantidade 0 se não existir); (6)
-checa a idempotência, já com as travas; confere saldo $\ge$ valor; (7) calcula quantidade; (8) grava transação \tb{INVESTMENT_APPLY} +
-lançamento de débito, atualiza saldo; (9) grava ordem; (10) soma quantidade e custo na posição;
+do dia; (5) trava a conta e depois a posição; (6) checa a idempotência, já com as travas (a
+chave da transação; pedido idêntico = lado, produto e valor); confere saldo $\ge$ valor; (7)
+calcula quantidade e cria a posição com quantidade 0 se não existir; (8) grava transação
+\tb{INVESTMENT_APPLY} (com a chave) + lançamento de débito, atualiza saldo; (9) grava a ordem
+ligada à transação; (10) soma quantidade e custo na posição;
 (11) \tb{commit}; (12) 201.\\
 \textbf{Falhas:} perfil vencido $\to$ 409; produto de risco 3 para Conservador $\to$ 422
 \tb{PPP007003}; saldo insuficiente $\to$ 409 (nada gravado).
@@ -1536,14 +1605,14 @@ custo; a ordem guarda o custo que saiu e a resposta traz resultado e rentabilida
 
 \subsection{Liquidação no vencimento (dentro do fechamento do dia)}
 Depois de gravar os preços do novo dia e antes de abri-lo: (1) busca as aplicações com
-\tb{maturity_date} $\le$ novo dia para as quais nenhuma ordem aponta em \tb{settled_order_id},
+\tb{maturity_date} $\le$ novo dia para as quais nenhuma ordem aponta em \tb{matured_investment_order_id},
 em ordem crescente de conta; (2) para cada uma, trava a conta e depois a posição; (3) grava o
-resgate da quantidade inteira ao preço do novo dia, com \tb{source = MATURITY}, chave
-\tb{uuid5} da aplicação e crédito mesmo em conta bloqueada; (4) segue o fechamento, que grava o
+resgate da quantidade inteira ao preço do novo dia, com \tb{matured_investment_order_id} = a aplicação,
+transação sem chave de idempotência e crédito mesmo em conta bloqueada; (4) segue o fechamento, que grava o
 novo \tb{business_day} e faz o \tb{commit}.\\
 \textbf{Falhas:} qualquer erro desfaz o fechamento inteiro, e a data não anda (RN-FEC-06); um
 segundo fechamento não liquida de novo, porque a aplicação já tem quem aponte para ela (e o
-\tb{UNIQUE} de \tb{settled_order_id} barraria).
+\tb{UNIQUE} de \tb{matured_investment_order_id} barraria).
 
 \subsection*{Principal desafio (candidato para a RFC)}
 
@@ -1568,7 +1637,7 @@ Seguindo as camadas do repositório-base. Para cada módulo, criar:
 \midrule
 \endhead
 \tb{database/} & \tb{database.sql}: todas as tabelas, índices, \tb{CHECK}s e o seed. \\
-\tb{src/models/} & \tb{customer.py}, \tb{account.py} (+ status e evento), \tb{transaction.py} (+ tipo e \tb{ledger_entry}), \tb{suitability.py}, \tb{product.py} (+ tipo e preço), \tb{model_portfolio.py}, \tb{investment_order.py} (ordem e posição). Atenção à ordem no \tb{models/__init__.py}: enumerador antes da entidade que o usa. \\
+\tb{src/models/} & \tb{customer.py}, \tb{account.py} (+ status e evento), \tb{transaction.py} (+ tipo e \tb{ledger_entry}), \tb{suitability.py} (+ perfil e as regras de cada um), \tb{product.py} (+ tipo e preço), \tb{model_portfolio.py}, \tb{investment_order.py} (ordem e posição). Atenção à ordem no \tb{models/__init__.py}: enumerador antes da entidade que o usa. \\
 \tb{src/schemas/} & Um \tb{.json} por corpo de entrada: \tb{customer_create}, \tb{account_status_update}, \tb{transaction_create}, \tb{suitability_submit}, \tb{price_create}, \tb{investment_order_create}. \\
 \tb{src/repositories/} & Um por entidade. Gera a \tb{key} no \tb{create}; métodos \tb{get_by_key}, \tb{get_by_key_for_update}, listagens paginadas. Não decide nada. \\
 \tb{src/controllers/} & \tb{customer}, \tb{account}, \tb{transaction}, \tb{suitability}, \tb{product}, \tb{portfolio}, \tb{investment_order}. Aqui moram todos os \tb{if} de negócio e o \tb{commit}. \\
@@ -1587,7 +1656,12 @@ Seguindo as camadas do repositório-base. Para cada módulo, criar:
 % =====================================================================
 
 Todos black box (R1): preparam o mundo pela porta da frente (criando cliente e conta via HTTP),
-fazem a requisição e conferem \textbf{status e corpo}. Nomes sugeridos, lidos como frases:
+fazem a requisição e conferem \textbf{status e corpo}. Além disso, \textbf{toda resposta de todo
+teste é conferida contra a R5}: a função por onde passam as chamadas (\tb{tests/utils/requisition.py})
+procura, no JSON inteiro (inclusive listas e objetos aninhados), chaves \tb{id} ou terminadas em
+\tb{_id}, e o teste falha apontando o campo. Assim rotas novas ficam cobertas sem ninguém lembrar de
+escrever o \emph{assert}. Única exceção: \tb{GET /} do repositório-base, cujo \tb{id} é o número do
+processo da API, não do banco. Nomes sugeridos, lidos como frases:
 
 \begingroup\small
 \begin{longtable}{@{}P{2.4cm}P{13.7cm}@{}}
@@ -1600,10 +1674,10 @@ Contas & abre conta com saldo zero e status ACTIVE; recusa segunda conta com 409
 Movimentações & depósito aumenta saldo; saque diminui saldo; \textbf{transferência debita valor + tarifa na origem e credita só o valor no destino}; recusa saldo insuficiente sem alterar nenhum saldo; recusa transferência para si mesmo; recusa destino inexistente; recusa conta bloqueada (origem e destino); recusa valor zero e acima do limite; mesmo Idempotency-Key não debita duas vezes; mesma chave com corpo diferente dá 409; sem chave dá 400; extrato reconstrói o saldo; extrato pagina; comprovante de outra conta dá 404; tipo INVESTMENT_APPLY recusado na rota de transação. \\
 Suitability & calcula cada um dos três perfis; trava da Q3 força Conservador; recusa respostas incompletas; recusa opção de outra pergunta; refazer mantém histórico e muda o perfil atual; cliente sem perfil dá 404. \\
 Produtos & lista catálogo; filtra por risco e por tipo; detalhe traz o preço do dia; histórico de preços no período; produto inexistente dá 404. \\
-Fechamento do dia & devolve a data de movimento; data de movimento e fechamento sem token de operador dão 403 (o fechamento não muda a data); fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova; \textbf{liquidação no vencimento}: aplica na LCI, fecha um dia por vez até o vencimento (cerca de 262 fechamentos), o dinheiro volta com rendimento, existe a ordem \tb{MATURITY}, a posição zera sem sumir e um fechamento a mais não paga de novo. \\
+Fechamento do dia & devolve a data de movimento; data de movimento e fechamento sem token de operador dão 403 (o fechamento não muda a data); fechamento grava um preço por produto e as duas taxas e abre o próximo dia útil (sexta $\to$ segunda); cota gravada é a que o mock respondeu; CDB $=$ preço anterior $\times (1 + c \times 95\%)$ (confere a relação, não um número fixo); \tb{close_date} errado dá 409 sem mudar nada; mock com erro, com queda de conexão ou com resposta inválida dá 502 sem gravar nada e sem mudar a data; produto mostra o preço novo depois do fechamento; ponta a ponta: aplica, fecha dois dias, posição e resgate refletem a cota nova; \textbf{liquidação no vencimento}: aplica na LCI, fecha um dia por vez até o vencimento (cerca de 262 fechamentos), o dinheiro volta com rendimento, existe a ordem \tb{MATURITY}, a posição zera sem sumir e um fechamento a mais não paga de novo; \textbf{conta bloqueada também recebe o vencimento} e continua sem sacar nem transferir (409). \\
 Carteira & soma dos pesos de cada carteira-modelo é 10.000; sugestão soma exatamente o valor pedido (inclusive com centavos quebrados); recusa sem perfil; recusa valor abaixo do mínimo. \\
 Ordens & aplicação debita a conta e cria posição; recusa produto acima do perfil; recusa sem perfil e com perfil vencido (se der para simular a data); recusa abaixo do mínimo; recusa sem saldo sem mexer em nada; resgate credita a conta e reduz posição; resgate devolve custo, resultado e rentabilidade (inclusive na repetição idempotente); resgate total zera posição sem apagá-la; recusa resgate maior que a posição; recusa resgate da LCI antes do vencimento; resgate sem perfil válido (não dá para vencer um perfil pela API: garantido porque o resgate não consulta o perfil); mesmo Idempotency-Key não aplica nem resgata duas vezes; ordem de outro cliente dá 404; \tb{GET} da ordem devolve o mesmo corpo da criação; histórico da mais nova para a mais antiga, paginado e filtrado por produto (produto inexistente: lista vazia); posição com valor atual, resultado, rentabilidade e total; posição zerada só com \tb{include_closed}; query inválida dá 400. \\
-Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. \\
+Receita & relatório soma exatamente as tarifas cobradas no período; transferência fora do período não entra; período invertido dá 400; pedir o relatório não altera nenhum saldo; conservação do dinheiro fecha depois de depósitos, saques, transferências, aplicações e resgates. A tarifa conta no dia de movimento da transferência, mesmo depois do fechamento. Estimada: o dia aberto não tem provisão; fechar um dia grava uma provisão com \tb{calendar_days} até o próximo dia e valores pela fórmula; a de sexta vale 3 dias; um dia fechado nunca muda; entre dois fechamentos, o depósito sobe a base do float no valor exato, a tarifa da transferência sai dela, a aplicação no CDB sobe a base do spread e a aplicação no fundo sobe a base do fundo; período sem dia fechado sai zerado; o período padrão é o mês da data de movimento. Extrato: filtra pelo dia de movimento, e um lançamento feito antes do fechamento fica no dia antigo. \\
 Concorrência \ext & dispara N transferências em paralelo (threads) de uma conta e confere que o saldo final nunca fica negativo e bate com o extrato. \\
 \bottomrule
 \end{longtable}
@@ -1695,14 +1769,38 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   \item \textbf{Quantidade como inteiro com escala fixa} (ex.: cotas $\times 10^8$ em \tb{BIGINT})
   --- descartada porque \tb{NUMERIC} já é exato e mais legível. Ganharia se o banco não tivesse
   tipo decimal exato.
-  \item \textbf{Conta de receitas do banco com saldo} (a tarifa seria creditada numa conta
-  interna) --- descartada porque toda transferência teria de travar e atualizar a \emph{mesma}
-  linha, e o banco inteiro passaria a fazer uma transferência por vez. Ganharia se o volume fosse
-  pequeno. \emph{Escolhido:} a receita é a soma dos lançamentos \tb{FEE}, e a conservação do
-  dinheiro é conferida pela reconciliação.
+  \item \textbf{Tarifa sem conta de destino} (a receita como soma dos débitos \tb{FEE} das contas
+  de cliente) --- era a escolha da versão anterior; descartada na revisão com a QI Tech porque a
+  tarifa saía da conta do cliente e não entrava em lugar nenhum: o débito ficava sem crédito, e a
+  conservação do dinheiro precisava de um termo à parte para a tarifa. \emph{Escolhido:} uma conta
+  do banco, sem cliente, recebe o crédito \tb{FEE} (partidas dobradas na tarifa, RN-REC-02).
+  \emph{Preço aceito:} toda transferência trava e atualiza a \emph{mesma} linha (a conta do banco),
+  então as transferências passam a ser feitas uma por vez. Se isso virar gargalo, a saída é
+  acumular a tarifa e creditá-la no fechamento do dia.
   \item \textbf{Cobrar a taxa de administração como transação diária} --- descartada porque exigiria
   uma rotina agendada e não é assim que o mercado faz: a taxa já vem descontada da cota. Ganharia se
   quiséssemos mostrar a cobrança no extrato do cliente.
+  \item \textbf{Relatório de receita só com os valores estimados} (um número por fonte) ---
+  descartada porque o número não se explica sozinho: na banca, ``de onde saiu esse float?'' fica sem
+  resposta, e o teste black box não consegue conferir a fórmula com outros testes mexendo nos saldos.
+  \emph{Escolhido:} cada estimativa traz a base e a taxa usadas (RN-REC-09). Ganharia se a resposta
+  fosse para um painel que só mostra totais.
+  \item \textbf{Estimativa como foto de agora $\times$ dias} (saldos, cotas e taxas do momento da
+  consulta, multiplicados pelos dias do período) --- foi a primeira versão do módulo 8; descartada
+  porque erra em período passado: o relatório de janeiro pedido em outubro usaria os saldos de
+  outubro. \emph{Também descartados:} projetar os dias futuros com a foto de hoje, porque mistura
+  histórico com projeção; e calcular cada dia \emph{pelo histórico} a cada pedido (acumulando
+  \tb{ledger_entry} e \tb{investment_order} desde o primeiro dia), que foi a segunda versão: o custo
+  crescia com a idade do banco, não com o período. \emph{Escolhido:} a provisão diária gravada no
+  fechamento (RN-REC-05 a 07), como a contabilidade de um banco faz; o relatório só soma as linhas do
+  período. \emph{Preço aceito:} uma tabela a mais e o dia aberto sem estimativa até fechar.
+  \item \textbf{Extrato e receita pelo relógio da máquina} (\tb{created_at}) --- descartado porque a
+  data de movimento é a data real simulada: depois de alguns fechamentos, o extrato mostraria 09/10
+  para uma transação feita no dia 14/10 do banco. \emph{Também descartado:} deduzir o dia de movimento
+  de cada transação pelo horário (o intervalo entre a abertura de um dia e a do seguinte), porque o
+  dia da transação é um dado de primeira classe, não algo a calcular por fora. \emph{Escolhido:}
+  \tb{transaction.business_date}, gravado na criação (RN-GER-13). Idade mínima e validade do perfil
+  continuam no relógio real, por serem fatos regulatórios.
   \item \textbf{Não fazer o módulo de investimentos} (``não fazer nada'') --- é a opção mais
   barata e deixaria todo o tempo para o núcleo. Descartada porque perderíamos o diferencial e a
   conexão com a vertical de fundos da QI Tech. \textbf{Vira o plano de corte:} se o núcleo atrasar,
@@ -1800,17 +1898,17 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   vencimento) --- descartada porque cada aplicação da LCI é uma emissão com o próprio vencimento
   (RN-PRO-09): um cliente que aplicou em março e em junho tem duas datas, e zerar tudo em março
   devolveria antes da hora o dinheiro de junho. Ganharia se o produto tivesse um vencimento só.
-  \emph{Escolhido:} liquidar por aplicação, com \tb{settled_order_id} ligando a liquidação à
+  \emph{Escolhido:} liquidar por aplicação, com \tb{matured_investment_order_id} ligando a liquidação à
   aplicação (RN-FEC-09).
   \item \textbf{Marcar a aplicação como liquidada} (uma coluna \tb{settled_at} ou um status
   \tb{SETTLED} na própria ordem) --- descartada porque a ordem é histórico e não é editada (R4).
   Ganharia se a ordem tivesse ciclo de estados (ver ``Cotização e liquidação com prazo'' nos
   incrementos). \emph{Escolhido:} ``liquidada'' é ``existe uma ordem que aponta para ela''.
-  \item \textbf{Chave de idempotência aleatória na liquidação} (\tb{uuid4}, como as do cliente)
-  --- descartada porque, se a mesma aplicação fosse liquidada duas vezes por engano, as duas chaves
-  seriam diferentes e o banco aceitaria pagar em dobro. \emph{Escolhido:} \tb{uuid5} da
-  \tb{order_key} da aplicação, sempre a mesma; o \tb{UNIQUE} de \tb{settled_order_id} é a
-  segunda rede.
+  \item \textbf{Chave de idempotência na liquidação} (aleatória, \tb{uuid4}, ou determinística,
+  \tb{uuid5} da \tb{order_key} da aplicação, como na versão anterior) --- descartada porque não há
+  pedido de cliente para repetir: a chave só existia para preencher uma coluna obrigatória.
+  \emph{Escolhido:} a transação da liquidação não tem chave (nula); quem impede pagar a mesma
+  aplicação duas vezes é o \tb{UNIQUE} de \tb{matured_investment_order_id}.
   \item \textbf{CDB e LCI rendendo pelo CDI do novo dia} (a taxa que acabou de chegar do Banco
   Central, usada direto da memória) --- descartada porque, no mercado, a taxa do dia $d$ é a que
   rende de $d$ para $d+1$, e porque contradizia a RN-REC-08, que manda ler a taxa de
@@ -1852,6 +1950,97 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   a conta congelaria no meio do caminho, o cliente poderia desistir e o banco confirmaria a
   identidade contra fraude. \emph{Escolhido:} uma etapa; as regras automáticas fazem o papel da
   confirmação do banco (RN-CON-11).
+
+  \item[] \textbf{Revisão da arquitetura do banco (feedback da QI Tech, outubro de 2026):}
+
+  \item \textbf{Chave de idempotência única por dono, com hash do corpo} (\tb{UNIQUE(conta, chave)}
+  em \tb{transaction}, \tb{UNIQUE(cliente, chave)} em \tb{investment_order}, mais um
+  \tb{request_hash} SHA-256) --- descartada porque a chave existia em dois lugares, e a aplicação
+  gravava nos dois: reusar numa aplicação a chave de um depósito passava pela busca de ordens e
+  quebrava no \tb{UNIQUE} da transação (500). E o hash repetia o que o pedido gravado já diz.
+  \emph{Escolhido:} \tb{idempotency_key UUID UNIQUE} só em \tb{transaction}, única no banco
+  inteiro; a repetição é conferida comparando o pedido com as colunas já gravadas (RN-GER-08).
+  \item \textbf{Repetição de chave sempre como erro} (409 em qualquer reenvio) --- descartada porque
+  o motivo da chave é o reenvio depois de uma falha de rede: o cliente precisa receber o resultado
+  original, não um erro que não diz o que aconteceu. Ganharia se a API devolvesse, no erro, onde
+  consultar o pedido original.
+  \item \textbf{Repetição conferida só pela conta, ou pela rota} (sem comparar o pedido) ---
+  descartada porque um pedido diferente com a mesma chave (outro valor, outro tipo) receberia
+  ``sucesso'' com a resposta de outro pedido, e o dinheiro pedido nunca se moveria.
+  \item \textbf{Três colunas de conta em \tb{transaction}} (\tb{requester}, \tb{origin},
+  \tb{destination}) --- descartada porque \tb{requester} sempre repetia a origem ou o destino, e no
+  depósito ``origem'' nem existe; quem foi afetado já está em \tb{ledger_entry}.
+  \emph{Escolhido:} \tb{owner_account_id} (a dona do pedido) e \tb{destination_account_id} (só na
+  transferência).
+  \item \textbf{Ordem e posição ligadas ao cliente} (\tb{investment_order.customer_id},
+  \tb{position.customer_id}), para os investimentos sobreviverem a uma troca de conta ---
+  descartada porque essa troca não existe: a conta só encerra com as posições zeradas
+  (RN-CON-08). Dois caminhos de ``quem é o dono'' confundiam. \emph{Escolhido:} a conta é a dona de
+  tudo que envolve dinheiro, e a ordem é só o anexo da transação, sem repetir dono, lado, valor
+  nem chave.
+  \item \textbf{Ordens e posição em rotas do cliente} (\rota|/customer/{ck}/investment_order|,
+  \rota|/customer/{ck}/positions|), com a API escolhendo por baixo dos panos a conta não encerrada
+  --- descartada porque no banco a ordem e a posição já são da conta, e as movimentações já ficavam
+  em \rota|/customer/{ck}/account/{ak}/|. Eram dois padrões de caminho para a mesma dona.
+  \emph{Escolhido:} as rotas de ordem e posição aninhadas na conta, com o mesmo formato das
+  movimentações (\tb{.../investment_order} cria e consulta, \tb{.../investment_orders} lista). O
+  cliente diz de qual conta sai o dinheiro, e a conta de outro cliente dá 404 como em todo o
+  resto. Sumiu o erro \tb{PPP007006} (cliente sem conta ativa): conta inexistente agora é 404
+  (\tb{PPP002001}), e conta bloqueada ou encerrada é \tb{PPP002005}. Suitability e carteira
+  sugerida continuam no cliente, porque o perfil é da pessoa.
+  \item \textbf{Uma rota só para movimentação e ordem} (\tb{POST .../transaction} com
+  \tb{type = INVESTMENT_APPLY}) --- descartada porque pedido, resposta e erros são outros
+  (produto, cotas, preço, perfil, mínimo, prazo): o schema viraria um ``um destes formatos'' e o
+  controller, um \tb{if} por tipo. A ligação já existe sem juntar as rotas: toda ordem gera uma
+  \tb{transaction}, que aparece no extrato e tem comprovante.
+  \item \textbf{Resgate total sem coluna própria} --- descartado porque, sem \tb{redeem_all}
+  gravado, a repetição de uma chave de resgate parcial num pedido total devolveria o parcial.
+  Também descartado: \textbf{remover o \tb{redeem_all} da API} (``valor igual ao valor atual =
+  total''), porque mudaria o contrato apresentado. \emph{Escolhido:} uma coluna booleana, que
+  guarda o que o cliente pediu.
+  \item \textbf{Tabelas de enumerador} (\tb{account_status}, \tb{transaction_type},
+  \tb{product_type}, com \tb{id} e \tb{enumerator}, como no repositório-base) --- descartadas porque
+  exigiam \emph{join} para ler um nome, um \tb{status_id <> 3} ``mágico'' no índice e conviviam com
+  outras listas feitas de \tb{VARCHAR + CHECK}. \emph{Escolhido:} tipos ENUM nativos do Postgres,
+  um padrão só. \emph{Também descartado:} manter \tb{investor_profile} como tabela por guardar
+  dados (a faixa de pontos e o risco máximo de cada perfil), que foi a primeira versão da revisão.
+  São três números fixos por perfil que nenhuma rota altera, ou seja, uma regra; e regra fixa mora no
+  código, como a tarifa. O perfil virou ENUM, e as faixas e o risco máximo, constantes em
+  \tb{models/suitability.py}.
+  \item \textbf{Colunas que repetem outras} --- descartadas: \tb{suitability_question.position}
+  (= código), \tb{suitability_option.points} (= código), \tb{suitability_answer.question_id} (vem
+  da opção), \tb{suitability_assessment.valid_until} e \tb{forced_by_rule} (calculados),
+  \tb{ledger_entry.entry_key} (nunca sai na API), \tb{product.own_issue} (= sem
+  \tb{price_source_code}), \tb{investment_order.source} e \tb{status} (calculado e constante) e a
+  tabela \tb{model_portfolio} (1:1 com o perfil, e o nome nunca saía na API).
+  \item \textbf{Capital total gravado numa coluna} (\tb{balance} = patrimônio, com colunas de
+  percentual) --- descartada porque o valor dos investimentos muda a cada fechamento, e o
+  \tb{balance} é a linha travada e a soma exata do extrato. \emph{Escolhido:} calcular na leitura,
+  na rota de posições (RN-POS-06) e na consulta da conta (RN-CON-12), com a mesma função de preço
+  para os dois nunca divergirem.
+  \item \textbf{Nomes curtos ou genéricos de coluna} (\tb{profile_id}, \tb{question_id},
+  \tb{min_score}, \tb{max_risk_level}, \tb{reference_date} em três tabelas, \tb{cost_amount} na ordem
+  e \tb{invested_amount} na posição para o mesmo conceito) --- descartados a pedido dos devs da QI Tech, porque obrigavam a abrir o
+  \tb{database.sql} para saber o que a coluna guarda. \emph{Escolhido:} chave estrangeira com o
+  nome completo da tabela de destino (\tb{suitability_question_id}, \tb{suitability_assessment_id}), com
+  o papel na frente quando há mais de uma para a mesma tabela (\tb{owner_account_id},
+  \tb{destination_account_id}, \tb{matured_investment_order_id}); \tb{minimum}/\tb{maximum} por
+  extenso; dinheiro em centavos termina em \tb{_amount}; cada data diz de quê é
+  (\tb{business_date}, \tb{price_date}, \tb{rate_date}); um nome só para um conceito
+  (\tb{acquisition_cost_amount}, o custo de aquisição das cotas, na ordem e na posição; ``investido''
+  lembrava o total já investido, e não o custo do que a conta ainda tem). Banco e API usam o mesmo
+  vocabulário.
+  \item \textbf{Coluna de isenção de imposto de renda} (\tb{product.tax_exempt}, com um \tb{CHECK}
+  exigindo prazo $\ge 9$ meses para letras isentas, como pedem as Resoluções CMN 5.119/2024 e
+  5.168/2024) --- descartada porque o banco não calcula imposto de renda (fora do escopo): nenhuma
+  regra lia a coluna, e o \tb{rate_description} da LCI já diz ``isento de IR'' a quem consulta.
+  Ganharia quando o IR entrar no cálculo da rentabilidade, junto com a regra do prazo mínimo.
+  \item \textbf{Liquidez e vencimento fixo como colunas do produto} (\tb{product.liquidity},
+  \tb{product.maturity_date}, e também \tb{product.updated_at}) --- descartadas porque liquidez
+  ``só no vencimento'' era exatamente ter prazo (\tb{term_months}), o vencimento fixo do Tesouro
+  não era usado por nenhuma regra (o primeiro vence em 2029, fora do horizonte da simulação), e o
+  catálogo nunca é editado. Ganharia com um produto com prazo e liquidez diária, ou quando o
+  vencimento do Tesouro for implementado (``Do MVP à produção'').
 
 \end{enumerate}
 
@@ -1917,8 +2106,8 @@ Em ordem aproximada de custo-benefício (os primeiros são baratos e impressiona
   desliga com \tb{docs_url=None}) e deixar exemplos de cada rota.
   \item \textbf{Índice único parcial} no banco para uma conta não encerrada por cliente.
   \item \textbf{Vencimento de título público}: no fechamento, zerar as posições de título com
-  vencimento fixo $\le$ novo dia, como a RN-FEC-09 faz com a LCI (chave \tb{uuid5} por posição e
-  data).
+  vencimento fixo $\le$ novo dia, como a RN-FEC-09 faz com a LCI (com uma referência única por
+  posição e data, para não pagar duas vezes).
   \item \textbf{Tirar produto do ar}: coluna de status em \tb{product}, rota interna e recusa da
   aplicação (o antigo \tb{PPP005002}).
 \end{enumerate}
@@ -1993,132 +2182,23 @@ podemos ter quantas entidades quisermos). Ficam três:
 Entendendo o problema & Seções 2 e 4 (garantias sobre o dinheiro, fora de escopo). \\
 Solução macro + alternativas & Seção 5 (peças) + Seção~\ref{sec:decisoes} (escolher 2 a 4 alternativas). \\
 Rotas & Tabela de rotas (uma linha por rota, com status e idempotência). \\
-Banco de dados & Diagrama do Apêndice~\ref{ap:mermaid} exportado como imagem. \\
+Banco de dados & Diagramas ER do Apêndice~\ref{ap:mermaid} (\tb{docs/diagramas/er-*.png}). \\
 Fluxos + principal desafio & Seção de fluxos (transferência e aplicação). \\
 \bottomrule
 \end{tabularx}
 
 % =====================================================================
 \appendix
-\section{Diagrama ER em mermaid}\label{ap:mermaid}
+\section{Diagramas ER}\label{ap:mermaid}
 % =====================================================================
 
-Colar em \url{https://mermaid.live} para gerar a imagem da RFC. Só as colunas que importam.
-
-\begin{lstlisting}
-erDiagram
-  customer ||--o{ account : "tem"
-  account_status ||--o{ account : "estado"
-  account ||--o{ account_status_event : "historico"
-  account ||--o{ ledger_entry : "lancamentos"
-  transaction ||--|{ ledger_entry : "gera"
-  transaction_type ||--o{ transaction : "tipo"
-  customer ||--o{ suitability_assessment : "responde"
-  investor_profile ||--o{ suitability_assessment : "resulta"
-  suitability_assessment ||--|{ suitability_answer : "contem"
-  suitability_question ||--|{ suitability_option : "opcoes"
-  suitability_option ||--o{ suitability_answer : "escolhida"
-  investor_profile ||--|| model_portfolio : "modelo"
-  model_portfolio ||--|{ model_portfolio_item : "itens"
-  product ||--o{ model_portfolio_item : "compoe"
-  product_type ||--o{ product : "tipo"
-  product ||--o{ product_price : "precos"
-  customer ||--o{ investment_order : "envia"
-  product ||--o{ investment_order : "negociado"
-  transaction ||--o| investment_order : "liquida"
-  investment_order |o--o| investment_order : "devolve no vencimento"
-  customer ||--o{ position : "possui"
-  product ||--o{ position : "em"
-
-  customer {
-    int id PK
-    char customer_key UK
-    char document_number UK
-  }
-  account {
-    int id PK
-    char account_key UK
-    int customer_id FK
-    int status_id FK
-    bigint balance "centavos, >= 0"
-  }
-  transaction {
-    int id PK
-    char transaction_key UK
-    int requester_account_id FK
-    int origin_account_id FK "nulo em deposito"
-    int destination_account_id FK "nulo em saque"
-    bigint amount "centavos"
-    bigint fee_amount
-    char idempotency_key "UK com requester"
-  }
-  ledger_entry {
-    int id PK
-    int transaction_id FK
-    int account_id FK
-    string direction "DEBIT ou CREDIT"
-    bigint amount
-    bigint balance_after
-  }
-  suitability_assessment {
-    int id PK
-    char assessment_key UK
-    int customer_id FK
-    int profile_id FK
-    smallint score
-    timestamptz valid_until
-  }
-  product {
-    int id PK
-    char product_key UK
-    smallint risk_level
-    string liquidity
-    date maturity_date "vencimento fixo ou nulo"
-    smallint term_months "prazo da oferta ou nulo"
-    boolean tax_exempt
-    bigint min_application
-    boolean own_issue
-    smallint admin_fee_bps
-    string external_code "nulo na emissao propria"
-  }
-  business_day {
-    int id PK
-    date reference_date UK "maior = data de movimento"
-  }
-  reference_rate {
-    int id PK
-    string code "CDI ou SELIC"
-    date reference_date "UK com code"
-    int annual_rate_bps
-  }
-  product_price {
-    int id PK
-    int product_id FK
-    date reference_date "UK com product"
-    numeric unit_price
-  }
-  investment_order {
-    int id PK
-    char order_key UK
-    int customer_id FK
-    int product_id FK
-    int transaction_id FK
-    string side "APPLY ou REDEEM"
-    bigint amount
-    numeric quantity
-    bigint cost_amount
-    date maturity_date "so aplicacao com prazo"
-    string source "CUSTOMER ou MATURITY"
-    int settled_order_id FK "UK, aplicacao devolvida"
-  }
-  position {
-    int id PK
-    int customer_id FK
-    int product_id FK "UK com customer"
-    numeric quantity ">= 0"
-    bigint invested_amount
-  }
-\end{lstlisting}
+Os diagramas ER ficam num lugar só, em \emph{mermaid}, com \textbf{todas} as colunas de cada tabela:
+\tb{docs/diagramas/er-nucleo.mmd}, \tb{er-perfil-e-carteira.mmd} e \tb{er-produtos-e-ordens.mmd},
+com o PNG gerado ao lado de cada um. Cada tabela aparece com as colunas em exatamente um diagrama;
+nos outros, só no relacionamento. O topo de cada arquivo liga o \emph{layout} ELK, que desenha as
+linhas em ângulo reto e sem cruzamento. Para regerar um PNG:
+\tb{npx -p @mermaid-js/mermaid-cli mmdc -b white -s 2 -i er-nucleo.mmd -o er-nucleo.png}. Depois de mexer no \tb{database.sql}, o
+\tb{python scripts/check_er.py} confere que os diagramas continuam iguais ao banco.
 
 % =====================================================================
 \section{Exemplos de requisição e resposta}
@@ -2168,7 +2248,7 @@ HTTP/1.1 201 Created
   "profile": "MODERATE",
   "score": 19,
   "forced_by_rule": false,
-  "max_risk_level": 3,
+  "maximum_risk_level": 3,
   "valid_until": "2028-10-02T14:12:00Z"
 }
 \end{lstlisting}
@@ -2193,7 +2273,7 @@ HTTP/1.1 200 OK
 
 \subsection*{Aplicação}
 \begin{lstlisting}
-POST /customer/9c2f.../investment_order
+POST /customer/9c2f.../account/7b1e.../investment_order
 Idempotency-Key: 0f9e8d7c-...
 {
   "product_key": "55ee...",
@@ -2218,7 +2298,7 @@ HTTP/1.1 201 Created
 
 \subsection*{Resgate}
 \begin{lstlisting}
-POST /customer/9c2f.../investment_order
+POST /customer/9c2f.../account/7b1e.../investment_order
 Idempotency-Key: 7a6b5c4d-...
 {
   "product_key": "55ee...",
@@ -2238,7 +2318,7 @@ HTTP/1.1 201 Created
   "maturity_date": null,
   "status": "EXECUTED",
   "transaction_key": "a1b2...",
-  "cost_amount": 49780,
+  "acquisition_cost_amount": 49780,
   "result_amount": 220,
   "return_bps": 44
 }
@@ -2246,7 +2326,7 @@ HTTP/1.1 201 Created
 
 \subsection*{Posição (antes do resgate acima, com a cota a 1,24)}
 \begin{lstlisting}
-GET /customer/9c2f.../positions
+GET /customer/9c2f.../account/7b1e.../positions
 
 HTTP/1.1 200 OK
 {
@@ -2256,14 +2336,14 @@ HTTP/1.1 200 OK
       "quantity": "1215.00001105",
       "unit_price": "1.24000000",
       "current_amount": 150660,
-      "invested_amount": 150000,
+      "acquisition_cost_amount": 150000,
       "result_amount": 660,
       "return_bps": 44
     }
   ],
   "total": {
-    "current_amount": 150660,
-    "invested_amount": 150000,
+    "investments_amount": 150660,
+    "acquisition_cost_amount": 150000,
     "result_amount": 660,
     "return_bps": 44
   }
@@ -2275,21 +2355,50 @@ HTTP/1.1 200 OK
 
 \subsection*{Relatório de receita}
 \begin{lstlisting}
-GET /internal/revenue?from=2026-10-01&to=2026-10-30
+GET /internal/revenue?from=2026-10-05&to=2026-11-01
 
 HTTP/1.1 200 OK
 {
-  "from": "2026-10-01",
-  "to": "2026-10-30",
+  "from": "2026-10-05",
+  "to": "2026-11-01",
+  "days": 20,
   "realized": {
-    "transfer_fees": 400000
+    "fee_amount": 400000
   },
   "estimated": {
-    "fund_admin_fee": 410959,
-    "own_issue_spread": 183699,
-    "float": 2465753
+    "fund_administration_fee": {
+      "amount": 383548,
+      "daily": [
+        {"date": "2026-10-05", "calendar_days": 1,
+         "base_amount": 500000000, "annual_rate_bps": 100,
+         "amount": 13698},
+        ...
+        {"date": "2026-10-09", "calendar_days": 3,
+         "base_amount": 500000000, "annual_rate_bps": 100,
+         "amount": 41095},
+        ...
+      ]
+    },
+    "own_issue_spread": {
+      "amount": 171444,
+      "daily": [
+        {"date": "2026-10-05", "calendar_days": 1,
+         "base_amount": 300000000, "cdi_annual_rate_bps": 1490,
+         "amount": 6123},
+        ...
+      ]
+    },
+    "float": {
+      "amount": 2301356,
+      "daily": [
+        {"date": "2026-10-05", "calendar_days": 1,
+         "base_amount": 200000000, "annual_rate_bps": 1500,
+         "amount": 82191},
+        ...
+      ]
+    }
   },
-  "total": 3460411
+  "total_amount": 3256348
 }
 \end{lstlisting}
 

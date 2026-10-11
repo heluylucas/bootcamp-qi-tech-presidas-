@@ -1,13 +1,13 @@
 -- Data de movimento (RN-GER-13): o "hoje" do banco. Uma linha por dia aberto,
--- nunca alterada; a data atual é a maior reference_date. Nasce com a data real
+-- nunca alterada; a data atual é a maior business_date. Nasce com a data real
 -- e só avança pelo fechamento do dia.
 CREATE TABLE business_day(
     id                              SERIAL PRIMARY KEY,
-    reference_date                  DATE NOT NULL UNIQUE,
+    business_date                   DATE NOT NULL UNIQUE,
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO business_day (reference_date) VALUES (CURRENT_DATE);
+INSERT INTO business_day (business_date) VALUES (CURRENT_DATE);
 
 CREATE TABLE customer(
     id                              SERIAL PRIMARY KEY,
@@ -18,22 +18,20 @@ CREATE TABLE customer(
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE account_status(
-    id                              SERIAL PRIMARY KEY,
-    enumerator                      VARCHAR(50) NOT NULL UNIQUE,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-INSERT INTO account_status (enumerator) VALUES
-('ACTIVE'),
-('BLOCKED'),
-('CLOSED');
+-- Enumeradores: listas fixas de valores, conferidas pelo próprio banco. Valor fora da
+-- lista é recusado na gravação. Acrescentar um valor: ALTER TYPE ... ADD VALUE.
+CREATE TYPE account_status AS ENUM ('ACTIVE', 'BLOCKED', 'CLOSED');
+CREATE TYPE status_actor AS ENUM ('CUSTOMER', 'BANK');
+CREATE TYPE transaction_type AS ENUM ('DEPOSIT', 'WITHDRAWAL', 'TRANSFER', 'INVESTMENT_APPLY', 'INVESTMENT_REDEEM');
+CREATE TYPE entry_direction AS ENUM ('DEBIT', 'CREDIT');
+CREATE TYPE entry_category AS ENUM ('PRINCIPAL', 'FEE');
 
 CREATE TABLE account(
     id                              SERIAL PRIMARY KEY,
     account_key                     CHAR(36) NOT NULL UNIQUE,
-    customer_id                     INTEGER NOT NULL REFERENCES customer(id),
-    status_id                       INTEGER NOT NULL REFERENCES account_status(id),
+    -- Nulo só na conta do próprio banco (seed abaixo), que recebe as tarifas.
+    customer_id                     INTEGER REFERENCES customer(id),
+    status                          account_status NOT NULL,
     balance                         BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -42,51 +40,47 @@ CREATE TABLE account(
 CREATE TABLE account_status_event(
     id                              SERIAL PRIMARY KEY,
     account_id                      INTEGER NOT NULL REFERENCES account(id),
-    from_status_id                  INTEGER REFERENCES account_status(id),
-    to_status_id                    INTEGER NOT NULL REFERENCES account_status(id),
+    -- Nulo no nascimento da conta (RN-CON-03).
+    from_status                     account_status,
+    to_status                       account_status NOT NULL,
     reason                          VARCHAR(255),
     -- Quem fez a mudança (RN-CON-05): CUSTOMER pela rota do cliente, BANK pela
     -- rota interna (RN-CON-11). Sem DEFAULT: esquecer de informar vira erro.
-    actor                           VARCHAR(8) NOT NULL CHECK (actor IN ('CUSTOMER', 'BANK')),
+    actor                           status_actor NOT NULL,
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE transaction_type(
-    id                              SERIAL PRIMARY KEY,
-    enumerator                      VARCHAR(50) NOT NULL UNIQUE,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-INSERT INTO transaction_type (enumerator) VALUES
-('DEPOSIT'),
-('WITHDRAWAL'),
-('TRANSFER'),
-('INVESTMENT_APPLY'),
-('INVESTMENT_REDEEM');
-
+-- O pedido que mexe em dinheiro. Os efeitos em cada saldo ficam em ledger_entry.
 CREATE TABLE transaction(
     id                              SERIAL PRIMARY KEY,
     transaction_key                 CHAR(36) NOT NULL UNIQUE,
-    type_id                         INTEGER NOT NULL REFERENCES transaction_type(id),
-    requester_account_id            INTEGER NOT NULL REFERENCES account(id),
-    origin_account_id               INTEGER REFERENCES account(id),
-    destination_account_id          INTEGER REFERENCES account(id),
+    type                            transaction_type NOT NULL,
+    -- A dona do pedido: a conta que pediu (no depósito e no resgate, a que recebe).
+    owner_account_id                INTEGER NOT NULL REFERENCES account(id),
+    -- Só na transferência, e nela sempre: a conta que recebe.
+    destination_account_id          INTEGER REFERENCES account(id) CHECK (destination_account_id <> owner_account_id),
     amount                          BIGINT NOT NULL CHECK (amount > 0),
     fee_amount                      BIGINT NOT NULL DEFAULT 0 CHECK (fee_amount >= 0),
     description                     VARCHAR(140),
-    idempotency_key                 CHAR(36) NOT NULL,
-    request_hash                    CHAR(64) NOT NULL,
+    -- Gerada por quem chama a API, única no banco inteiro. Nula quando o próprio
+    -- banco cria a transação (liquidação no vencimento): não há pedido para repetir.
+    idempotency_key                 UUID UNIQUE,
+    -- O dia em que a transação aconteceu, no calendário do banco (a data de movimento, que é a
+    -- data real simulada). O extrato e a tarifa da receita filtram por ela; o created_at fica
+    -- só como registro técnico de quando a linha foi gravada.
+    business_date                   DATE NOT NULL REFERENCES business_day(business_date),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(requester_account_id, idempotency_key)
+    CHECK ((type = 'TRANSFER') = (destination_account_id IS NOT NULL))
 );
+
+CREATE INDEX transaction_business_date_idx ON transaction (business_date);
 
 CREATE TABLE ledger_entry(
     id                              SERIAL PRIMARY KEY,
-    entry_key                       CHAR(36) NOT NULL UNIQUE,
     transaction_id                  INTEGER NOT NULL REFERENCES transaction(id),
     account_id                      INTEGER NOT NULL REFERENCES account(id),
-    direction                       VARCHAR(6) NOT NULL CHECK (direction IN ('DEBIT', 'CREDIT')),
-    category                        VARCHAR(9) NOT NULL CHECK (category IN ('PRINCIPAL', 'FEE')),
+    direction                       entry_direction NOT NULL,
+    category                        entry_category NOT NULL,
     amount                          BIGINT NOT NULL CHECK (amount > 0),
     balance_after                   BIGINT NOT NULL CHECK (balance_after >= 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -94,80 +88,73 @@ CREATE TABLE ledger_entry(
 
 CREATE INDEX ledger_entry_account_created_idx ON ledger_entry (account_id, created_at);
 
--- Rede de segurança: no máximo uma conta não encerrada por cliente. 3 = CLOSED (ordem do seed acima).
-CREATE UNIQUE INDEX account_one_open_per_customer_idx ON account (customer_id) WHERE status_id <> 3;
+-- Rede de segurança: no máximo uma conta não encerrada por cliente.
+CREATE UNIQUE INDEX account_one_open_per_customer_idx ON account (customer_id) WHERE status <> 'CLOSED';
+
+-- A conta do banco: a tarifa sai do cliente e entra aqui, então nenhum centavo some
+-- (RN-REC-03). Sem cliente, nenhuma rota /customer/... a alcança. Nasce primeiro, com o
+-- menor id: na ordem crescente de travas, é sempre a primeira a ser travada.
+INSERT INTO account (account_key, customer_id, status) VALUES (gen_random_uuid()::text, NULL, 'ACTIVE');
 
 -- =====================================================================
 -- Suitability
 -- =====================================================================
 
+-- O questionário segue a ordem do código (Q1 a Q7).
 CREATE TABLE suitability_question(
     id                              SERIAL PRIMARY KEY,
     code                            VARCHAR(3) NOT NULL UNIQUE,
     text                            TEXT NOT NULL,
     dimension                       VARCHAR(30) NOT NULL,
-    position                        SMALLINT NOT NULL,
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- O código da opção é também a sua pontuação: a opção N vale N pontos (RN-SUI-03).
 CREATE TABLE suitability_option(
     id                              SERIAL PRIMARY KEY,
-    question_id                     INTEGER NOT NULL REFERENCES suitability_question(id),
-    code                            SMALLINT NOT NULL,
+    suitability_question_id         INTEGER NOT NULL REFERENCES suitability_question(id),
+    code                            SMALLINT NOT NULL CHECK (code BETWEEN 1 AND 4),
     text                            TEXT NOT NULL,
-    points                          SMALLINT NOT NULL CHECK (points BETWEEN 1 AND 4),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(question_id, code)
+    UNIQUE(suitability_question_id, code)
 );
 
-CREATE TABLE investor_profile(
-    id                              SERIAL PRIMARY KEY,
-    enumerator                      VARCHAR(50) NOT NULL UNIQUE,
-    min_score                       SMALLINT NOT NULL,
-    max_score                       SMALLINT NOT NULL,
-    max_risk_level                  SMALLINT NOT NULL CHECK (max_risk_level BETWEEN 1 AND 5),
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+-- O perfil do investidor. A faixa de pontos e o risco máximo de cada um são regras fixas,
+-- como a tarifa: ficam no código (models/suitability.py), não numa tabela (RN-SUI-03 e 04).
+CREATE TYPE investor_profile AS ENUM ('CONSERVATIVE', 'MODERATE', 'AGGRESSIVE');
 
+-- Validade (created_at + 24 meses) e trava (perfil fora da faixa do score) são calculadas.
 CREATE TABLE suitability_assessment(
     id                              SERIAL PRIMARY KEY,
     assessment_key                  CHAR(36) NOT NULL UNIQUE,
     customer_id                     INTEGER NOT NULL REFERENCES customer(id),
-    profile_id                      INTEGER NOT NULL REFERENCES investor_profile(id),
+    investor_profile                investor_profile NOT NULL,
     score                           SMALLINT NOT NULL,
-    forced_by_rule                  BOOLEAN NOT NULL DEFAULT false,
-    valid_until                     TIMESTAMPTZ NOT NULL,
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX suitability_assessment_customer_created_idx ON suitability_assessment (customer_id, created_at);
 
+-- A pergunta respondida vem da opção escolhida.
 CREATE TABLE suitability_answer(
     id                              SERIAL PRIMARY KEY,
-    assessment_id                   INTEGER NOT NULL REFERENCES suitability_assessment(id),
-    question_id                     INTEGER NOT NULL REFERENCES suitability_question(id),
-    option_id                       INTEGER NOT NULL REFERENCES suitability_option(id),
+    suitability_assessment_id       INTEGER NOT NULL REFERENCES suitability_assessment(id),
+    suitability_option_id           INTEGER NOT NULL REFERENCES suitability_option(id),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(assessment_id, question_id)
+    UNIQUE(suitability_assessment_id, suitability_option_id)
 );
 
-INSERT INTO investor_profile (enumerator, min_score, max_score, max_risk_level) VALUES
-('CONSERVATIVE', 7, 13, 2),
-('MODERATE', 14, 20, 3),
-('AGGRESSIVE', 21, 28, 5);
+INSERT INTO suitability_question (code, text, dimension) VALUES
+('Q1', 'Por quanto tempo pretende deixar o dinheiro investido?', 'objetivo'),
+('Q2', 'Qual o principal objetivo?', 'objetivo'),
+('Q3', 'Se seus investimentos caíssem 10% em um mês, você...', 'tolerância'),
+('Q4', 'Quanto da sua renda mensal sobra para investir?', 'situação financeira'),
+('Q5', 'Você pode precisar deste dinheiro de repente?', 'liquidez'),
+('Q6', 'Em quais produtos você já investiu?', 'experiência'),
+('Q7', 'Como você descreve seu conhecimento financeiro?', 'conhecimento');
 
-INSERT INTO suitability_question (code, text, dimension, position) VALUES
-('Q1', 'Por quanto tempo pretende deixar o dinheiro investido?', 'objetivo', 1),
-('Q2', 'Qual o principal objetivo?', 'objetivo', 2),
-('Q3', 'Se seus investimentos caíssem 10% em um mês, você...', 'tolerância', 3),
-('Q4', 'Quanto da sua renda mensal sobra para investir?', 'situação financeira', 4),
-('Q5', 'Você pode precisar deste dinheiro de repente?', 'liquidez', 5),
-('Q6', 'Em quais produtos você já investiu?', 'experiência', 6),
-('Q7', 'Como você descreve seu conhecimento financeiro?', 'conhecimento', 7);
-
--- Em todas as perguntas, a opção de código N vale N pontos.
-INSERT INTO suitability_option (question_id, code, text, points)
-SELECT q.id, o.code, o.text, o.code
+INSERT INTO suitability_option (suitability_question_id, code, text)
+SELECT q.id, o.code, o.text
 FROM (VALUES
     ('Q1', 1, 'Menos de 1 ano'),
     ('Q1', 2, '1 a 3 anos'),
@@ -204,85 +191,71 @@ JOIN suitability_question q ON q.code = o.question_code;
 -- Produtos e preços
 -- =====================================================================
 
-CREATE TABLE product_type(
-    id                              SERIAL PRIMARY KEY,
-    enumerator                      VARCHAR(50) NOT NULL UNIQUE,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE TYPE product_type AS ENUM ('PUBLIC_BOND', 'PRIVATE_BOND', 'FUND');
+CREATE TYPE product_indexer AS ENUM ('SELIC', 'CDI', 'PREFIXED', 'IPCA', 'QUOTA');
+CREATE TYPE reference_rate_code AS ENUM ('CDI', 'SELIC');
 
-INSERT INTO product_type (enumerator) VALUES
-('PUBLIC_BOND'),
-('PRIVATE_BOND'),
-('FUND');
-
+-- O catálogo é fixo (seed) e nunca é editado: sem updated_at.
 CREATE TABLE product(
     id                              SERIAL PRIMARY KEY,
     product_key                     CHAR(36) NOT NULL UNIQUE,
     name                            VARCHAR(100) NOT NULL,
-    type_id                         INTEGER NOT NULL REFERENCES product_type(id),
+    type                            product_type NOT NULL,
     issuer                          VARCHAR(100) NOT NULL,
-    indexer                         VARCHAR(8) NOT NULL CHECK (indexer IN ('SELIC', 'CDI', 'PREFIXED', 'IPCA', 'QUOTA')),
+    indexer                         product_indexer NOT NULL,
     rate_description                VARCHAR(100) NOT NULL,
     risk_level                      SMALLINT NOT NULL CHECK (risk_level BETWEEN 1 AND 5),
-    liquidity                       VARCHAR(11) NOT NULL CHECK (liquidity IN ('DAILY', 'AT_MATURITY')),
-    -- Título com vencimento fixo (Tesouro) usa maturity_date. Emissão própria com prazo usa
-    -- term_months: cada aplicação vence em data da aplicação + prazo (RN-PRO-09).
-    maturity_date                   DATE,
+    -- Prazo de cada aplicação (RN-PRO-09). Nulo: resgate a qualquer dia. Com prazo, cada aplicação
+    -- vence em data da aplicação + prazo, só é resgatada no vencimento e o fechamento do dia a paga.
     term_months                     SMALLINT CHECK (term_months > 0),
-    -- Isento de IR (LCI, LCA). O CMN exige prazo mínimo de 9 meses para essas letras
-    -- (Resoluções CMN 5.119/2024 e 5.168/2024).
-    tax_exempt                      BOOLEAN NOT NULL DEFAULT false,
-    min_application                BIGINT NOT NULL CHECK (min_application > 0),
-    own_issue                       BOOLEAN NOT NULL DEFAULT false,
+    minimum_application_amount      BIGINT NOT NULL CHECK (minimum_application_amount > 0),
     cdi_percentage_bps              SMALLINT CHECK (cdi_percentage_bps > 0),
-    admin_fee_bps                   SMALLINT CHECK (admin_fee_bps >= 0),
-    -- Como a fonte externa chama o produto (RN-FEC-04). Nulo na emissão própria.
-    external_code                   VARCHAR(50),
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (maturity_date IS NULL OR term_months IS NULL),
-    CHECK (NOT tax_exempt OR term_months >= 9)
+    administration_fee_bps          SMALLINT CHECK (administration_fee_bps >= 0),
+    -- Como a fonte externa chama o produto (RN-FEC-04). Nulo é emissão própria (CDB e LCI):
+    -- o preço sai do CDI, não de fora.
+    price_source_code               VARCHAR(50),
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Histórico das taxas (RN-REC-08): uma linha por taxa e por data, nunca alterada.
 CREATE TABLE reference_rate(
     id                              SERIAL PRIMARY KEY,
-    code                            VARCHAR(5) NOT NULL CHECK (code IN ('CDI', 'SELIC')),
-    reference_date                  DATE NOT NULL,
+    code                            reference_rate_code NOT NULL,
+    rate_date                       DATE NOT NULL,
     annual_rate_bps                 INTEGER NOT NULL CHECK (annual_rate_bps > 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(code, reference_date)
+    UNIQUE(code, rate_date)
 );
 
 CREATE TABLE product_price(
     id                              SERIAL PRIMARY KEY,
     product_id                      INTEGER NOT NULL REFERENCES product(id),
-    reference_date                  DATE NOT NULL,
+    price_date                      DATE NOT NULL,
     unit_price                      NUMERIC(20,8) NOT NULL CHECK (unit_price > 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(product_id, reference_date)
+    UNIQUE(product_id, price_date)
 );
 
-INSERT INTO reference_rate (code, reference_date, annual_rate_bps) VALUES
+INSERT INTO reference_rate (code, rate_date, annual_rate_bps) VALUES
 ('CDI', CURRENT_DATE, 1490),
 ('SELIC', CURRENT_DATE, 1500);
 
-INSERT INTO product (product_key, name, type_id, issuer, indexer, rate_description, risk_level, liquidity,
-                     maturity_date, term_months, tax_exempt, min_application, own_issue, cdi_percentage_bps,
-                     admin_fee_bps, external_code)
-SELECT gen_random_uuid()::text, v.name, t.id, v.issuer, v.indexer, v.rate_description, v.risk_level, v.liquidity,
-       v.maturity_date::date, v.term_months, v.tax_exempt, v.min_application, v.own_issue, v.cdi_percentage_bps,
-       v.admin_fee_bps, v.external_code
+INSERT INTO product (product_key, name, type, issuer, indexer, rate_description, risk_level,
+                     term_months, minimum_application_amount, cdi_percentage_bps,
+                     administration_fee_bps, price_source_code)
+SELECT gen_random_uuid()::text, v.name, v.type::product_type, v.issuer, v.indexer::product_indexer,
+       v.rate_description, v.risk_level,
+       v.term_months, v.minimum_application_amount, v.cdi_percentage_bps,
+       v.administration_fee_bps, v.price_source_code
 FROM (VALUES
-    ('Tesouro Selic 2031',      'PUBLIC_BOND',  'Tesouro Nacional',  'SELIC',    '100% da Selic',           1, 'DAILY',       '2031-03-01', NULL, false, 5000,  false, NULL, NULL, 'TESOURO SELIC 2031'),
-    ('CDB Triple P Bank Liquidez', 'PRIVATE_BOND', 'Triple P Bank',        'CDI',      '95% do CDI',              2, 'DAILY',       NULL,         NULL, false, 5000,  true,  9500, NULL, NULL),
-    ('LCI Triple P Bank 12 meses', 'PRIVATE_BOND', 'Triple P Bank',        'CDI',      '93% do CDI, isento de IR',2, 'AT_MATURITY', NULL,         12,   true,  10000, true,  9300, NULL, NULL),
-    ('Tesouro Prefixado 2029',  'PUBLIC_BOND',  'Tesouro Nacional',  'PREFIXED', '13% a.a.',                2, 'DAILY',       '2029-01-01', NULL, false, 5000,  false, NULL, NULL, 'TESOURO PREFIXADO 2029'),
-    ('Tesouro IPCA+ 2035',      'PUBLIC_BOND',  'Tesouro Nacional',  'IPCA',     'IPCA + 6% a.a.',          3, 'DAILY',       '2035-05-15', NULL, false, 5000,  false, NULL, NULL, 'TESOURO IPCA+ 2035'),
-    ('FGV Quant Capital FIM',   'FUND',         'FGV Quant Capital', 'QUOTA',    'Varia com a cota',        3, 'DAILY',       NULL,         NULL, false, 10000, false, NULL, 100,  '12.345.678/0001-95')
-) AS v(name, type, issuer, indexer, rate_description, risk_level, liquidity,
-       maturity_date, term_months, tax_exempt, min_application, own_issue, cdi_percentage_bps, admin_fee_bps, external_code)
-JOIN product_type t ON t.enumerator = v.type;
+    ('Tesouro Selic 2031',         'PUBLIC_BOND',  'Tesouro Nacional',  'SELIC',    '100% da Selic',            1, NULL, 5000,  NULL, NULL, 'TESOURO SELIC 2031'),
+    ('CDB Triple P Bank Liquidez', 'PRIVATE_BOND', 'Triple P Bank',     'CDI',      '95% do CDI',               2, NULL, 5000,  9500, NULL, NULL),
+    ('LCI Triple P Bank 12 meses', 'PRIVATE_BOND', 'Triple P Bank',     'CDI',      '93% do CDI, isento de IR', 2, 12,   10000, 9300, NULL, NULL),
+    ('Tesouro Prefixado 2029',     'PUBLIC_BOND',  'Tesouro Nacional',  'PREFIXED', '13% a.a.',                 2, NULL, 5000,  NULL, NULL, 'TESOURO PREFIXADO 2029'),
+    ('Tesouro IPCA+ 2035',         'PUBLIC_BOND',  'Tesouro Nacional',  'IPCA',     'IPCA + 6% a.a.',           3, NULL, 5000,  NULL, NULL, 'TESOURO IPCA+ 2035'),
+    ('FGV Quant Capital FIM',      'FUND',         'FGV Quant Capital', 'QUOTA',    'Varia com a cota',         3, NULL, 10000, NULL, 100,  '12.345.678/0001-95')
+) AS v(name, type, issuer, indexer, rate_description, risk_level,
+       term_months, minimum_application_amount, cdi_percentage_bps, administration_fee_bps, price_source_code);
 
 -- Preço do dia em que o banco nasce, pelas fórmulas da RN-PRO-06 (as mesmas do mock).
 -- Os dias seguintes entram pelo fechamento do dia.
@@ -301,7 +274,7 @@ WITH series AS (
     SELECT power(1 + annual_rate_bps / 10000.0, 1 / 252.0) - 1 AS c
     FROM reference_rate WHERE code = 'CDI'
 )
-INSERT INTO product_price (product_id, reference_date, unit_price)
+INSERT INTO product_price (product_id, price_date, unit_price)
 SELECT p.id, s.day, ROUND(
     CASE p.indexer
         WHEN 'SELIC'    THEN 100 * power(1.15, s.d / 252.0)
@@ -316,33 +289,19 @@ FROM product p CROSS JOIN series s CROSS JOIN cdi;
 -- Carteira sugerida
 -- =====================================================================
 
-CREATE TABLE model_portfolio(
-    id                              SERIAL PRIMARY KEY,
-    profile_id                      INTEGER NOT NULL UNIQUE REFERENCES investor_profile(id),
-    name                            VARCHAR(100) NOT NULL,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
+-- A carteira-modelo de cada perfil: os produtos e o peso de cada um.
 CREATE TABLE model_portfolio_item(
     id                              SERIAL PRIMARY KEY,
-    model_portfolio_id              INTEGER NOT NULL REFERENCES model_portfolio(id),
+    investor_profile                investor_profile NOT NULL,
     product_id                      INTEGER NOT NULL REFERENCES product(id),
     weight_bps                      SMALLINT NOT NULL CHECK (weight_bps > 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(model_portfolio_id, product_id)
+    UNIQUE(investor_profile, product_id)
 );
 
-INSERT INTO model_portfolio (profile_id, name)
-SELECT id, CASE enumerator
-    WHEN 'CONSERVATIVE' THEN 'Carteira Conservadora'
-    WHEN 'MODERATE'     THEN 'Carteira Moderada'
-    WHEN 'AGGRESSIVE'   THEN 'Carteira Arrojada'
-END
-FROM investor_profile;
-
 -- Pesos em pontos-base: cada carteira soma 10.000.
-INSERT INTO model_portfolio_item (model_portfolio_id, product_id, weight_bps)
-SELECT mp.id, p.id, v.weight_bps
+INSERT INTO model_portfolio_item (investor_profile, product_id, weight_bps)
+SELECT v.profile::investor_profile, p.id, v.weight_bps
 FROM (VALUES
     ('CONSERVATIVE', 'Tesouro Selic 2031',      5000),
     ('CONSERVATIVE', 'CDB Triple P Bank Liquidez', 3000),
@@ -357,46 +316,65 @@ FROM (VALUES
     ('AGGRESSIVE',   'Tesouro IPCA+ 2035',      3000),
     ('AGGRESSIVE',   'FGV Quant Capital FIM',   4000)
 ) AS v(profile, product_name, weight_bps)
-JOIN investor_profile ip ON ip.enumerator = v.profile
-JOIN model_portfolio mp ON mp.profile_id = ip.id
 JOIN product p ON p.name = v.product_name;
 
 -- =====================================================================
 -- Ordens e posição
 -- =====================================================================
 
+-- O anexo do pedido de investimento: o que só a aplicação e o resgate têm. Dono, lado
+-- (tipo INVESTMENT_APPLY ou INVESTMENT_REDEEM), valor e chave de idempotência ficam na transação.
 CREATE TABLE investment_order(
     id                              SERIAL PRIMARY KEY,
     order_key                       CHAR(36) NOT NULL UNIQUE,
-    customer_id                     INTEGER NOT NULL REFERENCES customer(id),
-    account_id                      INTEGER NOT NULL REFERENCES account(id),
+    transaction_id                  INTEGER NOT NULL UNIQUE REFERENCES transaction(id),
     product_id                      INTEGER NOT NULL REFERENCES product(id),
-    side                            VARCHAR(6) NOT NULL CHECK (side IN ('APPLY', 'REDEEM')),
-    amount                          BIGINT NOT NULL CHECK (amount > 0),
     quantity                        NUMERIC(24,8) NOT NULL CHECK (quantity > 0),
     unit_price                      NUMERIC(20,8) NOT NULL CHECK (unit_price > 0),
-    cost_amount                     BIGINT NOT NULL CHECK (cost_amount >= 0),
+    acquisition_cost_amount         BIGINT NOT NULL CHECK (acquisition_cost_amount >= 0),
+    -- O cliente pediu resgate total (RN-ORD-12). O pedido não traz valor, então é isto que
+    -- diferencia uma repetição dele de um resgate parcial com a mesma chave.
+    redeem_all                      BOOLEAN NOT NULL DEFAULT false,
     -- Vencimento da aplicação em produto com prazo (RN-ORD-17). Nulo nos demais casos.
     maturity_date                   DATE,
-    -- Quem pediu: o cliente ou a liquidação no vencimento, feita pelo fechamento do dia (RN-FEC-09).
-    source                          VARCHAR(8) NOT NULL DEFAULT 'CUSTOMER' CHECK (source IN ('CUSTOMER', 'MATURITY')),
-    -- Na liquidação, a aplicação que ela devolveu. O UNIQUE impede liquidar a mesma aplicação duas vezes.
-    settled_order_id                INTEGER UNIQUE REFERENCES investment_order(id),
-    transaction_id                  INTEGER NOT NULL UNIQUE REFERENCES transaction(id),
-    status                          VARCHAR(8) NOT NULL DEFAULT 'EXECUTED' CHECK (status IN ('EXECUTED')),
-    idempotency_key                 CHAR(36) NOT NULL,
-    request_hash                    CHAR(64) NOT NULL,
-    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(customer_id, idempotency_key)
+    -- Só na liquidação feita pelo fechamento do dia (RN-FEC-09): a aplicação que ela devolveu.
+    -- O UNIQUE impede liquidar a mesma aplicação duas vezes.
+    matured_investment_order_id     INTEGER UNIQUE REFERENCES investment_order(id),
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Da conta, como o saldo: a conta só encerra com todas as posições zeradas (RN-CON-08).
 CREATE TABLE position(
     id                              SERIAL PRIMARY KEY,
-    customer_id                     INTEGER NOT NULL REFERENCES customer(id),
+    account_id                      INTEGER NOT NULL REFERENCES account(id),
     product_id                      INTEGER NOT NULL REFERENCES product(id),
     quantity                        NUMERIC(24,8) NOT NULL DEFAULT 0 CHECK (quantity >= 0),
-    invested_amount                 BIGINT NOT NULL DEFAULT 0 CHECK (invested_amount >= 0),
+    acquisition_cost_amount         BIGINT NOT NULL DEFAULT 0 CHECK (acquisition_cost_amount >= 0),
     created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(customer_id, product_id)
+    UNIQUE(account_id, product_id)
+);
+
+-- =====================================================================
+-- Receita
+-- =====================================================================
+
+-- A provisão diária (RN-REC-05 a 07): o fechamento grava, para o dia que fecha, as bases
+-- (a foto do fim do dia) e o que o banco ganharia com elas. Uma linha por dia fechado, nunca
+-- alterada (R4). O relatório de receita só soma as linhas do período.
+-- As taxas usadas não são repetidas aqui: o CDI e a Selic do dia estão em reference_rate, e a
+-- taxa do fundo em product.
+CREATE TABLE revenue_accrual(
+    id                              SERIAL PRIMARY KEY,
+    business_date                   DATE NOT NULL UNIQUE REFERENCES business_day(business_date),
+    -- Dias corridos até o próximo dia de movimento: a provisão de sexta vale sexta, sábado e domingo.
+    calendar_days                   SMALLINT NOT NULL CHECK (calendar_days > 0),
+    customer_balance_amount         BIGINT NOT NULL CHECK (customer_balance_amount >= 0),
+    fund_equity_amount              BIGINT NOT NULL CHECK (fund_equity_amount >= 0),
+    own_issue_cost_amount           BIGINT NOT NULL CHECK (own_issue_cost_amount >= 0),
+    float_amount                    BIGINT NOT NULL CHECK (float_amount >= 0),
+    fund_administration_fee_amount  BIGINT NOT NULL CHECK (fund_administration_fee_amount >= 0),
+    -- Gravado, não recalculado: depende do percentual do CDI de cada título, que a base somada não guarda.
+    own_issue_spread_amount         BIGINT NOT NULL CHECK (own_issue_spread_amount >= 0),
+    created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

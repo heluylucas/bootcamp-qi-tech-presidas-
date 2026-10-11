@@ -3,9 +3,9 @@ from typing import List, Tuple
 from controllers.base_controller import BaseController
 from controllers.suitability_controller import SuitabilityController
 from dtos.portfolio_dto import suggestion_to_dict
-from errors import CustomerNotFound, SuggestionAmountTooLow
+from errors import SuggestionAmountTooLow
 from models import ModelPortfolioItem
-from repositories import CustomerRepository, PortfolioRepository
+from repositories import PortfolioRepository
 
 
 # RN-CAR-02: R$ 1.000,00. Garante que cada fatia respeite a aplicação mínima do produto.
@@ -24,10 +24,7 @@ class PortfolioController(BaseController):
 
         É só simulação: não olha saldo nem conta e não grava nada, por isso não há commit.
         """
-        customer = CustomerRepository.get_by_key(self.context, customer_key)
-
-        if customer is None:
-            raise CustomerNotFound()
+        customer = self.get_customer(customer_key)
 
         # A mesma regra de perfil válido que as ordens usam (sem perfil / vencido → 409).
         assessment = SuitabilityController().get_valid_assessment(customer.id)
@@ -35,11 +32,11 @@ class PortfolioController(BaseController):
         if amount < MINIMUM_SUGGESTION_AMOUNT:
             raise SuggestionAmountTooLow()
 
-        # O seed grava uma carteira para cada perfil, então ela sempre existe.
-        portfolio = PortfolioRepository.get_by_profile(self.context, assessment.profile_id)
+        # O seed grava uma carteira para cada perfil, então ela sempre tem itens.
+        items = PortfolioRepository.list_items(self.context, assessment.investor_profile)
 
-        allocations = split_amount(amount, portfolio.items)
-        return suggestion_to_dict(assessment.profile.enumerator, amount, allocations)
+        allocations = split_amount(amount, items)
+        return suggestion_to_dict(assessment.investor_profile, amount, allocations)
 
 
 def split_amount(amount: int, items: List[ModelPortfolioItem]) -> List[Tuple[ModelPortfolioItem, int]]:

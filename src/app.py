@@ -9,7 +9,18 @@ from middlewares import (
     register_request_logger_middleware,
     register_session_manager_middleware,
 )
-from resources import AccountResource, BusinessDayResource, CustomerResource, HealthCheckResource, InvestmentOrderResource, PortfolioResource, ProductResource, SuitabilityResource, TransactionResource
+from resources import (
+    AccountResource,
+    BusinessDayResource,
+    CustomerResource,
+    HealthCheckResource,
+    InvestmentOrderResource,
+    PortfolioResource,
+    ProductResource,
+    RevenueResource,
+    SuitabilityResource,
+    TransactionResource,
+)
 from utils.logger import setup_logging
 
 
@@ -141,6 +152,11 @@ def create_app() -> FastAPI:
     application.add_api_route("/internal/business_date", business_day_resource.on_get, methods=["GET"])
     application.add_api_route("/internal/day_close", business_day_resource.on_post_close, methods=["POST"])
 
+    # Quanto o banco ganhou (RN-REC-09). Em /internal/: exige o token de operador.
+    revenue_resource = RevenueResource()
+
+    application.add_api_route("/internal/revenue", revenue_resource.on_get, methods=["GET"])
+
     customer_resource = CustomerResource()
 
     application.add_api_route("/customer", customer_resource.on_post, methods=["POST"])
@@ -204,17 +220,18 @@ def create_app() -> FastAPI:
 
     investment_order_resource = InvestmentOrderResource()
 
-    investment_order_path = "/customer/{customer_key}/investment_order"
+    # A ordem e a posição são da conta, como as movimentações: mesmo prefixo de caminho.
+    investment_order_path = f"{account_path}/investment_order"
 
     application.add_api_route(investment_order_path, investment_order_resource.on_post, methods=["POST"])
     application.add_api_route(f"{investment_order_path}/{{order_key}}", investment_order_resource.on_get, methods=["GET"])
     application.add_api_route(
-        "/customer/{customer_key}/investment_orders",
+        f"{account_path}/investment_orders",
         investment_order_resource.on_get_list,
         methods=["GET"]
     )
     application.add_api_route(
-        "/customer/{customer_key}/positions",
+        f"{account_path}/positions",
         investment_order_resource.on_get_positions,
         methods=["GET"]
     )

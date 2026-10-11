@@ -1,11 +1,10 @@
 import uuid
-from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy.orm import selectinload
 
 from database import Context
-from models import InvestorProfile, SuitabilityAnswer, SuitabilityAssessment, SuitabilityQuestion
+from models import SuitabilityAnswer, SuitabilityAssessment, SuitabilityQuestion
 
 
 class SuitabilityRepository:
@@ -16,38 +15,14 @@ class SuitabilityRepository:
         return (
             context.db_session.query(SuitabilityQuestion)
             .options(selectinload(SuitabilityQuestion.options))
-            .order_by(SuitabilityQuestion.position)
+            .order_by(SuitabilityQuestion.code)
             .all()
         )
 
     @staticmethod
-    def get_profile_for_score(context: Context, score: int) -> Optional[InvestorProfile]:
-        return (
-            context.db_session.query(InvestorProfile)
-            .filter(InvestorProfile.min_score <= score, InvestorProfile.max_score >= score)
-            .first()
-        )
-
-    @staticmethod
-    def get_profile(context: Context, enumerator: str) -> Optional[InvestorProfile]:
-        return context.db_session.query(InvestorProfile).filter(InvestorProfile.enumerator == enumerator).first()
-
-    @staticmethod
-    def create_assessment(
-        context: Context,
-        customer_id: int,
-        profile_id: int,
-        score: int,
-        forced_by_rule: bool,
-        valid_until: datetime,
-    ) -> SuitabilityAssessment:
+    def create_assessment(context: Context, customer_id: int, investor_profile: str, score: int) -> SuitabilityAssessment:
         assessment = SuitabilityAssessment(
-            assessment_key=str(uuid.uuid4()),
-            customer_id=customer_id,
-            profile_id=profile_id,
-            score=score,
-            forced_by_rule=forced_by_rule,
-            valid_until=valid_until,
+            assessment_key=str(uuid.uuid4()), customer_id=customer_id, investor_profile=investor_profile, score=score
         )
         context.db_session.add(assessment)
         context.db_session.flush()
@@ -55,8 +30,8 @@ class SuitabilityRepository:
         return assessment
 
     @staticmethod
-    def create_answer(context: Context, assessment_id: int, question_id: int, option_id: int) -> SuitabilityAnswer:
-        answer = SuitabilityAnswer(assessment_id=assessment_id, question_id=question_id, option_id=option_id)
+    def create_answer(context: Context, suitability_assessment_id: int, suitability_option_id: int) -> SuitabilityAnswer:
+        answer = SuitabilityAnswer(suitability_assessment_id=suitability_assessment_id, suitability_option_id=suitability_option_id)
         context.db_session.add(answer)
         context.db_session.flush()
 

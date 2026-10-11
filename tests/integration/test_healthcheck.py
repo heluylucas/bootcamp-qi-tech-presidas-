@@ -26,42 +26,15 @@ class TestHealthCheck:
         response = ClientRequisition.send("GET", "/health_check")
         assert response.response_status == 204
 
-    def test_no_token(self):
-        response = ClientRequisition.send("PUT", "/sample")
-        assert response.response_status == 403
-        assert response.response_json["code"] == "PPP000002"
-
-    def test_sink(self):
-        response = ClientRequisition.send(
-            "PUT",
-            "/sample",
-            headers={"INTERNAL-TOKEN": INTERNAL_TOKEN},
-        )
-        assert response.response_status == 404
-        assert response.response_json["code"] == "PPP000404"
-
-    def test_method_not_allowed(self):
-        response = ClientRequisition.send("PUT", "/health_check")
-        assert response.response_status == 405
-        assert response.response_json["code"] == "PPP000405"
-
-    def test_error_translation_keeps_accents(self):
-        """O acento da fonte chega no cliente — nas duas portas de erro da API.
-
-        São dois caminhos diferentes, e por isso são duas requisições num
-        teste só. O 403 nasce DENTRO do middleware de token, que devolve a
-        resposta com a requisição ainda a caminho da rota; o 404 nasce num
-        exception handler, bem mais pra dentro. Um só não prova o outro.
-
-        O que se defende aqui é o campo "translation" em português de
-        verdade: JSON é UTF-8, o acento cabe nele, e a API não tem por que
-        raspar cedilha e til de um texto escrito pra brasileiro ler.
-        """
+    def test_no_token_keeps_accents(self):
+        # O 403 nasce DENTRO do middleware de token, antes da rota.
         response = ClientRequisition.send("PUT", "/sample")
         assert response.response_status == 403
         assert response.response_json["code"] == "PPP000002"
         assert response.response_json["translation"] == FORBIDDEN_TRANSLATION
 
+    def test_sink_keeps_accents(self):
+        # O 404 nasce num exception handler, bem mais pra dentro: o outro caminho de erro.
         response = ClientRequisition.send(
             "PUT",
             "/sample",
@@ -70,3 +43,8 @@ class TestHealthCheck:
         assert response.response_status == 404
         assert response.response_json["code"] == "PPP000404"
         assert response.response_json["translation"] == NOT_FOUND_TRANSLATION
+
+    def test_method_not_allowed(self):
+        response = ClientRequisition.send("PUT", "/health_check")
+        assert response.response_status == 405
+        assert response.response_json["code"] == "PPP000405"

@@ -66,10 +66,15 @@ preço novo é o fechamento do dia:
         ↓
   7. grava os 6 preços e as 2 taxas
         ↓
-  8. devolve o dinheiro das aplicações da LCI que vencem em 06/10
-     (resgate automático ao preço novo, crédito na conta)
+  8. grava a provisão de receita de 05/10: a foto do fim do dia (saldos
+     de cliente, cotas do fundo, custo em CDB e LCI) e o que o banco
+     ganharia com ela até 06/10 (numa sexta, vale 3 dias)
         ↓
-  9. grava a nova data e dá um commit só: tudo ou nada
+  9. grava a nova data (06/10)
+        ↓
+ 10. devolve o dinheiro das aplicações da LCI que vencem em 06/10
+     (resgate automático ao preço novo, crédito na conta; a transação
+     já é do dia 06/10) e dá um commit só: tudo ou nada
         ↓
   201 {"business_date": "2026-10-06", "prices": [...], "rates": [...]}
 ```
@@ -89,8 +94,9 @@ sequenceDiagram
     Mock-->>API: respostas do novo dia
     API->>API: valida e calcula CDB/LCI
     API->>DB: grava preços e taxas
-    API->>DB: resgata as aplicações vencidas (trava conta e posição)
-    API->>DB: grava a nova data (1 commit para tudo)
+    API->>DB: grava a provisão de receita do dia que fecha (revenue_accrual)
+    API->>DB: grava a nova data
+    API->>DB: resgata as aplicações vencidas (trava conta e posição; 1 commit para tudo)
     API-->>Op: 201 nova data de movimento
 ```
 
@@ -164,7 +170,7 @@ Exemplo com números redondos, do jeito que os testes vão fazer:
 | 1     | Cliente aplica R$ 1.500 no fundo | 05/10             | 100,00 | Recebe 15 cotas. R$ 1.500 saem do saldo e aparecem no extrato como débito.                                      |
 | 2     | `POST /internal/day_close`       | 05/10 → **06/10** | 102,00 | Preço novo gravado, dia virou.                                                                                  |
 | 3     | `POST /internal/day_close`       | 06/10 → **07/10** | 104,00 | Mais um dia.                                                                                                    |
-| 4     | `GET /customer/{ck}/positions`   | 07/10             | 104,00 | Posição vale 15 × 104 = **R$ 1.560**. Resultado R$ 60, rentabilidade 400 pb (4%).                               |
+| 4     | `GET .../account/{ak}/positions` | 07/10             | 104,00 | Posição vale 15 × 104 = **R$ 1.560**. Resultado R$ 60, rentabilidade 400 pb (4%).                               |
 | 5     | Resgate total                    | 07/10             | 104,00 | R$ 1.560 voltam para a conta (crédito no extrato). A resposta mostra `result_amount: 6000` e `return_bps: 400`. |
 
 Os passos 2 e 3 levam milissegundos. É isso que deixa a banca ver a
@@ -345,8 +351,8 @@ real. E no nosso simulador a data de movimento fica à frente do calendário
 (cada vez que a suíte roda, ela anda alguns dias). Se a idade usasse essa
 data, alguém com 17 anos de verdade poderia abrir conta. Nenhum teste de
 investimento depende dessas duas regras. Por isso o `customer_controller.py`
-e os testes de idade **não mudaram**, e `valid_until` continua
-`TIMESTAMPTZ`. Continuam na data de movimento: vencimento do produto, preço
+e os testes de idade **não mudaram**, e `valid_until` continua no relógio
+real (hoje calculado como `created_at` + 24 meses, sem coluna própria). Continuam na data de movimento: vencimento do produto, preço
 do dia e taxas. A RFC (RN-GER-13, RN-CLI-05, RN-SUI-05, modelo de dados,
 fluxos e decisões) foi ajustada.
 
@@ -388,7 +394,7 @@ o seed nas fórmulas que o mock vai usar.
 
 | Rota                                  | O que faz                                                          |
 | ------------------------------------- | ------------------------------------------------------------------ |
-| `GET /products?type=&max_risk=`       | Catálogo, com filtros por tipo e risco máximo.                     |
+| `GET /products?type=&maximum_risk_level=`       | Catálogo, com filtros por tipo e risco máximo.                     |
 | `GET /product/{key}`                  | Detalhe do produto + `price` do dia (`null` se não houver nenhum). |
 | `GET /product/{key}/prices?from=&to=` | Histórico de preços, do mais antigo ao mais novo.                  |
 
@@ -564,9 +570,10 @@ vez de 100 → 102 → 104.
 - No fechamento, depois de gravar os preços e antes de abrir o dia, o banco
   resgata sozinho cada aplicação da LCI que vence no novo dia, ao preço novo.
   O dinheiro volta para a conta, mesmo que ela esteja bloqueada.
-- A ordem desse resgate tem `source = MATURITY` e `settled_order_id` (a
-  aplicação que ela devolveu). O `UNIQUE` dessa coluna impede pagar duas
-  vezes. A chave de idempotência é fixa por aplicação (`uuid5`).
+- A ordem desse resgate tem `matured_investment_order_id` (a aplicação que ela
+  devolveu); a API mostra `source = MATURITY` por causa dele. O `UNIQUE`
+  dessa coluna impede pagar duas vezes. A transação desse resgate não tem
+  chave de idempotência: não há pedido de cliente para repetir.
 - As travas seguem a mesma ordem das ordens do cliente (conta, depois
   posição), então não há _deadlock_ com uma aplicação no mesmo instante.
 - Está tudo no mesmo `commit` do fechamento: ou o dia abre com tudo pago, ou
@@ -620,6 +627,13 @@ Primeiro falhou (saldo parado em R$ 9.900), depois passou. `pytest -v`:
 | 05/10/2026 | 2    | Seed de preços e taxas reduzido ao dia em que o banco nasce (eram 30 dias). RFC ajustada.                                                                                                                                                                                                           |
 | 05/10/2026 | 2    | LCI virou "LCI Triple P Bank 12 meses": `term_months` e `tax_exempt` em `product`, `CHECK` do prazo mínimo de 9 meses (Res. CMN 5.119 e 5.168/2024). RFC: RN-PRO-09, RN-ORD-17, RN-FEC-09 (rascunho, liquidação no vencimento) e "Do MVP à produção". O fechamento continua calculando a LCI igual. |
 | 06/10/2026 | 5    | Módulo 7 (ordens, posição, consultas) pronto. Fechamento liquida a LCI no vencimento (RN-FEC-09, deixou de ser rascunho): `source` e `settled_order_id` em `investment_order`. `mock-init` com 300 dias úteis, em lotes com novas tentativas; a API espera o `mock-init` terminar. Removidos `is_active`, `PPP005002` e `PPP005003` (catálogo fixo). |
+| 08/10/2026 | —    | Revisão do banco (feedback da QI Tech, `docs/revisao-arquitetura.md`). No que toca preço e fechamento: emissão própria passou a ser "produto sem `external_code`" (saiu `product.own_issue`); a liquidação no vencimento grava a transação sem chave de idempotência (saiu o `uuid5`) e a ordem sem `source` (calculado de `settled_order_id`); tipos de produto, indexador, liquidez e código de taxa viraram ENUM do Postgres. |
+| 08/10/2026 | —    | Nomes de coluna e de campo por extenso (pedido da QI Tech): `product_price.reference_date` → `price_date` (sai assim na API), `business_day.reference_date` → `business_date`, `reference_rate.reference_date` → `rate_date`, `product.external_code` → `price_source_code`, `product.min_application` → `minimum_application_amount`, `investment_order.settled_order_id` → `matured_investment_order_id`, query `max_risk` → `maximum_risk_level`. |
+| 09/10/2026 | —    | Ordens e posição passam a ficar embaixo da conta, como as movimentações: `/customer/{ck}/account/{ak}/investment_order`, `.../investment_orders` e `.../positions`. Sai o erro `PPP007006` (sem conta ativa): conta inexistente é `404` e conta não ativa é `PPP002005`. RFC: RN-ORD-01, RN-POS-01 e R7. |
+| 09/10/2026 | —    | A consulta da conta passa a trazer `investments_amount` (posições ao preço do dia) e `net_worth_amount` (saldo + investimentos), calculados na leitura com a mesma função de preço da rota de posições. No total de posições, `current_amount` virou `investments_amount`. RFC: RN-CON-12, RN-POS-04 e RN-POS-06. |
+| 09/10/2026 | —    | Removidas `product.liquidity`, `product.maturity_date` e `product.updated_at`: "só resgata no vencimento" passa a ser "tem prazo" (`term_months`), o vencimento fixo do Tesouro não era usado por nenhuma regra e o catálogo nunca muda. O preço do dia não muda em nada. |
+| 09/10/2026 | —    | Removida a coluna `product.tax_exempt` e o `CHECK` de prazo mínimo das letras isentas: o banco não calcula imposto de renda, e o `rate_description` da LCI já diz "isento de IR". |
+| 09/10/2026 | —    | O fechamento passa a gravar a **provisão de receita** do dia que fecha (`revenue_accrual`: bases do fim do dia, `calendar_days` até o novo dia e os valores do fundo, do spread e do float), antes da liquidação; a nova linha de `business_day` vem antes da liquidação, porque as transações dela são do dia novo. Toda transação guarda o seu dia de movimento (`transaction.business_date`), que o extrato e a receita usam. O preço do dia não muda em nada. RFC: RN-GER-13, RN-MOV-12, RN-FEC-07, RN-FEC-08 e RN-REC. |
 | 05/10/2026 | —    | Banco renomeado de Quant Bank para **Triple P Bank**; códigos de erro de `PPP` para `PPP` (mesmo formato); serviço `triple-p-bank-api`. O fundo continua FGV Quant Capital.                                                                                                                         |
 
 ---

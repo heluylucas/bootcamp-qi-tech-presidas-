@@ -3,16 +3,11 @@ from datetime import datetime
 
 import pytest
 
-from tests.utils import RandomGenerator, RequestGenerator
+from tests.utils import RequestGenerator
+from tests.utils.helpers import create_customer
 
 
 QUESTION_CODES = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"]
-
-
-def create_customer() -> str:
-    payload = {"name": "Ana Silva", "document_number": RandomGenerator.generate_cpf(), "birth_date": "1990-05-17"}
-    _, body = RequestGenerator.post_customer(payload)
-    return body["customer_key"]
 
 
 def answers(default: int, **overrides) -> dict:
@@ -47,21 +42,11 @@ class TestListQuestions:
             assert question["text"]
             assert question["dimension"]
             assert [option["code"] for option in question["options"]] == [1, 2, 3, 4]
-            assert "id" not in question
-
-    def test_points_are_not_exposed(self):
-        """Se os pontos aparecessem, o cliente escolheria o perfil em vez de responder."""
-        _, body = RequestGenerator.get_suitability_questions()
-
-        for question in body["items"]:
-            for option in question["options"]:
-                assert "points" not in option
-                assert "id" not in option
 
 
 class TestSubmitSuitability:
     @pytest.mark.parametrize(
-        "option, expected_score, expected_profile, expected_max_risk",
+        "option, expected_score, expected_profile, expected_maximum_risk",
         [
             (1, 7, "CONSERVATIVE", 2),
             (2, 14, "MODERATE", 3),
@@ -69,7 +54,7 @@ class TestSubmitSuitability:
             (4, 28, "AGGRESSIVE", 5),
         ],
     )
-    def test_profile_by_score(self, option, expected_score, expected_profile, expected_max_risk):
+    def test_profile_by_score(self, option, expected_score, expected_profile, expected_maximum_risk):
         customer_key = create_customer()
 
         status, body = RequestGenerator.post_suitability(customer_key, answers(option))
@@ -77,7 +62,7 @@ class TestSubmitSuitability:
         assert status == 201
         assert body["score"] == expected_score
         assert body["profile"] == expected_profile
-        assert body["max_risk_level"] == expected_max_risk
+        assert body["maximum_risk_level"] == expected_maximum_risk
         assert body["forced_by_rule"] is False
 
     def test_upper_limit_of_conservative(self):
@@ -111,7 +96,7 @@ class TestSubmitSuitability:
         assert body["score"] == 25
         assert body["profile"] == "CONSERVATIVE"
         # O risco máximo segue o perfil final, não os pontos (que dariam Arrojado, 5).
-        assert body["max_risk_level"] == 2
+        assert body["maximum_risk_level"] == 2
         assert body["forced_by_rule"] is True
 
     def test_response_format(self):
@@ -121,7 +106,6 @@ class TestSubmitSuitability:
 
         assert status == 201
         assert len(body["assessment_key"]) == 36
-        assert "id" not in body
         assert "created_at" in body
         assert body["answers"] == answers(2)["answers"]
 

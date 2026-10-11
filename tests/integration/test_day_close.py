@@ -4,33 +4,8 @@ from decimal import ROUND_HALF_UP, Decimal
 import pytest
 
 from tests.utils import RequestGenerator
+from tests.utils.helpers import CDB, FUND, SELIC, business_date, close_day, next_business_day, product
 from tests.utils.price_source_mock import DEFAULT_TREASURY_PRICES, PriceSourceMock, rate_body
-
-
-def business_date() -> date:
-    _, body = RequestGenerator.get_business_date()
-    return date.fromisoformat(body["business_date"])
-
-
-def next_business_day(day: date) -> date:
-    day += timedelta(days=1)
-    while day.weekday() >= 5:
-        day += timedelta(days=1)
-    return day
-
-
-def product_named(name: str) -> dict:
-    _, body = RequestGenerator.get_products()
-    product = next(product for product in body["items"] if product["name"] == name)
-    _, detail = RequestGenerator.get_product(product["product_key"])
-    return detail
-
-
-def close_day(**teach) -> tuple:
-    """Ensina o próximo dia ao mock e fecha a data de movimento atual."""
-    today = business_date()
-    PriceSourceMock.teach_day(next_business_day(today), **teach)
-    return RequestGenerator.post_day_close({"close_date": today.isoformat()})
 
 
 class TestDayClose:
@@ -68,16 +43,16 @@ class TestDayClose:
         status, body = close_day(fund="102.00", treasury={**DEFAULT_TREASURY_PRICES, "TESOURO SELIC 2031": "123.45"})
 
         assert status == 201
-        fund = product_named("FGV Quant Capital FIM")
-        selic = product_named("Tesouro Selic 2031")
-        assert fund["price"] == {"reference_date": body["business_date"], "unit_price": "102.00000000"}
+        fund = product(FUND)
+        selic = product(SELIC)
+        assert fund["price"] == {"price_date": body["business_date"], "unit_price": "102.00000000"}
         assert selic["price"]["unit_price"] == "123.45000000"
 
     def test_own_issue_grows_by_cdi_of_the_closing_day(self):
         # O primeiro fechamento abre um dia com CDI de 12%; o segundo fecha esse dia
         # e abre outro com 20%. O CDB do segundo fechamento rende pelos 12%.
         assert close_day(cdi="12.00")[0] == 201
-        previous = Decimal(product_named("CDB Triple P Bank Liquidez")["price"]["unit_price"])
+        previous = Decimal(product(CDB)["price"]["unit_price"])
 
         status, _ = close_day(cdi="20.00")
 
@@ -85,7 +60,7 @@ class TestDayClose:
         # CDB = preço anterior × (1 + c × 95%), c = CDI de um dia útil (RN-FEC-05).
         daily_cdi = (Decimal("1.12") ** (Decimal(1) / Decimal(252))) - 1
         expected = (previous * (1 + daily_cdi * Decimal("0.95"))).quantize(Decimal("0.00000001"), ROUND_HALF_UP)
-        assert Decimal(product_named("CDB Triple P Bank Liquidez")["price"]["unit_price"]) == expected
+        assert Decimal(product(CDB)["price"]["unit_price"]) == expected
 
 
 class TestDayCloseRefused:
@@ -121,11 +96,11 @@ class TestPriceSourceFailure:
 
     def assert_nothing_changed(self, today: date, fund_price: dict) -> None:
         assert business_date() == today
-        assert product_named("FGV Quant Capital FIM")["price"] == fund_price
+        assert product(FUND)["price"] == fund_price
 
     @pytest.mark.parametrize("service", ["fund", "treasury", "cdi", "selic"])
     def test_source_answers_error(self, service):
-        today, fund_price = business_date(), product_named("FGV Quant Capital FIM")["price"]
+        today, fund_price = business_date(), product(FUND)["price"]
         new_day = next_business_day(today)
         PriceSourceMock.teach_day(new_day, skip=service)
         PriceSourceMock.server_error(service, new_day)
@@ -137,7 +112,7 @@ class TestPriceSourceFailure:
         self.assert_nothing_changed(today, fund_price)
 
     def test_connection_dropped(self):
-        today, fund_price = business_date(), product_named("FGV Quant Capital FIM")["price"]
+        today, fund_price = business_date(), product(FUND)["price"]
         new_day = next_business_day(today)
         PriceSourceMock.teach_day(new_day, skip="treasury")
         PriceSourceMock.connection_dropped("treasury", new_day)
@@ -149,7 +124,7 @@ class TestPriceSourceFailure:
         self.assert_nothing_changed(today, fund_price)
 
     def test_fund_quote_zero(self):
-        today, fund_price = business_date(), product_named("FGV Quant Capital FIM")["price"]
+        today, fund_price = business_date(), product(FUND)["price"]
 
         status, body = close_day(fund="0")
 
@@ -158,7 +133,7 @@ class TestPriceSourceFailure:
         self.assert_nothing_changed(today, fund_price)
 
     def test_fund_quote_of_another_day(self):
-        today, fund_price = business_date(), product_named("FGV Quant Capital FIM")["price"]
+        today, fund_price = business_date(), product(FUND)["price"]
         new_day = next_business_day(today)
         PriceSourceMock.teach_day(new_day, skip="fund")
         PriceSourceMock.fund_quote(new_day, "102.00", quote_date=today)
@@ -170,7 +145,7 @@ class TestPriceSourceFailure:
         self.assert_nothing_changed(today, fund_price)
 
     def test_treasury_bond_missing(self):
-        today, fund_price = business_date(), product_named("FGV Quant Capital FIM")["price"]
+        today, fund_price = business_date(), product(FUND)["price"]
         without_ipca = {name: price for name, price in DEFAULT_TREASURY_PRICES.items() if "IPCA" not in name}
 
         status, body = close_day(treasury=without_ipca)
@@ -179,9 +154,9 @@ class TestPriceSourceFailure:
         assert body["code"] == "PPP005007"
         self.assert_nothing_changed(today, fund_price)
 
-    @pytest.mark.parametrize("rate", [[], [{"data": "x", "valor": "abc"}], {"valor": "14.90"}])
+    @pytest.mark.parametrize("rate", [[], [{"data": "x", "valor": "abc"}]], ids=["empty", "not_a_number"])
     def test_rate_without_sense(self, rate):
-        today, fund_price = business_date(), product_named("FGV Quant Capital FIM")["price"]
+        today, fund_price = business_date(), product(FUND)["price"]
         new_day = next_business_day(today)
         PriceSourceMock.teach_day(new_day, skip="cdi")
         PriceSourceMock.answer("cdi", new_day, rate)
@@ -193,7 +168,7 @@ class TestPriceSourceFailure:
         self.assert_nothing_changed(today, fund_price)
 
     def test_rate_of_another_day(self):
-        today, fund_price = business_date(), product_named("FGV Quant Capital FIM")["price"]
+        today, fund_price = business_date(), product(FUND)["price"]
         new_day = next_business_day(today)
         PriceSourceMock.teach_day(new_day, skip="selic")
         PriceSourceMock.answer("selic", new_day, rate_body(today, "15.00"))

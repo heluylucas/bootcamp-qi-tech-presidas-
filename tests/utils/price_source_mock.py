@@ -58,7 +58,7 @@ class PriceSourceMock:
 
     @staticmethod
     def treasury_prices(day: date, unit_prices: Dict[str, str]) -> None:
-        """Tesouro: o preço de cada título, pelo nome (o external_code do produto)."""
+        """Tesouro: o preço de cada título, pelo nome (o price_source_code do produto)."""
         PriceSourceMock.answer("treasury", day, treasury_body(day, unit_prices))
 
     @staticmethod
