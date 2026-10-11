@@ -1,7 +1,6 @@
 from controllers.base_controller import BaseController
 from controllers.investment_order_controller import InvestmentOrderController
 from dtos.account_dto import account_to_dict, status_event_to_dict
-from dtos.investment_order_dto import current_amount
 from errors import (
     AccountAlreadyExists,
     AccountNotEmpty,
@@ -13,6 +12,7 @@ from errors import (
 )
 from models import Account
 from repositories import AccountRepository, CustomerRepository, PositionRepository
+from utils.money import amount_for
 
 
 # A tabela de transições do Módulo 2: de cada status, para onde se pode ir.
@@ -67,7 +67,7 @@ class AccountController(BaseController):
         if payload["status"] not in CUSTOMER_ALLOWED_TARGETS:
             raise StatusChangeReservedToBank()
 
-        return self._apply_status_change(account, payload, ACTOR_CUSTOMER)
+        return self.apply_status_change(account, payload, ACTOR_CUSTOMER)
 
     def change_status_by_bank(self, account_key: str, payload: dict) -> dict:
         """Rota do banco (RN-CON-11): bloqueia, desbloqueia e encerra. O token de operador já foi conferido na porta."""
@@ -76,9 +76,9 @@ class AccountController(BaseController):
         if account is None:
             raise AccountNotFound()
 
-        return self._apply_status_change(account, payload, ACTOR_BANK)
+        return self.apply_status_change(account, payload, ACTOR_BANK)
 
-    def _apply_status_change(self, account: Account, payload: dict, actor: str) -> dict:
+    def apply_status_change(self, account: Account, payload: dict, actor: str) -> dict:
         """As regras que valem nas duas rotas: transição, motivo, conta vazia e o evento com quem fez."""
         current = account.status
         target = payload["status"]
@@ -107,27 +107,10 @@ class AccountController(BaseController):
     def account_response(self, account: Account) -> dict:
         """A conta com o valor dos investimentos dela ao preço do dia (calculado, não gravado)."""
         priced = InvestmentOrderController().priced_positions(PositionRepository.list_by_account(self.context, account.id))
-        investments_amount = sum(current_amount(position, unit_price) for position, unit_price in priced)
+        investments_amount = sum(amount_for(position.quantity, unit_price) for position, unit_price in priced)
         return account_to_dict(account, investments_amount)
 
     def list_status_events(self, customer_key: str, account_key: str) -> dict:
         account = self.get_owned_account(customer_key, account_key)
         events = AccountRepository.list_status_events(self.context, account.id)
         return {"items": [status_event_to_dict(event) for event in events]}
-
-    def get_owned_account(self, customer_key: str, account_key: str, for_update: bool = False) -> Account:
-        """Confere o dono antes de tudo (R8): conta de outro cliente dá o mesmo 404 da inexistente."""
-        customer = CustomerRepository.get_by_key(self.context, customer_key)
-
-        if customer is None:
-            raise CustomerNotFound()
-
-        if for_update:
-            account = AccountRepository.get_by_key_for_update(self.context, customer.id, account_key)
-        else:
-            account = AccountRepository.get_by_key(self.context, customer.id, account_key)
-
-        if account is None:
-            raise AccountNotFound()
-
-        return account

@@ -3,16 +3,15 @@ from datetime import datetime, timezone
 from controllers.base_controller import BaseController
 from dtos.suitability_dto import assessment_to_dict, question_to_dict
 from errors import (
-    CustomerNotFound,
     IncompleteAnswers,
     InvalidOption,
     SuitabilityExpired,
     SuitabilityNotFound,
     SuitabilityRequired,
 )
-from models import Customer, SuitabilityAssessment
+from models import SuitabilityAssessment
 from models.suitability import profile_for_score
-from repositories import CustomerRepository, SuitabilityRepository
+from repositories import SuitabilityRepository
 
 
 # A trava de segurança (RN-SUI-04): quem escolhe estas opções é Conservador,
@@ -102,11 +101,3 @@ class SuitabilityController(BaseController):
         # fato regulatório (RN-SUI-05, RN-GER-13), e a data de movimento pode
         # estar à frente do calendário. Único lugar do módulo que olha o relógio.
         return datetime.now(timezone.utc)
-
-    def get_customer(self, customer_key: str) -> Customer:
-        customer = CustomerRepository.get_by_key(self.context, customer_key)
-
-        if customer is None:
-            raise CustomerNotFound()
-
-        return customer

@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy.exc import IntegrityError
 
@@ -8,9 +8,7 @@ from controllers.base_controller import BaseController
 from dtos.transaction_dto import entry_to_dict, receipt_to_dict, transaction_to_dict
 from errors import (
     AccountNotActive,
-    AccountNotFound,
     AmountAboveLimit,
-    CustomerNotFound,
     DestinationAccountNotActive,
     DestinationAccountNotFound,
     IdempotencyKeyReused,
@@ -22,7 +20,7 @@ from errors import (
     TransactionNotFound,
 )
 from models import Account, Transaction
-from repositories import AccountRepository, BusinessDayRepository, CustomerRepository, TransactionRepository
+from repositories import AccountRepository, BusinessDayRepository, TransactionRepository
 from utils.dates import parse_date
 
 
@@ -46,7 +44,7 @@ class TransactionController(BaseController):
     def __init__(self) -> None:
         super().__init__(__name__)
 
-    def create(self, customer_key: str, account_key: str, payload: dict, idempotency_key: Optional[str]) -> tuple:
+    def create(self, customer_key: str, account_key: str, payload: dict, idempotency_key: Optional[str]) -> Tuple[dict, bool]:
         """Devolve (resposta, criada). criada=False é a repetição de um pedido já feito."""
         idempotency_key = parse_idempotency_key(idempotency_key)
         transaction_type = payload["type"]
@@ -139,21 +137,7 @@ class TransactionController(BaseController):
 
         return receipt_to_dict(transaction)
 
-    def get_owned_account(self, customer_key: str, account_key: str) -> Account:
-        """Confere o dono antes de tudo (R8): conta de outro cliente dá o mesmo 404 da inexistente."""
-        customer = CustomerRepository.get_by_key(self.context, customer_key)
-
-        if customer is None:
-            raise CustomerNotFound()
-
-        account = AccountRepository.get_by_key(self.context, customer.id, account_key)
-
-        if account is None:
-            raise AccountNotFound()
-
-        return account
-
-    def lock_accounts(self, *accounts: Optional[Account]) -> list:
+    def lock_accounts(self, *accounts: Optional[Account]) -> List[Optional[Account]]:
         """Trava as contas sempre em ordem crescente de id e as devolve na ordem recebida (None fica None).
 
         Se A -> B e B -> A chegassem juntas e cada uma travasse primeiro a
@@ -167,13 +151,13 @@ class TransactionController(BaseController):
 
         return [locked[account.id] if account else None for account in accounts]
 
-    def deposit(self, account: Account, amount: int, description: Optional[str], idempotency_key: str) -> tuple:
+    def deposit(self, account: Account, amount: int, description: Optional[str], idempotency_key: str) -> Tuple[Transaction, int]:
         new_balance = account.balance + amount
         transaction = self.create_transaction("DEPOSIT", account, None, amount, 0, description, idempotency_key)
         self.add_entry(transaction, account, "CREDIT", "PRINCIPAL", amount, new_balance)
         return transaction, new_balance
 
-    def withdraw(self, account: Account, amount: int, description: Optional[str], idempotency_key: str) -> tuple:
+    def withdraw(self, account: Account, amount: int, description: Optional[str], idempotency_key: str) -> Tuple[Transaction, int]:
         new_balance = account.balance - amount
         transaction = self.create_transaction("WITHDRAWAL", account, None, amount, 0, description, idempotency_key)
         self.add_entry(transaction, account, "DEBIT", "PRINCIPAL", amount, new_balance)
@@ -187,7 +171,7 @@ class TransactionController(BaseController):
         amount: int,
         description: Optional[str],
         idempotency_key: str,
-    ) -> tuple:
+    ) -> Tuple[Transaction, int]:
         """Um pedido, quatro lançamentos: principal e tarifa saem da origem, o principal entra
         no destino e a tarifa entra na conta do banco. Cada débito tem o seu crédito."""
         transaction = self.create_transaction(
@@ -248,7 +232,7 @@ class TransactionController(BaseController):
         except IntegrityError:
             raise IdempotencyKeyReused()
 
-    def add_entry(self, transaction, account: Account, direction: str, category: str, amount: int, balance_after: int):
+    def add_entry(self, transaction: Transaction, account: Account, direction: str, category: str, amount: int, balance_after: int) -> None:
         """Grava o lançamento e leva o saldo da conta junto: os dois nunca se separam."""
         TransactionRepository.create_ledger_entry(
             self.context, transaction.id, account.id, direction, category, amount, balance_after

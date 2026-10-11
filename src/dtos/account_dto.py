@@ -1,6 +1,5 @@
-from datetime import datetime, timezone
-
 from models import Account, AccountStatusEvent
+from utils.dates import to_utc_text
 
 
 def account_to_dict(account: Account, investments_amount: int) -> dict:
@@ -27,7 +26,3 @@ def status_event_to_dict(event: AccountStatusEvent) -> dict:
         "actor": event.actor,
         "created_at": to_utc_text(event.created_at),
     }
-
-
-def to_utc_text(moment: datetime) -> str:
-    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

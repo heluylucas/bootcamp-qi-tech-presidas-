@@ -1,5 +1,11 @@
-from dtos.account_dto import to_utc_text
-from models import LedgerEntry, Transaction
+from typing import Optional
+
+from models import Account, LedgerEntry, Transaction
+from utils.dates import to_utc_text
+
+
+# Nestes tipos o dinheiro entra na conta dona vindo "de fora": ela é o destino, e não há origem.
+INCOMING_TYPES = ("DEPOSIT", "INVESTMENT_REDEEM")
 
 
 def transaction_to_dict(transaction: Transaction, balance: int) -> dict:
@@ -32,10 +38,6 @@ def entry_to_dict(entry: LedgerEntry) -> dict:
     }
 
 
-# Nestes tipos o dinheiro entra na conta dona vindo "de fora": ela é o destino, e não há origem.
-INCOMING_TYPES = ("DEPOSIT", "INVESTMENT_REDEEM")
-
-
 def receipt_to_dict(transaction: Transaction) -> dict:
     """O comprovante (RN-MOV-13). Sem saldo: o destino não pode ver o saldo da origem."""
     if transaction.type in INCOMING_TYPES:
@@ -56,7 +58,7 @@ def receipt_to_dict(transaction: Transaction) -> dict:
     }
 
 
-def counterparty_key(transaction: Transaction, account_id: int):
+def counterparty_key(transaction: Transaction, account_id: int) -> Optional[str]:
     """A OUTRA conta da transação; None quando o dinheiro veio ou foi para fora (depósito, saque)."""
     if transaction.owner_account_id == account_id:
         return account_key_or_none(transaction.destination_account)
@@ -64,5 +66,5 @@ def counterparty_key(transaction: Transaction, account_id: int):
     return account_key_or_none(transaction.owner_account)
 
 
-def account_key_or_none(account):
+def account_key_or_none(account: Optional[Account]) -> Optional[str]:
     return account.account_key if account is not None else None

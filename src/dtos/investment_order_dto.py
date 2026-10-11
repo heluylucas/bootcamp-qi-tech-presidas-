@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from models import InvestmentOrder, Position
+from utils.money import amount_for
 
 
 def order_to_dict(order: InvestmentOrder) -> dict:
@@ -33,13 +34,8 @@ def order_to_dict(order: InvestmentOrder) -> dict:
     return response
 
 
-def current_amount(position: Position, unit_price: Decimal) -> int:
-    """RN-POS-01: o valor atual é a quantidade ao preço do dia, em centavos inteiros (para baixo)."""
-    return int(position.quantity * unit_price * 100)
-
-
 def position_to_dict(position: Position, unit_price: Decimal) -> dict:
-    value = current_amount(position, unit_price)
+    value = amount_for(position.quantity, unit_price)
     return {
         "product_key": position.product.product_key,
         "quantity": f"{position.quantity:.8f}",

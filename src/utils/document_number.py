@@ -3,6 +3,12 @@ CPF_LENGTH = 11
 CHECK_DIGIT_POSITIONS = [9, 10]
 
 
+def normalize_cpf(document_number: str) -> str:
+    """'12345678909' e '123.456.789-09' viram '123.456.789-09' (RN-CLI-04)."""
+    digits = "".join(character for character in document_number if character.isdigit())
+    return f"{digits[0:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:11]}"
+
+
 def is_valid_cpf(document_number: str) -> bool:
     """Diz se um CPF existe de verdade — não se ele tem a cara certa.
 

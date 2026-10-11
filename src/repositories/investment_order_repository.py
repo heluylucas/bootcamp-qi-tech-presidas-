@@ -62,14 +62,10 @@ class InvestmentOrderRepository:
 
         Só a aplicação em produto com prazo tem maturity_date, então o filtro de data já basta.
         """
-        settlement = aliased(InvestmentOrder)
-        already_settled = context.db_session.query(settlement.id).filter(
-            settlement.matured_investment_order_id == InvestmentOrder.id
-        )
         return (
             context.db_session.query(InvestmentOrder)
             .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
-            .filter(InvestmentOrder.maturity_date <= day, ~already_settled.exists())
+            .filter(InvestmentOrder.maturity_date <= day, InvestmentOrderRepository.not_settled(context))
             .order_by(Transaction.owner_account_id, InvestmentOrder.id)
             .all()
         )
@@ -77,20 +73,25 @@ class InvestmentOrderRepository:
     @staticmethod
     def latest_open_maturity(context: Context, account_id: int, product_id: int) -> Optional[date]:
         """O vencimento mais distante entre as aplicações deste produto ainda não liquidadas."""
-        settlement = aliased(InvestmentOrder)
-        already_settled = context.db_session.query(settlement.id).filter(
-            settlement.matured_investment_order_id == InvestmentOrder.id
-        )
         return (
             context.db_session.query(func.max(InvestmentOrder.maturity_date))
             .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
             .filter(
                 Transaction.owner_account_id == account_id,
                 InvestmentOrder.product_id == product_id,
-                ~already_settled.exists(),
+                InvestmentOrderRepository.not_settled(context),
             )
             .scalar()
         )
+
+    @staticmethod
+    def not_settled(context: Context):
+        """Filtro: a aplicação ainda não foi devolvida por nenhuma liquidação de vencimento."""
+        settlement = aliased(InvestmentOrder)
+        already_settled = context.db_session.query(settlement.id).filter(
+            settlement.matured_investment_order_id == InvestmentOrder.id
+        )
+        return ~already_settled.exists()
 
 
 class PositionRepository:

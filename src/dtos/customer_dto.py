@@ -1,6 +1,5 @@
-from datetime import timezone
-
 from models import Customer
+from utils.dates import to_utc_text
 
 
 def customer_to_dict(customer: Customer) -> dict:
@@ -10,5 +9,5 @@ def customer_to_dict(customer: Customer) -> dict:
         # '123.456.789-09' sai como '***.456.789-**' (RN-GER-10).
         "document_number": f"***{customer.document_number[3:11]}-**",
         "birth_date": customer.birth_date.isoformat(),
-        "created_at": customer.created_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "created_at": to_utc_text(customer.created_at),
     }

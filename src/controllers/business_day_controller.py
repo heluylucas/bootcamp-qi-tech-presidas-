@@ -13,11 +13,11 @@ from errors import BusinessDateMismatch, InvalidPriceSourceResponse, PriceSource
 from models import Product
 from repositories import BusinessDayRepository, ProductRepository, ReferenceRateRepository
 from utils.dates import next_business_day, parse_date
+from utils.money import EIGHT_PLACES
 
 
 CDI_SERIES = 4389
 SELIC_SERIES = 1178
-EIGHT_PLACES = Decimal("0.00000001")
 # NUMERIC(20,8): no máximo 12 dígitos antes da vírgula.
 MAX_PRICE = Decimal(10) ** 12
 
@@ -48,11 +48,11 @@ class BusinessDayController(BaseController):
 
         # Daqui até as escritas só se pergunta e se confere: qualquer recusa
         # acontece antes de gravar a primeira linha (tudo ou nada, RN-FEC-06).
-        prices = self._fetch_fund_quotes(products, new_day)
-        prices.update(self._fetch_treasury_prices(products, new_day))
-        cdi_bps = self._fetch_rate(CDI_SERIES, new_day)
-        selic_bps = self._fetch_rate(SELIC_SERIES, new_day)
-        prices.update(self._own_issue_prices(products, close_date))
+        prices = self.fetch_fund_quotes(products, new_day)
+        prices.update(self.fetch_treasury_prices(products, new_day))
+        cdi_bps = self.fetch_rate(CDI_SERIES, new_day)
+        selic_bps = self.fetch_rate(SELIC_SERIES, new_day)
+        prices.update(self.own_issue_prices(products, close_date))
 
         # O UNIQUE de product_price, reference_rate e business_day é a rede
         # de segurança: se outro fechamento gravou o mesmo dia, recusa aqui.
@@ -82,7 +82,7 @@ class BusinessDayController(BaseController):
         self.session.commit()
         return response
 
-    def _fetch_fund_quotes(self, products: List[Product], day: date) -> Dict[int, Decimal]:
+    def fetch_fund_quotes(self, products: List[Product], day: date) -> Dict[int, Decimal]:
         """Administradora: a cota de cada fundo, já líquida da taxa de administração (RN-REC-04)."""
         quotes = {}
         for product in products:
@@ -99,7 +99,7 @@ class BusinessDayController(BaseController):
 
         return quotes
 
-    def _fetch_treasury_prices(self, products: List[Product], day: date) -> Dict[int, Decimal]:
+    def fetch_treasury_prices(self, products: List[Product], day: date) -> Dict[int, Decimal]:
         """Tesouro: uma chamada traz todos os títulos; cada produto acha o seu pelo price_source_code."""
         body = answer_of(TreasuryConnector().get_prices(day))
 
@@ -118,7 +118,7 @@ class BusinessDayController(BaseController):
 
         return prices
 
-    def _fetch_rate(self, series: int, day: date) -> int:
+    def fetch_rate(self, series: int, day: date) -> int:
         """Banco Central: a taxa anual em % (texto "14.90"), que vira pontos-base (1490)."""
         body = answer_of(CentralBankConnector().get_rate(series, day))
 
@@ -131,7 +131,7 @@ class BusinessDayController(BaseController):
 
         return annual_rate_bps
 
-    def _own_issue_prices(self, products: List[Product], close_date: date) -> Dict[int, Decimal]:
+    def own_issue_prices(self, products: List[Product], close_date: date) -> Dict[int, Decimal]:
         """CDB e LCI: preço anterior × (1 + c × percentual do CDI), c = CDI do dia que fecha (RN-FEC-05)."""
         # Sempre existe: o seed grava a do primeiro dia e cada fechamento grava a do dia que abre.
         cdi_bps = ReferenceRateRepository.get_on(self.context, "CDI", close_date).annual_rate_bps

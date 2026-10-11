@@ -1,11 +1,11 @@
 import calendar
 from datetime import date
 from decimal import Decimal
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from controllers.base_controller import BaseController
 from errors import InvalidParameter
-from models import RevenueAccrual
+from models import Product, RevenueAccrual
 from repositories import (
     AccountRepository,
     BusinessDayRepository,
@@ -16,6 +16,7 @@ from repositories import (
     TransactionRepository,
 )
 from utils.dates import parse_date
+from utils.money import amount_for
 
 
 # Maior período aceito no relatório, em dias, contando as duas pontas (RN-REC-09).
@@ -62,10 +63,8 @@ class RevenueController(BaseController):
     def estimated(self, accruals: List[RevenueAccrual], to_date: date) -> dict:
         """As provisões do período, com a taxa de cada dia para a conta poder ser conferida."""
         fund = self.fund()
-        cdi = [(rate.rate_date, rate.annual_rate_bps) for rate in ReferenceRateRepository.list_until(self.context, "CDI", to_date)]
-        selic = [
-            (rate.rate_date, rate.annual_rate_bps) for rate in ReferenceRateRepository.list_until(self.context, "SELIC", to_date)
-        ]
+        cdi = self.rates_until("CDI", to_date)
+        selic = self.rates_until("SELIC", to_date)
 
         fund_daily, spread_daily, float_daily = [], [], []
         for accrual in accruals:
@@ -120,7 +119,7 @@ class RevenueController(BaseController):
         # Fundo: o patrimônio dos clientes ao preço do dia, em centavos para baixo, como a posição (RN-POS-01).
         fund_quantity, _ = held.get(fund.id, (Decimal(0), 0))
         fund_price = ProductRepository.get_price_on(self.context, fund.id, close_date).unit_price
-        fund_equity = int(fund_quantity * fund_price * 100)
+        fund_equity = amount_for(fund_quantity, fund_price)
 
         # Spread: cada título próprio paga um percentual do CDI, então a conta é por produto.
         own_issues = [product for product in products if product.price_source_code is None]
@@ -142,7 +141,11 @@ class RevenueController(BaseController):
             own_issue_spread_amount=int(spread * days / (10000 * 10000 * 365)),
         )
 
-    def fund(self):
+    def rates_until(self, code: str, day: date) -> List[Tuple[date, int]]:
+        """(data, taxa) de cada publicação do CDI ou da Selic até o dia, da mais antiga para a mais nova."""
+        return [(rate.rate_date, rate.annual_rate_bps) for rate in ReferenceRateRepository.list_until(self.context, code, day)]
+
+    def fund(self) -> Product:
         """O fundo da casa: o único produto com taxa de administração (RN-REC-04)."""
         return next(product for product in ProductRepository.list(self.context, "FUND", None) if product.administration_fee_bps)
 

@@ -1,5 +1,5 @@
 import calendar
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from errors import InvalidSchema
@@ -35,3 +35,7 @@ def next_business_day(day: date) -> date:
     while day.weekday() >= 5:
         day += timedelta(days=1)
     return day
+
+
+def to_utc_text(moment: datetime) -> str:
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

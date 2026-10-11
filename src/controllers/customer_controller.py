@@ -5,14 +5,13 @@ from sqlalchemy.exc import IntegrityError
 from controllers.base_controller import BaseController
 from dtos.customer_dto import customer_to_dict
 from errors import (
-    CustomerNotFound,
     DocumentAlreadyRegistered,
     InvalidDocumentNumber,
     InvalidSchema,
     UnderageCustomer,
 )
 from repositories import CustomerRepository
-from utils.document_number import is_valid_cpf
+from utils.document_number import is_valid_cpf, normalize_cpf
 
 
 MINIMUM_AGE = 18
@@ -52,18 +51,7 @@ class CustomerController(BaseController):
         return customer_to_dict(customer)
 
     def get(self, customer_key: str) -> dict:
-        customer = CustomerRepository.get_by_key(self.context, customer_key)
-
-        if customer is None:
-            raise CustomerNotFound()
-
-        return customer_to_dict(customer)
-
-
-def normalize_cpf(document_number: str) -> str:
-    """'12345678909' e '123.456.789-09' viram '123.456.789-09' (RN-CLI-04)."""
-    digits = "".join(character for character in document_number if character.isdigit())
-    return f"{digits[0:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:11]}"
+        return customer_to_dict(self.get_customer(customer_key))
 
 
 def age_on(today: date, birth_date: date) -> int:

@@ -1,5 +1,5 @@
-from dtos.account_dto import to_utc_text
 from models import SuitabilityAssessment, SuitabilityQuestion
+from utils.dates import to_utc_text
 
 
 def question_to_dict(question: SuitabilityQuestion) -> dict:
