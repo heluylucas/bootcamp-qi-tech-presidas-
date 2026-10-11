@@ -4,19 +4,16 @@
 
 fastapi==0.141.1
 uvicorn[standard]==0.52.3
-# Dependencia que o FastAPI traz por dentro. Ela aparece nesta lista
-# so para ficar com a versao fixada, como todas as outras. O codigo
-# DESTE projeto nao a importa em lugar nenhum: quem confere o corpo
-# das requisicoes e o jsonschema, logo abaixo.
+# O FastAPI usa o pydantic por dentro, entao ele continua instalado e
+# fixado aqui. O codigo DESTE projeto nao o usa mais: quem valida o
+# corpo das requisicoes e o jsonschema, logo abaixo.
 pydantic==2.13.4
 # O jsonschema e quem confere o corpo da requisicao contra os arquivos
 # de src/schemas/. E a mesma versao que os servicos da QI usam.
 jsonschema==4.17.3
 SQLAlchemy==2.0.23
-# Versao fixa para todo mundo instalar exatamente a mesma coisa. O
-# sufixo -binary e o que importa aqui: ele traz o pacote ja compilado,
-# entao ninguem precisa ter o compilador de C nem os headers do
-# Postgres na maquina para instalar.
+# 2.9.10 e a primeira serie com pacote pronto para ARM: no Mac M1/M2/M3
+# a 2.9.5 tentaria compilar do zero e o build quebrava.
 psycopg2-binary==2.9.10
 # O requests e com que este servico chama OUTROS servicos por HTTP.
 # So os connectors (src/connectors/) podem usa-lo — nenhuma chamada
