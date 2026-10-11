@@ -60,7 +60,7 @@ class TestApply:
         status, body = apply(customer_key, account_key, CDB, 10000)
 
         assert status == 201
-        assert len(body["order_key"]) == 36
+        assert len(body["investment_order_key"]) == 36
         assert len(body["transaction_key"]) == 36
         assert body["product_key"] == product_key(CDB)
         assert body["side"] == "APPLY"
@@ -183,7 +183,7 @@ class TestApplyIdempotency:
 
         assert status == 409
         assert body["code"] == "PPP000004"
-        assert "order_key" not in body
+        assert "investment_order_key" not in body
         assert balance_of(second_customer, second_account) == 1_000_000
 
     def test_invalid_idempotency_key(self):
@@ -533,8 +533,8 @@ class TestGetOrder:
         _, applied = apply(customer_key, account_key, CDB, 10000)
         _, redeemed = redeem(customer_key, account_key, CDB, 4000)
 
-        apply_status, apply_body = RequestGenerator.get_investment_order(customer_key, account_key, applied["order_key"])
-        redeem_status, redeem_body = RequestGenerator.get_investment_order(customer_key, account_key, redeemed["order_key"])
+        apply_status, apply_body = RequestGenerator.get_investment_order(customer_key, account_key, applied["investment_order_key"])
+        redeem_status, redeem_body = RequestGenerator.get_investment_order(customer_key, account_key, redeemed["investment_order_key"])
 
         assert (apply_status, apply_body) == (200, applied)
         assert (redeem_status, redeem_body) == (200, redeemed)
@@ -552,7 +552,7 @@ class TestGetOrder:
         _, order = apply(owner, owner_account, CDB, 10000)
         stranger, stranger_account = investor()
 
-        status, body = RequestGenerator.get_investment_order(stranger, stranger_account, order["order_key"])
+        status, body = RequestGenerator.get_investment_order(stranger, stranger_account, order["investment_order_key"])
 
         assert status == 404
         assert body["code"] == "PPP007001"
@@ -562,7 +562,7 @@ class TestGetOrder:
         _, order = apply(owner, owner_account, CDB, 10000)
         stranger, _ = investor()
 
-        status, body = RequestGenerator.get_investment_order(stranger, owner_account, order["order_key"])
+        status, body = RequestGenerator.get_investment_order(stranger, owner_account, order["investment_order_key"])
 
         assert status == 404
         assert body["code"] == "PPP002001"

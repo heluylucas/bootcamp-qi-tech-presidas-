@@ -1335,7 +1335,7 @@ Abaixo, as colunas e restrições; os diagramas ER (\tb{docs/diagramas/er-*.mmd}
 \endhead
 \tb{suitability_question} & \tb{code} (Q1..Q7) UNIQUE, que também dá a ordem do questionário; \tb{text}; \tb{dimension} (objetivo, situação financeira, conhecimento). \\
 \tb{suitability_option} & \tb{suitability_question_id} FK; \tb{code SMALLINT CHECK (1..4)}, que também é a pontuação; \tb{text}. \tb{UNIQUE(suitability_question_id, code)}. \\
-\tb{suitability_assessment} & \tb{assessment_key}; \tb{customer_id} FK; \tb{investor_profile investor_profile NOT NULL} (\tb{CONSERVATIVE}/\tb{MODERATE}/\tb{AGGRESSIVE}); \tb{score SMALLINT}; \tb{created_at}. Uma linha por vez que o cliente responde; nunca é editada. \tb{valid_until} (\tb{created_at} + 24 meses) e \tb{forced_by_rule} (perfil fora da faixa do \tb{score}) são calculados (RN-SUI-04, RN-SUI-05), assim como o risco máximo do perfil, lido das regras no código (RN-SUI-03). \\
+\tb{suitability_assessment} & \tb{suitability_assessment_key}; \tb{customer_id} FK; \tb{investor_profile investor_profile NOT NULL} (\tb{CONSERVATIVE}/\tb{MODERATE}/\tb{AGGRESSIVE}); \tb{score SMALLINT}; \tb{created_at}. Uma linha por vez que o cliente responde; nunca é editada. \tb{valid_until} (\tb{created_at} + 24 meses) e \tb{forced_by_rule} (perfil fora da faixa do \tb{score}) são calculados (RN-SUI-04, RN-SUI-05), assim como o risco máximo do perfil, lido das regras no código (RN-SUI-03). \\
 \tb{suitability_answer} & \tb{suitability_assessment_id} FK; \tb{suitability_option_id} FK (a pergunta vem da opção). \tb{UNIQUE(suitability_assessment_id, suitability_option_id)}. \\
 \tb{product} & \tb{product_key}; \tb{name}; \tb{type product_type}; \tb{issuer}; \tb{indexer product_indexer} (SELIC, CDI, PREFIXED, IPCA, QUOTA); \tb{rate_description}; \tb{risk_level SMALLINT CHECK (1..5)}; \tb{term_months SMALLINT CHECK (> 0)} (prazo de cada aplicação; nulo = resgate a qualquer dia, RN-PRO-09); \tb{minimum_application_amount BIGINT}; \tb{cdi_percentage_bps SMALLINT} (só títulos atrelados ao CDI); \tb{administration_fee_bps SMALLINT} (só no fundo); \tb{price_source_code VARCHAR(50)} (como a fonte externa chama o produto: nome do título ou CNPJ do fundo; nulo é emissão própria, CDB e LCI). \\
 \tb{business_day} & \tb{business_date DATE NOT NULL UNIQUE}; \tb{created_at}. Uma linha por dia aberto, nunca alterada; a data de movimento é a maior \tb{business_date} (RN-GER-13). \\
@@ -1343,7 +1343,7 @@ Abaixo, as colunas e restrições; os diagramas ER (\tb{docs/diagramas/er-*.mmd}
 \tb{reference_rate} & \tb{code reference_rate_code} (\tb{CDI}, \tb{SELIC}); \tb{rate_date DATE NOT NULL}; \tb{annual_rate_bps INTEGER CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(code, rate_date)}. Histórico das taxas (RN-REC-08). \\
 \tb{product_price} & \tb{product_id} FK; \tb{price_date DATE}; \tb{unit_price NUMERIC(20,8) CHECK (> 0)}; \tb{created_at}. \tb{UNIQUE(product_id, price_date)}. \\
 \tb{model_portfolio_item} & A carteira-modelo de cada perfil. \tb{investor_profile investor_profile NOT NULL}; \tb{product_id} FK; \tb{weight_bps SMALLINT CHECK (> 0)}. \tb{UNIQUE(investor_profile, product_id)}. A soma de 10.000 é conferida por um teste. \\
-\tb{investment_order} & O \emph{anexo} da transação de investimento: dono, lado (pelo tipo da transação), valor e chave de idempotência ficam na transação. \tb{order_key}; \tb{transaction_id} FK NOT NULL UNIQUE (1 ordem = 1 transação); \tb{product_id} FK; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{acquisition_cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{redeem_all BOOLEAN NOT NULL DEFAULT false} (o cliente pediu resgate total, RN-ORD-12); \tb{maturity_date DATE} (só na aplicação em produto com prazo, RN-ORD-17); \tb{matured_investment_order_id INTEGER UNIQUE} FK $\to$ \tb{investment_order} (só na liquidação do vencimento: a aplicação devolvida; o \tb{UNIQUE} impede liquidar duas vezes); \tb{created_at}. \\
+\tb{investment_order} & O \emph{anexo} da transação de investimento: dono, lado (pelo tipo da transação), valor e chave de idempotência ficam na transação. \tb{investment_order_key}; \tb{transaction_id} FK NOT NULL UNIQUE (1 ordem = 1 transação); \tb{product_id} FK; \tb{quantity NUMERIC(24,8) CHECK (> 0)}; \tb{unit_price NUMERIC(20,8)}; \tb{acquisition_cost_amount BIGINT CHECK (>= 0)} (custo que entrou ou saiu da posição, RN-ORD-16); \tb{redeem_all BOOLEAN NOT NULL DEFAULT false} (o cliente pediu resgate total, RN-ORD-12); \tb{maturity_date DATE} (só na aplicação em produto com prazo, RN-ORD-17); \tb{matured_investment_order_id INTEGER UNIQUE} FK $\to$ \tb{investment_order} (só na liquidação do vencimento: a aplicação devolvida; o \tb{UNIQUE} impede liquidar duas vezes); \tb{created_at}. \\
 \tb{position} & \tb{account_id} FK; \tb{product_id} FK; \tb{quantity NUMERIC(24,8) NOT NULL CHECK (>= 0)}; \tb{acquisition_cost_amount BIGINT NOT NULL CHECK (>= 0)}; \tb{created_at}, \tb{updated_at}. \tb{UNIQUE(account_id, product_id)}. \\
 \bottomrule
 \end{longtable}
@@ -1431,9 +1431,9 @@ POST & \rota|/internal/day_close| & Fecha o dia e abre o próximo dia útil, bus
 GET & \rota|/customer/{ck}/portfolio_suggestion| & Sugestão. Query: \tb{amount}. & 200 itens com valores; 400 \tb{amount} ausente ou inválido; 404; 409 sem perfil ou vencido; 422 valor abaixo do mínimo. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Ordens e posição}} \\
-POST & \rota|/customer/{ck}/account/{ak}/investment_order| & Aplica ou resgata na conta. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{order_key}, quantidade, preço (no resgate, também custo, resultado e rentabilidade); 200 repetição idempotente; 400 schema/sem chave; 404 cliente, conta (inclusive de outro cliente) ou produto; 409 conta bloqueada ou encerrada, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; 422 valor $\le 0$, abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
+POST & \rota|/customer/{ck}/account/{ak}/investment_order| & Aplica ou resgata na conta. \tb{product_key}, \tb{side}, \tb{amount} ou \tb{redeem_all}. \textbf{Idem.} & 201 \tb{investment_order_key}, quantidade, preço (no resgate, também custo, resultado e rentabilidade); 200 repetição idempotente; 400 schema/sem chave; 404 cliente, conta (inclusive de outro cliente) ou produto; 409 conta bloqueada ou encerrada, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; 422 valor $\le 0$, abaixo do mínimo, fora do perfil, resgate antes do vencimento. \\
 GET & \rota|/customer/{ck}/account/{ak}/investment_orders| & Histórico de ordens da conta, a mais nova primeiro (RN-POS-05). Query: \tb{page}, \tb{limit}, \tb{product_key}. & 200 \tb{\{items, page, limit, total\}} (produto inexistente: lista vazia); 400 query inválida; 404 cliente ou conta. \\
-GET & \rota|/customer/{ck}/account/{ak}/investment_order/{order_key}| & Detalhe da ordem. & 200; 404 (inclusive de outra conta ou de outro cliente). \\
+GET & \rota|/customer/{ck}/account/{ak}/investment_order/{investment_order_key}| & Detalhe da ordem. & 200; 404 (inclusive de outra conta ou de outro cliente). \\
 GET & \rota|/customer/{ck}/account/{ak}/positions| & Posição da conta, rentabilidade e capital total, com a divisão entre caixa e investimentos (RN-POS-04, RN-POS-06). Query: \tb{include_closed}. & 200; 400 query inválida; 404. \\
 \midrule
 \multicolumn{4}{@{}l}{\textbf{Receita}} \\
@@ -1905,7 +1905,7 @@ No formato pedido pelo modelo de RFC: \emph{alternativa --- descartada porque (p
   Ganharia se a ordem tivesse ciclo de estados (ver ``Cotização e liquidação com prazo'' nos
   incrementos). \emph{Escolhido:} ``liquidada'' é ``existe uma ordem que aponta para ela''.
   \item \textbf{Chave de idempotência na liquidação} (aleatória, \tb{uuid4}, ou determinística,
-  \tb{uuid5} da \tb{order_key} da aplicação, como na versão anterior) --- descartada porque não há
+  \tb{uuid5} da \tb{investment_order_key} da aplicação, como na versão anterior) --- descartada porque não há
   pedido de cliente para repetir: a chave só existia para preencher uma coluna obrigatória.
   \emph{Escolhido:} a transação da liquidação não tem chave (nula); quem impede pagar a mesma
   aplicação duas vezes é o \tb{UNIQUE} de \tb{matured_investment_order_id}.
@@ -2244,7 +2244,7 @@ POST /customer/9c2f.../suitability
 
 HTTP/1.1 201 Created
 {
-  "assessment_key": "a81f...",
+  "suitability_assessment_key": "a81f...",
   "profile": "MODERATE",
   "score": 19,
   "forced_by_rule": false,
@@ -2283,7 +2283,7 @@ Idempotency-Key: 0f9e8d7c-...
 
 HTTP/1.1 201 Created
 {
-  "order_key": "b3c4...",
+  "investment_order_key": "b3c4...",
   "product_key": "55ee...",
   "side": "APPLY",
   "source": "CUSTOMER",
@@ -2308,7 +2308,7 @@ Idempotency-Key: 7a6b5c4d-...
 
 HTTP/1.1 201 Created
 {
-  "order_key": "c4d5...",
+  "investment_order_key": "c4d5...",
   "product_key": "55ee...",
   "side": "REDEEM",
   "source": "CUSTOMER",

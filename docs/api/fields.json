@@ -3,8 +3,8 @@
   "account_key": "Identificador da conta (UUID).",
   "transaction_key": "Identificador da movimentação (UUID).",
   "product_key": "Identificador do produto (UUID).",
-  "order_key": "Identificador da ordem de investimento (UUID).",
-  "assessment_key": "Identificador da avaliação de perfil (UUID).",
+  "investment_order_key": "Identificador da ordem de investimento (UUID).",
+  "suitability_assessment_key": "Identificador da avaliação de perfil (UUID).",
 
   "name": "Nome. No cadastro: nome completo do cliente, de 3 a 120 caracteres, sem espaço nas pontas.",
   "document_number": "CPF. Entra com ou sem pontuação (`123.456.789-09` ou `12345678909`) e sai mascarado (`***.456.789-**`).",

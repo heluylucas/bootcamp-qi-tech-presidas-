@@ -19,8 +19,8 @@ class InvestmentOrderResource:
         order, created = InvestmentOrderController().create(customer_key, account_key, payload, idempotency_key)
         return JSONResponse(content=order, status_code=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
-    def on_get(self, customer_key: str, account_key: str, order_key: str) -> JSONResponse:
-        order = InvestmentOrderController().get(customer_key, account_key, order_key)
+    def on_get(self, customer_key: str, account_key: str, investment_order_key: str) -> JSONResponse:
+        order = InvestmentOrderController().get(customer_key, account_key, investment_order_key)
         return JSONResponse(content=order, status_code=status.HTTP_200_OK)
 
     @SchemaHandler.validate_query_params("get_investment_orders.json")

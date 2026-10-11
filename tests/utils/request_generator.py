@@ -141,8 +141,8 @@ class RequestGenerator:
         return response.response_status, response.response_json
 
     @staticmethod
-    def get_investment_order(customer_key: str, account_key: str, order_key: str):
-        endpoint = f"/customer/{customer_key}/account/{account_key}/investment_order/{order_key}"
+    def get_investment_order(customer_key: str, account_key: str, investment_order_key: str):
+        endpoint = f"/customer/{customer_key}/account/{account_key}/investment_order/{investment_order_key}"
         response = ClientRequisition.send("GET", endpoint, headers=HEADERS)
         return response.response_status, response.response_json
 

@@ -98,7 +98,7 @@ class TestSubmitSuitability:
         status, body = RequestGenerator.post_suitability(customer_key, answers(2))
 
         assert status == 201
-        assert len(body["assessment_key"]) == 36
+        assert len(body["suitability_assessment_key"]) == 36
         assert "created_at" in body
         assert body["answers"] == answers(2)["answers"]
 
@@ -208,7 +208,7 @@ class TestCurrentSuitability:
         status, body = RequestGenerator.get_suitability(customer_key)
 
         assert status == 200
-        assert body["assessment_key"] == retaken["assessment_key"]
+        assert body["suitability_assessment_key"] == retaken["suitability_assessment_key"]
         assert body["profile"] == "AGGRESSIVE"
 
 
@@ -221,9 +221,9 @@ class TestSuitabilityHistory:
         status, body = RequestGenerator.get_suitabilities(customer_key)
 
         assert status == 200
-        assert [item["assessment_key"] for item in body["items"]] == [
-            second["assessment_key"],
-            first["assessment_key"],
+        assert [item["suitability_assessment_key"] for item in body["items"]] == [
+            second["suitability_assessment_key"],
+            first["suitability_assessment_key"],
         ]
         assert [item["profile"] for item in body["items"]] == ["AGGRESSIVE", "CONSERVATIVE"]
 

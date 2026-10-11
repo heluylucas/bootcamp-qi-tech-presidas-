@@ -118,7 +118,7 @@ def create_app() -> FastAPI:
     investment_order_path = f"{account_path}/investment_order"
 
     application.add_api_route(investment_order_path, investment_order_resource.on_post, methods=["POST"])
-    application.add_api_route(f"{investment_order_path}/{{order_key}}", investment_order_resource.on_get, methods=["GET"])
+    application.add_api_route(f"{investment_order_path}/{{investment_order_key}}", investment_order_resource.on_get, methods=["GET"])
     application.add_api_route(
         f"{account_path}/investment_orders",
         investment_order_resource.on_get_list,

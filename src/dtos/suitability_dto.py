@@ -13,7 +13,7 @@ def question_to_dict(question: SuitabilityQuestion) -> dict:
 
 def assessment_to_dict(assessment: SuitabilityAssessment) -> dict:
     return {
-        "assessment_key": assessment.assessment_key,
+        "suitability_assessment_key": assessment.suitability_assessment_key,
         "profile": assessment.investor_profile,
         "maximum_risk_level": assessment.maximum_risk_level,
         "score": assessment.score,

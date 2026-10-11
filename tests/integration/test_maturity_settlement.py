@@ -39,7 +39,7 @@ class TestMaturitySettlement:
             assert balance > 1_000_000
 
             settlement, original = lci_orders(customer_key, account_key)
-            assert original["order_key"] == applied["order_key"]
+            assert original["investment_order_key"] == applied["investment_order_key"]
             assert settlement["side"] == "REDEEM"
             assert settlement["source"] == "MATURITY"
             assert settlement["quantity"] == applied["quantity"]

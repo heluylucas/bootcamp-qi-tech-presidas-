@@ -296,7 +296,7 @@ igual a um inexistente. As rotas marcadas como
 pedido; sem ele ou fora do formato, `400` (`PPP000003`). A chave é `UNIQUE` no banco inteiro
 (`transaction.idempotency_key`). Se ela voltar da mesma conta com o mesmo pedido (comparado com o que
 já está gravado), a resposta é `200` com o corpo original e nada se move de novo. Se vier de outra
-conta ou com um pedido diferente, `409` (`PPP000004`). `ck` = `customer_key`, `ak` = `account_key`.
+conta ou com um pedido diferente, `409` (`PPP000004`). `ck` = `customer_key`, `ak` = `account_key`, `ok` = `investment_order_key`.
 
 | Método | Caminho | O que faz | Entrada (campos que importam) | Saídas (status e quando) |
 |---|---|---|---|---|
@@ -318,7 +318,7 @@ conta ou com um pedido diferente, `409` (`PPP000004`). `ck` = `customer_key`, `a
 | `GET` | `/product/{pk}` | Detalhe e preço do dia | — | `200`; `404` |
 | `GET` | `/product/{pk}/prices` | Histórico de preços | `from`, `to` | `200`; `404` |
 | `GET` | `/customer/{ck}/portfolio_suggestion` | Divide um valor pela carteira-modelo do perfil (não grava nada) | `amount` | `200` itens que somam exatamente `amount`; `400`; `404`; `409` sem perfil ou vencido; `422` abaixo de R$ 1.000 |
-| `POST` | `/customer/{ck}/account/{ak}/investment_order` | Aplica ou resgata; o dinheiro sai ou entra nesta conta. **Idempotente** | `product_key`, `side`, `amount` ou `redeem_all` | `201` `order_key`, quantidade, preço (resgate: custo, resultado, rentabilidade); `200` repetição; `400` schema ou sem chave; `404` conta ou produto; `409` conta não ativa, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; `422` abaixo do mínimo, fora do perfil, resgate antes do vencimento |
+| `POST` | `/customer/{ck}/account/{ak}/investment_order` | Aplica ou resgata; o dinheiro sai ou entra nesta conta. **Idempotente** | `product_key`, `side`, `amount` ou `redeem_all` | `201` `investment_order_key`, quantidade, preço (resgate: custo, resultado, rentabilidade); `200` repetição; `400` schema ou sem chave; `404` conta ou produto; `409` conta não ativa, sem perfil válido, saldo ou posição insuficiente, chave reutilizada; `422` abaixo do mínimo, fora do perfil, resgate antes do vencimento |
 | `GET` | `/customer/{ck}/account/{ak}/investment_orders` | Histórico de ordens da conta | `page`, `limit`, `product_key` | `200` (produto inexistente: lista vazia); `400`; `404` |
 | `GET` | `/customer/{ck}/account/{ak}/investment_order/{ok}` | Detalhe da ordem | — | `200`; `404` |
 | `GET` | `/customer/{ck}/account/{ak}/positions` | Posição, valor do dia, rentabilidade e capital total na conta (caixa + investimentos, com a divisão em pontos-base) | `include_closed` | `200`; `400`; `404` |

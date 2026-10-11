@@ -222,7 +222,7 @@
         {
           "id": "consultar-ordem",
           "method": "GET",
-          "path": "/customer/{customer_key}/account/{account_key}/investment_order/{order_key}",
+          "path": "/customer/{customer_key}/account/{account_key}/investment_order/{investment_order_key}",
           "title": "Consultar ordem",
           "description": "A ordem, com o mesmo corpo da resposta de criação. Ordem de outra conta ou de outro cliente responde 404.",
           "responses": [{"status": 200, "description": "Ordem."}],

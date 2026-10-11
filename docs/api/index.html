@@ -242,7 +242,7 @@ td:first-child { white-space: nowrap; }
 }</code></pre>
 <div class="table"><table><thead><tr><th>Campo</th><th>O que é</th></tr></thead><tbody><tr><td><code>title</code></td><td>Nome curto do erro, em inglês.</td></tr><tr><td><code>description</code></td><td>Explicação em inglês.</td></tr><tr><td><code>translation</code></td><td>Explicação em português, pronta para mostrar ao usuário.</td></tr><tr><td><code>code</code></td><td>Código estável do erro (<code>PPP</code> + 6 dígitos). Use ele para decidir o que fazer, não o texto.</td></tr></tbody></table></div>
 <p>O corpo pode ganhar campos novos no futuro: não trate um campo a mais como erro. A lista completa está em <strong>Catálogo de erros</strong>.</p><nav class="pager"><a class="prev" href="#paginacao"><span>Anterior</span>Paginação</a><a class="next" href="#catalogo-de-erros"><span>Próxima</span>Catálogo de erros</a></nav></section>
-<section class="page" id="p-catalogo-de-erros" data-title="Catálogo de erros"><h1>Catálogo de erros</h1><p class="lede">Todos os códigos que a API devolve. Os três primeiros dígitos depois de <code>PPP</code> dizem o módulo: 000 geral, 001 clientes, 002 contas, 003 movimentações, 004 perfil, 005 produtos, 006 carteira, 007 ordens.</p><div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">400</span></td><td><code>PPP000001</code></td><td>Bad Request</td><td>(varia: diz o que está errado)</td><td>Payload Inválido</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">400</span></td><td><code>PPP000003</code></td><td>Missing Idempotency Key</td><td>This route moves money and requires the Idempotency-Key header with a UUID.</td><td>Esta operação exige o cabeçalho Idempotency-Key com um UUID.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP000004</code></td><td>Idempotency Key Reused</td><td>This Idempotency-Key was already used by another request.</td><td>Esta Idempotency-Key já foi usada em outro pedido.</td></tr><tr><td><span class="status s-warn">400</span></td><td><code>PPP000005</code></td><td>Invalid Parameter</td><td>(varia: diz o que está errado)</td><td>Parâmetros inválidos foram fornecidos na requisição.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP000006</code></td><td>Business Date Mismatch</td><td>The close_date is not the current business date.</td><td>A data a fechar não é a data de movimento atual.</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP000007</code></td><td>Operator Only</td><td>This route belongs to the bank operation and requires the OPERATOR-TOKEN header.</td><td>Esta rota é da operação do banco e exige o token de operador.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP000404</code></td><td>Resource not Found</td><td>The requested resource could not be found but may be available in the future. Subsequent requests by the client are permissible.</td><td>O resource solicitado não pode ser encontrado, mas pode estar disponível no futuro. Requests subsequentes do cliente são permitidos.</td></tr><tr><td><span class="status s-warn">405</span></td><td><code>PPP000405</code></td><td>Method not allowed</td><td>The requested method is forbidden for this resource.</td><td>O método desejado não foi encontrado para esse recurso.</td></tr><tr><td><span class="status s-bad">500</span></td><td><code>PPP000500</code></td><td>Internal Error</td><td>An internal error has occurred and its being investigated.</td><td>Um erro interno aconteceu e está sendo investigado.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP001002</code></td><td>Document Already Registered</td><td>There is already a customer with this document_number.</td><td>Já existe um cliente cadastrado com este CPF.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP001003</code></td><td>Invalid Document Number</td><td>The document_number check digits are invalid.</td><td>CPF inválido.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP001004</code></td><td>Underage Customer</td><td>The customer must be at least 18 years old and born in the past.</td><td>O cliente precisa ter pelo menos 18 anos.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP002001</code></td><td>Account Not Found</td><td>The account_key does not exist for this customer.</td><td>Conta não encontrada.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002002</code></td><td>Account Already Exists</td><td>The customer already has an account that is not closed.</td><td>O cliente já tem uma conta não encerrada.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002003</code></td><td>Invalid Status Transition</td><td>The account cannot move from its current status to the requested one.</td><td>A conta não pode passar do status atual para o status pedido.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002004</code></td><td>Account Not Empty</td><td>The account must have zero balance and no investment position to be closed.</td><td>Só é possível encerrar uma conta sem saldo e sem investimentos.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002005</code></td><td>Account Not Active</td><td>The account is blocked or closed and cannot move money.</td><td>A conta está bloqueada ou encerrada e não pode movimentar dinheiro.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP002006</code></td><td>Status Reason Required</td><td>Blocking or closing an account requires a reason.</td><td>Bloquear ou encerrar a conta exige um motivo.</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP002007</code></td><td>Status Change Reserved To Bank</td><td>Customers can only close their own account; blocking and unblocking are bank decisions.</td><td>O cliente só pode encerrar a própria conta; bloquear e desbloquear são decisões do banco.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP003001</code></td><td>Transaction Not Found</td><td>The transaction_key does not exist or does not involve this account.</td><td>Transação não encontrada.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP003002</code></td><td>Destination Account Not Found</td><td>The destination_account_key does not exist.</td><td>Conta de destino não encontrada.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP003003</code></td><td>Insufficient Balance</td><td>The account does not have enough balance for amount plus fee.</td><td>Saldo insuficiente para o valor mais a tarifa.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP003004</code></td><td>Invalid Amount</td><td>The amount must be an integer greater than zero, in cents.</td><td>O valor precisa ser maior que zero, em centavos.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP003005</code></td><td>Amount Above Limit</td><td>The amount is above the limit for this type of operation.</td><td>O valor está acima do limite para este tipo de operação.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP003006</code></td><td>Same Account Transfer</td><td>The destination account must be different from the origin account.</td><td>A conta de destino precisa ser diferente da conta de origem.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP003007</code></td><td>Destination Account Not Active</td><td>The destination account is blocked or closed and cannot receive money.</td><td>A conta de destino está bloqueada ou encerrada e não pode receber dinheiro.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP004001</code></td><td>Suitability Not Found</td><td>The customer has never answered the suitability questionnaire.</td><td>O cliente ainda não respondeu o questionário de perfil de investidor.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP004002</code></td><td>Incomplete Answers</td><td>Every question must be answered exactly once, and only existing questions can be answered.</td><td>Cada pergunta do questionário precisa de exatamente uma resposta.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP004003</code></td><td>Invalid Option</td><td>The option_code does not belong to the question.</td><td>A opção escolhida não pertence a esta pergunta.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP004004</code></td><td>Suitability Expired</td><td>The investor profile is more than 24 months old and must be answered again.</td><td>O perfil de investidor tem mais de 24 meses e precisa ser refeito.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP004005</code></td><td>Suitability Required</td><td>The customer needs an investor profile before this operation.</td><td>O cliente precisa responder o questionário de perfil de investidor antes desta operação.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP005001</code></td><td>Product Not Found</td><td>The product_key does not exist.</td><td>Produto não encontrado.</td></tr><tr><td><span class="status s-bad">502</span></td><td><code>PPP005006</code></td><td>Price Source Unavailable</td><td>An external price or rate source is down, timed out or answered an error.</td><td>Uma fonte externa de preço ou taxa está fora do ar ou respondeu erro. Nada foi gravado.</td></tr><tr><td><span class="status s-bad">502</span></td><td><code>PPP005007</code></td><td>Invalid Price Source Response</td><td>An external price or rate source answered something that makes no sense.</td><td>Uma fonte externa de preço ou taxa respondeu algo sem sentido. Nada foi gravado.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP006001</code></td><td>Suggestion Amount Too Low</td><td>The amount for a portfolio suggestion must be at least 100000 cents (R$ 1,000.00).</td><td>O valor mínimo para pedir uma sugestão de carteira é R$ 1.000,00.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP007001</code></td><td>Order Not Found</td><td>The order_key does not exist for this customer.</td><td>Ordem não encontrada.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007002</code></td><td>Below Minimum Application</td><td>The amount is below the product&#x27;s minimum application.</td><td>O valor está abaixo da aplicação mínima do produto.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007003</code></td><td>Product Not Suitable</td><td>The product&#x27;s risk level is above what the investor profile allows.</td><td>O risco do produto está acima do permitido para o seu perfil de investidor.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP007004</code></td><td>Insufficient Position</td><td>The redemption is larger than the customer&#x27;s position in this product.</td><td>O resgate é maior do que o que você tem aplicado neste produto.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007005</code></td><td>Redemption Not Allowed</td><td>This product can only be redeemed at maturity.</td><td>Este produto só pode ser resgatado no vencimento.</td></tr></tbody></table></div><nav class="pager"><a class="prev" href="#erros"><span>Anterior</span>Formato de erro</a><a class="next" href="#criar-cliente"><span>Próxima</span>Cadastrar cliente</a></nav></section>
+<section class="page" id="p-catalogo-de-erros" data-title="Catálogo de erros"><h1>Catálogo de erros</h1><p class="lede">Todos os códigos que a API devolve. Os três primeiros dígitos depois de <code>PPP</code> dizem o módulo: 000 geral, 001 clientes, 002 contas, 003 movimentações, 004 perfil, 005 produtos, 006 carteira, 007 ordens.</p><div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">400</span></td><td><code>PPP000001</code></td><td>Bad Request</td><td>(varia: diz o que está errado)</td><td>Payload Inválido</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">400</span></td><td><code>PPP000003</code></td><td>Missing Idempotency Key</td><td>This route moves money and requires the Idempotency-Key header with a UUID.</td><td>Esta operação exige o cabeçalho Idempotency-Key com um UUID.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP000004</code></td><td>Idempotency Key Reused</td><td>This Idempotency-Key was already used by another request.</td><td>Esta Idempotency-Key já foi usada em outro pedido.</td></tr><tr><td><span class="status s-warn">400</span></td><td><code>PPP000005</code></td><td>Invalid Parameter</td><td>(varia: diz o que está errado)</td><td>Parâmetros inválidos foram fornecidos na requisição.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP000006</code></td><td>Business Date Mismatch</td><td>The close_date is not the current business date.</td><td>A data a fechar não é a data de movimento atual.</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP000007</code></td><td>Operator Only</td><td>This route belongs to the bank operation and requires the OPERATOR-TOKEN header.</td><td>Esta rota é da operação do banco e exige o token de operador.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP000404</code></td><td>Resource not Found</td><td>The requested resource could not be found but may be available in the future. Subsequent requests by the client are permissible.</td><td>O resource solicitado não pode ser encontrado, mas pode estar disponível no futuro. Requests subsequentes do cliente são permitidos.</td></tr><tr><td><span class="status s-warn">405</span></td><td><code>PPP000405</code></td><td>Method not allowed</td><td>The requested method is forbidden for this resource.</td><td>O método desejado não foi encontrado para esse recurso.</td></tr><tr><td><span class="status s-bad">500</span></td><td><code>PPP000500</code></td><td>Internal Error</td><td>An internal error has occurred and its being investigated.</td><td>Um erro interno aconteceu e está sendo investigado.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP001002</code></td><td>Document Already Registered</td><td>There is already a customer with this document_number.</td><td>Já existe um cliente cadastrado com este CPF.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP001003</code></td><td>Invalid Document Number</td><td>The document_number check digits are invalid.</td><td>CPF inválido.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP001004</code></td><td>Underage Customer</td><td>The customer must be at least 18 years old and born in the past.</td><td>O cliente precisa ter pelo menos 18 anos.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP002001</code></td><td>Account Not Found</td><td>The account_key does not exist for this customer.</td><td>Conta não encontrada.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002002</code></td><td>Account Already Exists</td><td>The customer already has an account that is not closed.</td><td>O cliente já tem uma conta não encerrada.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002003</code></td><td>Invalid Status Transition</td><td>The account cannot move from its current status to the requested one.</td><td>A conta não pode passar do status atual para o status pedido.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002004</code></td><td>Account Not Empty</td><td>The account must have zero balance and no investment position to be closed.</td><td>Só é possível encerrar uma conta sem saldo e sem investimentos.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002005</code></td><td>Account Not Active</td><td>The account is blocked or closed and cannot move money.</td><td>A conta está bloqueada ou encerrada e não pode movimentar dinheiro.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP002006</code></td><td>Status Reason Required</td><td>Blocking or closing an account requires a reason.</td><td>Bloquear ou encerrar a conta exige um motivo.</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP002007</code></td><td>Status Change Reserved To Bank</td><td>Customers can only close their own account; blocking and unblocking are bank decisions.</td><td>O cliente só pode encerrar a própria conta; bloquear e desbloquear são decisões do banco.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP003001</code></td><td>Transaction Not Found</td><td>The transaction_key does not exist or does not involve this account.</td><td>Transação não encontrada.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP003002</code></td><td>Destination Account Not Found</td><td>The destination_account_key does not exist.</td><td>Conta de destino não encontrada.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP003003</code></td><td>Insufficient Balance</td><td>The account does not have enough balance for amount plus fee.</td><td>Saldo insuficiente para o valor mais a tarifa.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP003004</code></td><td>Invalid Amount</td><td>The amount must be an integer greater than zero, in cents.</td><td>O valor precisa ser maior que zero, em centavos.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP003005</code></td><td>Amount Above Limit</td><td>The amount is above the limit for this type of operation.</td><td>O valor está acima do limite para este tipo de operação.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP003006</code></td><td>Same Account Transfer</td><td>The destination account must be different from the origin account.</td><td>A conta de destino precisa ser diferente da conta de origem.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP003007</code></td><td>Destination Account Not Active</td><td>The destination account is blocked or closed and cannot receive money.</td><td>A conta de destino está bloqueada ou encerrada e não pode receber dinheiro.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP004001</code></td><td>Suitability Not Found</td><td>The customer has never answered the suitability questionnaire.</td><td>O cliente ainda não respondeu o questionário de perfil de investidor.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP004002</code></td><td>Incomplete Answers</td><td>Every question must be answered exactly once, and only existing questions can be answered.</td><td>Cada pergunta do questionário precisa de exatamente uma resposta.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP004003</code></td><td>Invalid Option</td><td>The option_code does not belong to the question.</td><td>A opção escolhida não pertence a esta pergunta.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP004004</code></td><td>Suitability Expired</td><td>The investor profile is more than 24 months old and must be answered again.</td><td>O perfil de investidor tem mais de 24 meses e precisa ser refeito.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP004005</code></td><td>Suitability Required</td><td>The customer needs an investor profile before this operation.</td><td>O cliente precisa responder o questionário de perfil de investidor antes desta operação.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP005001</code></td><td>Product Not Found</td><td>The product_key does not exist.</td><td>Produto não encontrado.</td></tr><tr><td><span class="status s-bad">502</span></td><td><code>PPP005006</code></td><td>Price Source Unavailable</td><td>An external price or rate source is down, timed out or answered an error.</td><td>Uma fonte externa de preço ou taxa está fora do ar ou respondeu erro. Nada foi gravado.</td></tr><tr><td><span class="status s-bad">502</span></td><td><code>PPP005007</code></td><td>Invalid Price Source Response</td><td>An external price or rate source answered something that makes no sense.</td><td>Uma fonte externa de preço ou taxa respondeu algo sem sentido. Nada foi gravado.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP006001</code></td><td>Suggestion Amount Too Low</td><td>The amount for a portfolio suggestion must be at least 100000 cents (R$ 1,000.00).</td><td>O valor mínimo para pedir uma sugestão de carteira é R$ 1.000,00.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP007001</code></td><td>Order Not Found</td><td>The investment_order_key does not exist for this customer.</td><td>Ordem não encontrada.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007002</code></td><td>Below Minimum Application</td><td>The amount is below the product&#x27;s minimum application.</td><td>O valor está abaixo da aplicação mínima do produto.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007003</code></td><td>Product Not Suitable</td><td>The product&#x27;s risk level is above what the investor profile allows.</td><td>O risco do produto está acima do permitido para o seu perfil de investidor.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP007004</code></td><td>Insufficient Position</td><td>The redemption is larger than the customer&#x27;s position in this product.</td><td>O resgate é maior do que o que você tem aplicado neste produto.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007005</code></td><td>Redemption Not Allowed</td><td>This product can only be redeemed at maturity.</td><td>Este produto só pode ser resgatado no vencimento.</td></tr></tbody></table></div><nav class="pager"><a class="prev" href="#erros"><span>Anterior</span>Formato de erro</a><a class="next" href="#criar-cliente"><span>Próxima</span>Cadastrar cliente</a></nav></section>
 <section class="page" id="p-criar-cliente" data-title="Cadastrar cliente"><p class="crumb">Clientes</p>
 <h1>Cadastrar cliente</h1>
 <p class="lede">Cadastra um cliente pessoa física. O CPF pode vir com ou sem pontuação e é guardado só com os dígitos; o cliente precisa ter 18 anos ou mais. A resposta traz a <code>customer_key</code>, que identifica o cliente em todas as outras rotas, e o CPF mascarado.</p>
@@ -260,11 +260,11 @@ td:first-child { white-space: nowrap; }
 <h2 id="criar-cliente-respostas">Respostas</h2>
 <p><span class="status s-ok">201</span> Cliente cadastrado.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 201</span><span>Cliente cadastrado</span></div><pre class="code"><code>{
-  &quot;customer_key&quot;: &quot;9e67ce08-92c1-415b-814a-ca571e3ec008&quot;,
+  &quot;customer_key&quot;: &quot;4f9a35d6-e269-4e84-a9f6-b50552c5ce56&quot;,
   &quot;name&quot;: &quot;Ana Souza&quot;,
   &quot;document_number&quot;: &quot;***.982.247-**&quot;,
   &quot;birth_date&quot;: &quot;1992-04-17&quot;,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-warn">STATUS 409</span><span>CPF já cadastrado</span></div><pre class="code"><code>{
   &quot;title&quot;: &quot;Document Already Registered&quot;,
@@ -286,16 +286,16 @@ td:first-child { white-space: nowrap; }
 <h2 id="consultar-cliente-caminho">Parâmetros de caminho</h2>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr></tbody></table></div>
 <h2 id="consultar-cliente-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="consultar-cliente-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Dados do cliente.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Dados do cliente</span></div><pre class="code"><code>{
-  &quot;customer_key&quot;: &quot;9e67ce08-92c1-415b-814a-ca571e3ec008&quot;,
+  &quot;customer_key&quot;: &quot;4f9a35d6-e269-4e84-a9f6-b50552c5ce56&quot;,
   &quot;name&quot;: &quot;Ana Souza&quot;,
   &quot;document_number&quot;: &quot;***.982.247-**&quot;,
   &quot;birth_date&quot;: &quot;1992-04-17&quot;,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <h3 id="consultar-cliente-campos-resposta">Campos da resposta</h3>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr><tr><td><code>name</code></td><td>Nome. No cadastro: nome completo do cliente, de 3 a 120 caracteres, sem espaço nas pontas.</td></tr><tr><td><code>document_number</code></td><td>CPF. Entra com ou sem pontuação (<code>123.456.789-09</code> ou <code>12345678909</code>) e sai mascarado (<code>*<strong>.456.789-</strong></code>).</td></tr><tr><td><code>birth_date</code></td><td>Data de nascimento (<code>AAAA-MM-DD</code>). O cliente precisa ter 18 anos ou mais.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr></tbody></table></div>
@@ -311,18 +311,18 @@ td:first-child { white-space: nowrap; }
 <h2 id="abrir-conta-caminho">Parâmetros de caminho</h2>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr></tbody></table></div>
 <h2 id="abrir-conta-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X POST &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account&#x27; \
+<pre class="code"><code>curl -X POST &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="abrir-conta-respostas">Respostas</h2>
 <p><span class="status s-ok">201</span> Conta aberta.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 201</span><span>Conta aberta</span></div><pre class="code"><code>{
-  &quot;account_key&quot;: &quot;d7579ea5-de3a-4eb1-9169-69574d6f489b&quot;,
+  &quot;account_key&quot;: &quot;b043541b-19bc-4c23-a079-b18cbff9354c&quot;,
   &quot;status&quot;: &quot;ACTIVE&quot;,
   &quot;balance&quot;: 0,
   &quot;investments_amount&quot;: 0,
   &quot;net_worth_amount&quot;: 0,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;,
-  &quot;updated_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;,
+  &quot;updated_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <h3 id="abrir-conta-campos-resposta">Campos da resposta</h3>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>account_key</code></td><td>Identificador da conta (UUID).</td></tr><tr><td><code>status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>balance</code></td><td>Saldo da conta (só o dinheiro parado nela, sem os investimentos), em centavos. Na resposta de uma movimentação, é o saldo logo depois dela.</td></tr><tr><td><code>investments_amount</code></td><td>Valor de todas as posições ao preço do dia, em centavos. Fica fora do balance: o que foi aplicado saiu do saldo.</td></tr><tr><td><code>net_worth_amount</code></td><td>Capital total do cliente no banco: caixa + investimentos ao preço do dia, em centavos.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>updated_at</code></td><td>Quando o registro mudou pela última vez, em UTC.</td></tr></tbody></table></div>
@@ -338,27 +338,27 @@ td:first-child { white-space: nowrap; }
 <h2 id="consultar-conta-caminho">Parâmetros de caminho</h2>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr><tr><td><code>account_key</code></td><td>Identificador da conta (UUID).</td></tr></tbody></table></div>
 <h2 id="consultar-conta-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account/d7579ea5-de3a-4eb1-9169-69574d6f489b&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account/b043541b-19bc-4c23-a079-b18cbff9354c&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="consultar-conta-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Dados da conta.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Dados da conta</span></div><pre class="code"><code>{
-  &quot;account_key&quot;: &quot;d7579ea5-de3a-4eb1-9169-69574d6f489b&quot;,
+  &quot;account_key&quot;: &quot;b043541b-19bc-4c23-a079-b18cbff9354c&quot;,
   &quot;status&quot;: &quot;ACTIVE&quot;,
   &quot;balance&quot;: 0,
   &quot;investments_amount&quot;: 0,
   &quot;net_worth_amount&quot;: 0,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;,
-  &quot;updated_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;,
+  &quot;updated_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Conta com investimentos</span></div><pre class="code"><code>{
-  &quot;account_key&quot;: &quot;d7579ea5-de3a-4eb1-9169-69574d6f489b&quot;,
+  &quot;account_key&quot;: &quot;b043541b-19bc-4c23-a079-b18cbff9354c&quot;,
   &quot;status&quot;: &quot;ACTIVE&quot;,
   &quot;balance&quot;: 99800,
   &quot;investments_amount&quot;: 79998,
   &quot;net_worth_amount&quot;: 179798,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;,
-  &quot;updated_at&quot;: &quot;2026-10-09T22:03:19Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;,
+  &quot;updated_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <h3 id="consultar-conta-campos-resposta">Campos da resposta</h3>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>account_key</code></td><td>Identificador da conta (UUID).</td></tr><tr><td><code>status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>balance</code></td><td>Saldo da conta (só o dinheiro parado nela, sem os investimentos), em centavos. Na resposta de uma movimentação, é o saldo logo depois dela.</td></tr><tr><td><code>investments_amount</code></td><td>Valor de todas as posições ao preço do dia, em centavos. Fica fora do balance: o que foi aplicado saiu do saldo.</td></tr><tr><td><code>net_worth_amount</code></td><td>Capital total do cliente no banco: caixa + investimentos ao preço do dia, em centavos.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>updated_at</code></td><td>Quando o registro mudou pela última vez, em UTC.</td></tr></tbody></table></div>
@@ -377,20 +377,20 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>status</code><span class="req">*</span></td><td>string</td><td>Novo status. O cliente só pode pedir <code>CLOSED</code>; <code>BLOCKED</code> e <code>ACTIVE</code> são do banco (rota interna) e respondem 403.</td><td><code>ACTIVE</code> · <code>BLOCKED</code> · <code>CLOSED</code></td></tr><tr><td><code>reason</code></td><td>string</td><td>Motivo da mudança de status, até 255 caracteres. Obrigatório para bloquear e encerrar.</td><td>até 255 caracteres</td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="encerrar-conta-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X PATCH &#x27;http://localhost:3000/customer/7ab00976-e106-411b-b284-8a07990091d4/account/5a6c598a-d810-46b4-9da6-c717f24187c0&#x27; \
+<pre class="code"><code>curl -X PATCH &#x27;http://localhost:3000/customer/117b4144-e22a-456f-8975-6760acfc0481/account/829a2669-8375-43b1-bbf8-19e21609e92d&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27; \
   -H &#x27;Content-Type: application/json&#x27; \
   -d &#x27;{&quot;status&quot;: &quot;CLOSED&quot;, &quot;reason&quot;: &quot;Não vou mais usar&quot;}&#x27;</code></pre>
 <h2 id="encerrar-conta-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Conta encerrada; um evento de status é gravado.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Cliente encerra a conta vazia</span></div><pre class="code"><code>{
-  &quot;account_key&quot;: &quot;5a6c598a-d810-46b4-9da6-c717f24187c0&quot;,
+  &quot;account_key&quot;: &quot;829a2669-8375-43b1-bbf8-19e21609e92d&quot;,
   &quot;status&quot;: &quot;CLOSED&quot;,
   &quot;balance&quot;: 0,
   &quot;investments_amount&quot;: 0,
   &quot;net_worth_amount&quot;: 0,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:19Z&quot;,
-  &quot;updated_at&quot;: &quot;2026-10-09T22:03:19Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:44:00Z&quot;,
+  &quot;updated_at&quot;: &quot;2026-10-11T19:44:00Z&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-warn">STATUS 403</span><span>Cliente tenta bloquear</span></div><pre class="code"><code>{
   &quot;title&quot;: &quot;Status Change Reserved To Bank&quot;,
@@ -412,7 +412,7 @@ td:first-child { white-space: nowrap; }
 <h2 id="historico-status-caminho">Parâmetros de caminho</h2>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr><tr><td><code>account_key</code></td><td>Identificador da conta (UUID).</td></tr></tbody></table></div>
 <h2 id="historico-status-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/7ab00976-e106-411b-b284-8a07990091d4/account/5a6c598a-d810-46b4-9da6-c717f24187c0/status_events&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/117b4144-e22a-456f-8975-6760acfc0481/account/829a2669-8375-43b1-bbf8-19e21609e92d/status_events&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="historico-status-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Eventos, do mais antigo para o mais novo.</p>
@@ -423,14 +423,14 @@ td:first-child { white-space: nowrap; }
       &quot;to_status&quot;: &quot;ACTIVE&quot;,
       &quot;reason&quot;: null,
       &quot;actor&quot;: &quot;CUSTOMER&quot;,
-      &quot;created_at&quot;: &quot;2026-10-09T22:03:19Z&quot;
+      &quot;created_at&quot;: &quot;2026-10-11T19:44:00Z&quot;
     },
     {
       &quot;from_status&quot;: &quot;ACTIVE&quot;,
       &quot;to_status&quot;: &quot;CLOSED&quot;,
       &quot;reason&quot;: &quot;Não vou mais usar&quot;,
       &quot;actor&quot;: &quot;CUSTOMER&quot;,
-      &quot;created_at&quot;: &quot;2026-10-09T22:03:19Z&quot;
+      &quot;created_at&quot;: &quot;2026-10-11T19:44:00Z&quot;
     }
   ]
 }</code></pre></div>
@@ -451,40 +451,40 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>type</code><span class="req">*</span></td><td>string</td><td>Tipo da movimentação: <code>DEPOSIT</code> (depósito), <code>WITHDRAWAL</code> (saque) ou <code>TRANSFER</code> (transferência). Aplicação e resgate vão pela rota de ordens.</td><td><code>DEPOSIT</code> · <code>WITHDRAWAL</code> · <code>TRANSFER</code></td></tr><tr><td><code>amount</code><span class="req">*</span></td><td>integer</td><td>Valor em centavos, inteiro e maior que zero (R$ 10,50 = <code>1050</code>).</td><td></td></tr><tr><td><code>destination_account_key</code></td><td>string</td><td>Conta que recebe a transferência. Obrigatório só no <code>TRANSFER</code>; pode ser de outro cliente, mas não a própria conta.</td><td>até 36 caracteres</td></tr><tr><td><code>description</code></td><td>string</td><td>Texto livre que aparece no extrato e no comprovante, até 140 caracteres.</td><td>até 140 caracteres</td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="movimentar-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X POST &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account/d7579ea5-de3a-4eb1-9169-69574d6f489b/transaction&#x27; \
+<pre class="code"><code>curl -X POST &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account/b043541b-19bc-4c23-a079-b18cbff9354c/transaction&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27; \
-  -H &#x27;Idempotency-Key: f9d65495-83af-4508-8754-675a2d28c7f3&#x27; \
+  -H &#x27;Idempotency-Key: cbb910f5-6214-48fb-bdba-3d2aa80ffe86&#x27; \
   -H &#x27;Content-Type: application/json&#x27; \
   -d &#x27;{&quot;type&quot;: &quot;DEPOSIT&quot;, &quot;amount&quot;: 200000, &quot;description&quot;: &quot;Salário&quot;}&#x27;</code></pre>
 <h2 id="movimentar-respostas">Respostas</h2>
 <p><span class="status s-ok">201</span> Movimentação feita.</p>
 <p><span class="status s-ok">200</span> Repetição do mesmo pedido (mesma chave, mesma conta, mesmo corpo): devolve a resposta original e não move o dinheiro de novo.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 201</span><span>Depósito de R$ 2.000,00</span></div><pre class="code"><code>{
-  &quot;transaction_key&quot;: &quot;a3caa17d-b7a5-4bed-a725-a4f7d680c6a1&quot;,
+  &quot;transaction_key&quot;: &quot;97d971c5-10dc-4350-bdb1-ff8dad5de744&quot;,
   &quot;type&quot;: &quot;DEPOSIT&quot;,
   &quot;amount&quot;: 200000,
   &quot;fee_amount&quot;: 0,
   &quot;description&quot;: &quot;Salário&quot;,
   &quot;balance&quot;: 200000,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 201</span><span>Transferência de R$ 200,00 (tarifa de R$ 2,00)</span></div><pre class="code"><code>{
-  &quot;transaction_key&quot;: &quot;d2ceebff-94ee-4630-b278-ae138e93a10c&quot;,
+  &quot;transaction_key&quot;: &quot;42ff2a44-cb70-41d9-9d9e-8c25bc377dd6&quot;,
   &quot;type&quot;: &quot;TRANSFER&quot;,
   &quot;amount&quot;: 20000,
   &quot;fee_amount&quot;: 200,
   &quot;description&quot;: &quot;Aluguel&quot;,
   &quot;balance&quot;: 179800,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Reenvio do mesmo depósito (mesma chave)</span></div><pre class="code"><code>{
-  &quot;transaction_key&quot;: &quot;a3caa17d-b7a5-4bed-a725-a4f7d680c6a1&quot;,
+  &quot;transaction_key&quot;: &quot;97d971c5-10dc-4350-bdb1-ff8dad5de744&quot;,
   &quot;type&quot;: &quot;DEPOSIT&quot;,
   &quot;amount&quot;: 200000,
   &quot;fee_amount&quot;: 0,
   &quot;description&quot;: &quot;Salário&quot;,
   &quot;balance&quot;: 200000,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-warn">STATUS 409</span><span>Mesma chave com outro valor</span></div><pre class="code"><code>{
   &quot;title&quot;: &quot;Idempotency Key Reused&quot;,
@@ -515,38 +515,38 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>page</code></td><td>string</td><td>Número da página, a partir de 1 (padrão 1).</td><td>inteiro a partir de 1</td></tr><tr><td><code>limit</code></td><td>string</td><td>Itens por página, de 1 a 100 (padrão 20).</td><td>de 1 a 100</td></tr><tr><td><code>type</code></td><td>string</td><td>Filtra o extrato por tipo de movimentação.</td><td><code>DEPOSIT</code> · <code>WITHDRAWAL</code> · <code>TRANSFER</code> · <code>INVESTMENT_APPLY</code> · <code>INVESTMENT_REDEEM</code></td></tr><tr><td><code>from</code></td><td>string</td><td>Data inicial do período (<code>AAAA-MM-DD</code>), inclusive, no calendário do banco (data de movimento).</td><td>data <code>AAAA-MM-DD</code></td></tr><tr><td><code>to</code></td><td>string</td><td>Data final do período (<code>AAAA-MM-DD</code>), inclusive, no calendário do banco (data de movimento).</td><td>data <code>AAAA-MM-DD</code></td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="extrato-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account/d7579ea5-de3a-4eb1-9169-69574d6f489b/transactions?limit=5&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account/b043541b-19bc-4c23-a079-b18cbff9354c/transactions?limit=5&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="extrato-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Uma página do extrato.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Últimos lançamentos</span></div><pre class="code"><code>{
   &quot;items&quot;: [
     {
-      &quot;transaction_key&quot;: &quot;d2ceebff-94ee-4630-b278-ae138e93a10c&quot;,
+      &quot;transaction_key&quot;: &quot;42ff2a44-cb70-41d9-9d9e-8c25bc377dd6&quot;,
       &quot;type&quot;: &quot;TRANSFER&quot;,
       &quot;direction&quot;: &quot;DEBIT&quot;,
       &quot;category&quot;: &quot;FEE&quot;,
       &quot;amount&quot;: 200,
       &quot;balance_after&quot;: 179800,
       &quot;description&quot;: &quot;Aluguel&quot;,
-      &quot;counterparty_account_key&quot;: &quot;3c2f9866-bb47-4052-8a7a-40dc8106f0c5&quot;,
+      &quot;counterparty_account_key&quot;: &quot;4ec7839a-1587-4d71-99de-7b2576e03be5&quot;,
       &quot;business_date&quot;: &quot;2026-11-03&quot;,
-      &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+      &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
     },
     {
-      &quot;transaction_key&quot;: &quot;d2ceebff-94ee-4630-b278-ae138e93a10c&quot;,
+      &quot;transaction_key&quot;: &quot;42ff2a44-cb70-41d9-9d9e-8c25bc377dd6&quot;,
       &quot;type&quot;: &quot;TRANSFER&quot;,
       &quot;direction&quot;: &quot;DEBIT&quot;,
       &quot;category&quot;: &quot;PRINCIPAL&quot;,
       &quot;amount&quot;: 20000,
       &quot;balance_after&quot;: 180000,
       &quot;description&quot;: &quot;Aluguel&quot;,
-      &quot;counterparty_account_key&quot;: &quot;3c2f9866-bb47-4052-8a7a-40dc8106f0c5&quot;,
+      &quot;counterparty_account_key&quot;: &quot;4ec7839a-1587-4d71-99de-7b2576e03be5&quot;,
       &quot;business_date&quot;: &quot;2026-11-03&quot;,
-      &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+      &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
     },
     {
-      &quot;transaction_key&quot;: &quot;a3caa17d-b7a5-4bed-a725-a4f7d680c6a1&quot;,
+      &quot;transaction_key&quot;: &quot;97d971c5-10dc-4350-bdb1-ff8dad5de744&quot;,
       &quot;type&quot;: &quot;DEPOSIT&quot;,
       &quot;direction&quot;: &quot;CREDIT&quot;,
       &quot;category&quot;: &quot;PRINCIPAL&quot;,
@@ -555,7 +555,7 @@ td:first-child { white-space: nowrap; }
       &quot;description&quot;: &quot;Salário&quot;,
       &quot;counterparty_account_key&quot;: null,
       &quot;business_date&quot;: &quot;2026-11-03&quot;,
-      &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+      &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
     }
   ],
   &quot;page&quot;: 1,
@@ -576,20 +576,20 @@ td:first-child { white-space: nowrap; }
 <h2 id="comprovante-caminho">Parâmetros de caminho</h2>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr><tr><td><code>account_key</code></td><td>Identificador da conta (UUID).</td></tr><tr><td><code>transaction_key</code></td><td>Identificador da movimentação (UUID).</td></tr></tbody></table></div>
 <h2 id="comprovante-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account/d7579ea5-de3a-4eb1-9169-69574d6f489b/transaction/d2ceebff-94ee-4630-b278-ae138e93a10c&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account/b043541b-19bc-4c23-a079-b18cbff9354c/transaction/42ff2a44-cb70-41d9-9d9e-8c25bc377dd6&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="comprovante-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Comprovante.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Comprovante da transferência</span></div><pre class="code"><code>{
-  &quot;transaction_key&quot;: &quot;d2ceebff-94ee-4630-b278-ae138e93a10c&quot;,
+  &quot;transaction_key&quot;: &quot;42ff2a44-cb70-41d9-9d9e-8c25bc377dd6&quot;,
   &quot;type&quot;: &quot;TRANSFER&quot;,
   &quot;amount&quot;: 20000,
   &quot;fee_amount&quot;: 200,
   &quot;description&quot;: &quot;Aluguel&quot;,
-  &quot;origin_account_key&quot;: &quot;d7579ea5-de3a-4eb1-9169-69574d6f489b&quot;,
-  &quot;destination_account_key&quot;: &quot;3c2f9866-bb47-4052-8a7a-40dc8106f0c5&quot;,
+  &quot;origin_account_key&quot;: &quot;b043541b-19bc-4c23-a079-b18cbff9354c&quot;,
+  &quot;destination_account_key&quot;: &quot;4ec7839a-1587-4d71-99de-7b2576e03be5&quot;,
   &quot;business_date&quot;: &quot;2026-11-03&quot;,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;
 }</code></pre></div>
 <h3 id="comprovante-campos-resposta">Campos da resposta</h3>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>transaction_key</code></td><td>Identificador da movimentação (UUID).</td></tr><tr><td><code>type</code></td><td>Tipo da movimentação: <code>DEPOSIT</code>, <code>WITHDRAWAL</code>, <code>TRANSFER</code>, <code>INVESTMENT_APPLY</code> ou <code>INVESTMENT_REDEEM</code>.</td></tr><tr><td><code>amount</code></td><td>Valor em centavos, inteiro e maior que zero (R$ 10,50 = <code>1050</code>).</td></tr><tr><td><code>fee_amount</code></td><td>Tarifa cobrada, em centavos. R$ 2,00 (<code>200</code>) na transferência; zero nas outras.</td></tr><tr><td><code>description</code></td><td>Texto livre que aparece no extrato e no comprovante, até 140 caracteres.</td></tr><tr><td><code>origin_account_key</code></td><td>Conta de onde o dinheiro saiu. Nulo no depósito e no resgate (o dinheiro vem de fora da conta).</td></tr><tr><td><code>destination_account_key</code></td><td>Conta que recebe a transferência. Obrigatório só no <code>TRANSFER</code>; pode ser de outro cliente, mas não a própria conta.</td></tr><tr><td><code>business_date</code></td><td>Data de movimento: o "hoje" do banco, a data real simulada. Num lançamento ou comprovante, o dia de movimento em que a transação aconteceu.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr></tbody></table></div>
@@ -789,20 +789,20 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>answers</code><span class="req">*</span></td><td>array de objetos</td><td>Uma resposta para cada uma das 7 perguntas.</td><td></td></tr><tr><td><code>answers[].question_code</code><span class="req">*</span></td><td>string</td><td>Código da pergunta (<code>Q1</code> a <code>Q7</code>).</td><td></td></tr><tr><td><code>answers[].option_code</code><span class="req">*</span></td><td>integer</td><td>Código da opção escolhida (1 a 4).</td><td></td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="responder-perfil-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X POST &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/suitability&#x27; \
+<pre class="code"><code>curl -X POST &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/suitability&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27; \
   -H &#x27;Content-Type: application/json&#x27; \
   -d &#x27;{&quot;answers&quot;: [{&quot;question_code&quot;: &quot;Q1&quot;, &quot;option_code&quot;: 2}, {&quot;question_code&quot;: &quot;Q2&quot;, &quot;option_code&quot;: 2}, {&quot;question_code&quot;: &quot;Q3&quot;, &quot;option_code&quot;: 2}, {&quot;question_code&quot;: &quot;Q4&quot;, &quot;option_code&quot;: 2}, {&quot;question_code&quot;: &quot;Q5&quot;, &quot;option_code&quot;: 2}, {&quot;question_code&quot;: &quot;Q6&quot;, &quot;option_code&quot;: 2}, {&quot;question_code&quot;: &quot;Q7&quot;, &quot;option_code&quot;: 2}]}&#x27;</code></pre>
 <h2 id="responder-perfil-respostas">Respostas</h2>
 <p><span class="status s-ok">201</span> Avaliação criada.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 201</span><span>Perfil Moderado (14 pontos)</span></div><pre class="code"><code>{
-  &quot;assessment_key&quot;: &quot;18b788e2-c1b1-4431-b474-381dd49a8a12&quot;,
+  &quot;suitability_assessment_key&quot;: &quot;845f79aa-afd2-4dcf-8336-2f3bc900876a&quot;,
   &quot;profile&quot;: &quot;MODERATE&quot;,
   &quot;maximum_risk_level&quot;: 3,
   &quot;score&quot;: 14,
   &quot;forced_by_rule&quot;: false,
-  &quot;valid_until&quot;: &quot;2028-10-09T22:03:18Z&quot;,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;,
+  &quot;valid_until&quot;: &quot;2028-10-11T19:43:59Z&quot;,
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;,
   &quot;answers&quot;: [
     {
       &quot;question_code&quot;: &quot;Q1&quot;,
@@ -841,7 +841,7 @@ td:first-child { white-space: nowrap; }
   &quot;code&quot;: &quot;PPP004002&quot;
 }</code></pre></div>
 <h3 id="responder-perfil-campos-resposta">Campos da resposta</h3>
-<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>assessment_key</code></td><td>Identificador da avaliação de perfil (UUID).</td></tr><tr><td><code>profile</code></td><td>Perfil do investidor: <code>CONSERVATIVE</code>, <code>MODERATE</code> ou <code>AGGRESSIVE</code>.</td></tr><tr><td><code>maximum_risk_level</code></td><td>Risco máximo de produto. No perfil: até que risco ele aceita (Conservador 2, Moderado 3, Arrojado 5). No filtro do catálogo: só produtos com risco até este (1 a 5).</td></tr><tr><td><code>score</code></td><td>Pontuação do questionário (soma dos códigos das opções, de 7 a 28).</td></tr><tr><td><code>forced_by_rule</code></td><td><code>true</code> quando a trava da Q3/Q5 mudou o perfil para Conservador; <code>false</code> quando os pontos já davam esse perfil.</td></tr><tr><td><code>valid_until</code></td><td>Até quando o perfil vale (24 meses depois da resposta), em UTC.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>answers</code></td><td>Uma resposta para cada uma das 7 perguntas.</td></tr><tr><td><code>answers[].question_code</code></td><td>Código da pergunta (<code>Q1</code> a <code>Q7</code>).</td></tr><tr><td><code>answers[].option_code</code></td><td>Código da opção escolhida (1 a 4).</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>suitability_assessment_key</code></td><td>Identificador da avaliação de perfil (UUID).</td></tr><tr><td><code>profile</code></td><td>Perfil do investidor: <code>CONSERVATIVE</code>, <code>MODERATE</code> ou <code>AGGRESSIVE</code>.</td></tr><tr><td><code>maximum_risk_level</code></td><td>Risco máximo de produto. No perfil: até que risco ele aceita (Conservador 2, Moderado 3, Arrojado 5). No filtro do catálogo: só produtos com risco até este (1 a 5).</td></tr><tr><td><code>score</code></td><td>Pontuação do questionário (soma dos códigos das opções, de 7 a 28).</td></tr><tr><td><code>forced_by_rule</code></td><td><code>true</code> quando a trava da Q3/Q5 mudou o perfil para Conservador; <code>false</code> quando os pontos já davam esse perfil.</td></tr><tr><td><code>valid_until</code></td><td>Até quando o perfil vale (24 meses depois da resposta), em UTC.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>answers</code></td><td>Uma resposta para cada uma das 7 perguntas.</td></tr><tr><td><code>answers[].question_code</code></td><td>Código da pergunta (<code>Q1</code> a <code>Q7</code>).</td></tr><tr><td><code>answers[].option_code</code></td><td>Código da opção escolhida (1 a 4).</td></tr></tbody></table></div>
 <h2 id="responder-perfil-erros">Erros</h2>
 <div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">400</span></td><td><code>PPP000001</code></td><td>Bad Request</td><td>(varia: diz o que está errado)</td><td>Payload Inválido</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP004002</code></td><td>Incomplete Answers</td><td>Every question must be answered exactly once, and only existing questions can be answered.</td><td>Cada pergunta do questionário precisa de exatamente uma resposta.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP004003</code></td><td>Invalid Option</td><td>The option_code does not belong to the question.</td><td>A opção escolhida não pertence a esta pergunta.</td></tr></tbody></table></div>
 <nav class="pager"><a class="prev" href="#perguntas"><span>Anterior</span>Perguntas do questionário</a><a class="next" href="#perfil-atual"><span>Próxima</span>Perfil atual</a></nav></section>
@@ -854,18 +854,18 @@ td:first-child { white-space: nowrap; }
 <h2 id="perfil-atual-caminho">Parâmetros de caminho</h2>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr></tbody></table></div>
 <h2 id="perfil-atual-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/suitability&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/suitability&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="perfil-atual-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Avaliação vigente.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Perfil vigente</span></div><pre class="code"><code>{
-  &quot;assessment_key&quot;: &quot;18b788e2-c1b1-4431-b474-381dd49a8a12&quot;,
+  &quot;suitability_assessment_key&quot;: &quot;845f79aa-afd2-4dcf-8336-2f3bc900876a&quot;,
   &quot;profile&quot;: &quot;MODERATE&quot;,
   &quot;maximum_risk_level&quot;: 3,
   &quot;score&quot;: 14,
   &quot;forced_by_rule&quot;: false,
-  &quot;valid_until&quot;: &quot;2028-10-09T22:03:18Z&quot;,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;,
+  &quot;valid_until&quot;: &quot;2028-10-11T19:43:59Z&quot;,
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;,
   &quot;answers&quot;: [
     {
       &quot;question_code&quot;: &quot;Q1&quot;,
@@ -898,7 +898,7 @@ td:first-child { white-space: nowrap; }
   ]
 }</code></pre></div>
 <h3 id="perfil-atual-campos-resposta">Campos da resposta</h3>
-<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>assessment_key</code></td><td>Identificador da avaliação de perfil (UUID).</td></tr><tr><td><code>profile</code></td><td>Perfil do investidor: <code>CONSERVATIVE</code>, <code>MODERATE</code> ou <code>AGGRESSIVE</code>.</td></tr><tr><td><code>maximum_risk_level</code></td><td>Risco máximo de produto. No perfil: até que risco ele aceita (Conservador 2, Moderado 3, Arrojado 5). No filtro do catálogo: só produtos com risco até este (1 a 5).</td></tr><tr><td><code>score</code></td><td>Pontuação do questionário (soma dos códigos das opções, de 7 a 28).</td></tr><tr><td><code>forced_by_rule</code></td><td><code>true</code> quando a trava da Q3/Q5 mudou o perfil para Conservador; <code>false</code> quando os pontos já davam esse perfil.</td></tr><tr><td><code>valid_until</code></td><td>Até quando o perfil vale (24 meses depois da resposta), em UTC.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>answers</code></td><td>Uma resposta para cada uma das 7 perguntas.</td></tr><tr><td><code>answers[].question_code</code></td><td>Código da pergunta (<code>Q1</code> a <code>Q7</code>).</td></tr><tr><td><code>answers[].option_code</code></td><td>Código da opção escolhida (1 a 4).</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>suitability_assessment_key</code></td><td>Identificador da avaliação de perfil (UUID).</td></tr><tr><td><code>profile</code></td><td>Perfil do investidor: <code>CONSERVATIVE</code>, <code>MODERATE</code> ou <code>AGGRESSIVE</code>.</td></tr><tr><td><code>maximum_risk_level</code></td><td>Risco máximo de produto. No perfil: até que risco ele aceita (Conservador 2, Moderado 3, Arrojado 5). No filtro do catálogo: só produtos com risco até este (1 a 5).</td></tr><tr><td><code>score</code></td><td>Pontuação do questionário (soma dos códigos das opções, de 7 a 28).</td></tr><tr><td><code>forced_by_rule</code></td><td><code>true</code> quando a trava da Q3/Q5 mudou o perfil para Conservador; <code>false</code> quando os pontos já davam esse perfil.</td></tr><tr><td><code>valid_until</code></td><td>Até quando o perfil vale (24 meses depois da resposta), em UTC.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>answers</code></td><td>Uma resposta para cada uma das 7 perguntas.</td></tr><tr><td><code>answers[].question_code</code></td><td>Código da pergunta (<code>Q1</code> a <code>Q7</code>).</td></tr><tr><td><code>answers[].option_code</code></td><td>Código da opção escolhida (1 a 4).</td></tr></tbody></table></div>
 <h2 id="perfil-atual-erros">Erros</h2>
 <div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP004001</code></td><td>Suitability Not Found</td><td>The customer has never answered the suitability questionnaire.</td><td>O cliente ainda não respondeu o questionário de perfil de investidor.</td></tr></tbody></table></div>
 <nav class="pager"><a class="prev" href="#responder-perfil"><span>Anterior</span>Responder o questionário</a><a class="next" href="#historico-perfil"><span>Próxima</span>Histórico de perfis</a></nav></section>
@@ -911,20 +911,20 @@ td:first-child { white-space: nowrap; }
 <h2 id="historico-perfil-caminho">Parâmetros de caminho</h2>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr></tbody></table></div>
 <h2 id="historico-perfil-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/suitabilities&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/suitabilities&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="historico-perfil-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Avaliações.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Avaliações</span></div><pre class="code"><code>{
   &quot;items&quot;: [
     {
-      &quot;assessment_key&quot;: &quot;18b788e2-c1b1-4431-b474-381dd49a8a12&quot;,
+      &quot;suitability_assessment_key&quot;: &quot;845f79aa-afd2-4dcf-8336-2f3bc900876a&quot;,
       &quot;profile&quot;: &quot;MODERATE&quot;,
       &quot;maximum_risk_level&quot;: 3,
       &quot;score&quot;: 14,
       &quot;forced_by_rule&quot;: false,
-      &quot;valid_until&quot;: &quot;2028-10-09T22:03:18Z&quot;,
-      &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;,
+      &quot;valid_until&quot;: &quot;2028-10-11T19:43:59Z&quot;,
+      &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;,
       &quot;answers&quot;: [
         {
           &quot;question_code&quot;: &quot;Q1&quot;,
@@ -959,7 +959,7 @@ td:first-child { white-space: nowrap; }
   ]
 }</code></pre></div>
 <h3 id="historico-perfil-campos-resposta">Campos da resposta</h3>
-<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>items</code></td><td>A lista de resultados.</td></tr><tr><td><code>items[].assessment_key</code></td><td>Identificador da avaliação de perfil (UUID).</td></tr><tr><td><code>items[].profile</code></td><td>Perfil do investidor: <code>CONSERVATIVE</code>, <code>MODERATE</code> ou <code>AGGRESSIVE</code>.</td></tr><tr><td><code>items[].maximum_risk_level</code></td><td>Risco máximo de produto. No perfil: até que risco ele aceita (Conservador 2, Moderado 3, Arrojado 5). No filtro do catálogo: só produtos com risco até este (1 a 5).</td></tr><tr><td><code>items[].score</code></td><td>Pontuação do questionário (soma dos códigos das opções, de 7 a 28).</td></tr><tr><td><code>items[].forced_by_rule</code></td><td><code>true</code> quando a trava da Q3/Q5 mudou o perfil para Conservador; <code>false</code> quando os pontos já davam esse perfil.</td></tr><tr><td><code>items[].valid_until</code></td><td>Até quando o perfil vale (24 meses depois da resposta), em UTC.</td></tr><tr><td><code>items[].created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>items[].answers</code></td><td>Uma resposta para cada uma das 7 perguntas.</td></tr><tr><td><code>items[].answers[].question_code</code></td><td>Código da pergunta (<code>Q1</code> a <code>Q7</code>).</td></tr><tr><td><code>items[].answers[].option_code</code></td><td>Código da opção escolhida (1 a 4).</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>items</code></td><td>A lista de resultados.</td></tr><tr><td><code>items[].suitability_assessment_key</code></td><td>Identificador da avaliação de perfil (UUID).</td></tr><tr><td><code>items[].profile</code></td><td>Perfil do investidor: <code>CONSERVATIVE</code>, <code>MODERATE</code> ou <code>AGGRESSIVE</code>.</td></tr><tr><td><code>items[].maximum_risk_level</code></td><td>Risco máximo de produto. No perfil: até que risco ele aceita (Conservador 2, Moderado 3, Arrojado 5). No filtro do catálogo: só produtos com risco até este (1 a 5).</td></tr><tr><td><code>items[].score</code></td><td>Pontuação do questionário (soma dos códigos das opções, de 7 a 28).</td></tr><tr><td><code>items[].forced_by_rule</code></td><td><code>true</code> quando a trava da Q3/Q5 mudou o perfil para Conservador; <code>false</code> quando os pontos já davam esse perfil.</td></tr><tr><td><code>items[].valid_until</code></td><td>Até quando o perfil vale (24 meses depois da resposta), em UTC.</td></tr><tr><td><code>items[].created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>items[].answers</code></td><td>Uma resposta para cada uma das 7 perguntas.</td></tr><tr><td><code>items[].answers[].question_code</code></td><td>Código da pergunta (<code>Q1</code> a <code>Q7</code>).</td></tr><tr><td><code>items[].answers[].option_code</code></td><td>Código da opção escolhida (1 a 4).</td></tr></tbody></table></div>
 <h2 id="historico-perfil-erros">Erros</h2>
 <div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr></tbody></table></div>
 <nav class="pager"><a class="prev" href="#perfil-atual"><span>Anterior</span>Perfil atual</a><a class="next" href="#listar-produtos"><span>Próxima</span>Catálogo de produtos</a></nav></section>
@@ -980,7 +980,7 @@ td:first-child { white-space: nowrap; }
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Catálogo completo</span></div><pre class="code"><code>{
   &quot;items&quot;: [
     {
-      &quot;product_key&quot;: &quot;04f89dd4-87b2-4baa-8f1f-4dd25233a877&quot;,
+      &quot;product_key&quot;: &quot;681c7fed-81ea-483f-8a5f-caef127c411c&quot;,
       &quot;name&quot;: &quot;Tesouro Selic 2031&quot;,
       &quot;type&quot;: &quot;PUBLIC_BOND&quot;,
       &quot;issuer&quot;: &quot;Tesouro Nacional&quot;,
@@ -991,7 +991,7 @@ td:first-child { white-space: nowrap; }
       &quot;minimum_application_amount&quot;: 5000
     },
     {
-      &quot;product_key&quot;: &quot;09784de3-7192-42b0-ba1f-f94963d01e8a&quot;,
+      &quot;product_key&quot;: &quot;6bcbbf83-3789-4d74-8f99-f944b569d36e&quot;,
       &quot;name&quot;: &quot;CDB Triple P Bank Liquidez&quot;,
       &quot;type&quot;: &quot;PRIVATE_BOND&quot;,
       &quot;issuer&quot;: &quot;Triple P Bank&quot;,
@@ -1002,7 +1002,7 @@ td:first-child { white-space: nowrap; }
       &quot;minimum_application_amount&quot;: 5000
     },
     {
-      &quot;product_key&quot;: &quot;a2515924-c37c-484f-b9b6-9e560a84c684&quot;,
+      &quot;product_key&quot;: &quot;cf85fbe3-a0b0-4e7b-b534-a8a602641c41&quot;,
       &quot;name&quot;: &quot;LCI Triple P Bank 12 meses&quot;,
       &quot;type&quot;: &quot;PRIVATE_BOND&quot;,
       &quot;issuer&quot;: &quot;Triple P Bank&quot;,
@@ -1013,7 +1013,7 @@ td:first-child { white-space: nowrap; }
       &quot;minimum_application_amount&quot;: 10000
     },
     {
-      &quot;product_key&quot;: &quot;a1c7ea9b-1698-4ada-b15f-5342bf1ed2fa&quot;,
+      &quot;product_key&quot;: &quot;3e60dd05-c365-467b-90fa-dfebf7db22ef&quot;,
       &quot;name&quot;: &quot;Tesouro Prefixado 2029&quot;,
       &quot;type&quot;: &quot;PUBLIC_BOND&quot;,
       &quot;issuer&quot;: &quot;Tesouro Nacional&quot;,
@@ -1024,7 +1024,7 @@ td:first-child { white-space: nowrap; }
       &quot;minimum_application_amount&quot;: 5000
     },
     {
-      &quot;product_key&quot;: &quot;e16b9ae8-c1cf-45ce-9ecb-827160b511d2&quot;,
+      &quot;product_key&quot;: &quot;eff42ff3-f013-440d-9ea2-760ecc9e3fa6&quot;,
       &quot;name&quot;: &quot;Tesouro IPCA+ 2035&quot;,
       &quot;type&quot;: &quot;PUBLIC_BOND&quot;,
       &quot;issuer&quot;: &quot;Tesouro Nacional&quot;,
@@ -1035,7 +1035,7 @@ td:first-child { white-space: nowrap; }
       &quot;minimum_application_amount&quot;: 5000
     },
     {
-      &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+      &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
       &quot;name&quot;: &quot;FGV Quant Capital FIM&quot;,
       &quot;type&quot;: &quot;FUND&quot;,
       &quot;issuer&quot;: &quot;FGV Quant Capital&quot;,
@@ -1050,7 +1050,7 @@ td:first-child { white-space: nowrap; }
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Só risco até 2</span></div><pre class="code"><code>{
   &quot;items&quot;: [
     {
-      &quot;product_key&quot;: &quot;04f89dd4-87b2-4baa-8f1f-4dd25233a877&quot;,
+      &quot;product_key&quot;: &quot;681c7fed-81ea-483f-8a5f-caef127c411c&quot;,
       &quot;name&quot;: &quot;Tesouro Selic 2031&quot;,
       &quot;type&quot;: &quot;PUBLIC_BOND&quot;,
       &quot;issuer&quot;: &quot;Tesouro Nacional&quot;,
@@ -1061,7 +1061,7 @@ td:first-child { white-space: nowrap; }
       &quot;minimum_application_amount&quot;: 5000
     },
     {
-      &quot;product_key&quot;: &quot;09784de3-7192-42b0-ba1f-f94963d01e8a&quot;,
+      &quot;product_key&quot;: &quot;6bcbbf83-3789-4d74-8f99-f944b569d36e&quot;,
       &quot;name&quot;: &quot;CDB Triple P Bank Liquidez&quot;,
       &quot;type&quot;: &quot;PRIVATE_BOND&quot;,
       &quot;issuer&quot;: &quot;Triple P Bank&quot;,
@@ -1072,7 +1072,7 @@ td:first-child { white-space: nowrap; }
       &quot;minimum_application_amount&quot;: 5000
     },
     {
-      &quot;product_key&quot;: &quot;a2515924-c37c-484f-b9b6-9e560a84c684&quot;,
+      &quot;product_key&quot;: &quot;cf85fbe3-a0b0-4e7b-b534-a8a602641c41&quot;,
       &quot;name&quot;: &quot;LCI Triple P Bank 12 meses&quot;,
       &quot;type&quot;: &quot;PRIVATE_BOND&quot;,
       &quot;issuer&quot;: &quot;Triple P Bank&quot;,
@@ -1083,7 +1083,7 @@ td:first-child { white-space: nowrap; }
       &quot;minimum_application_amount&quot;: 10000
     },
     {
-      &quot;product_key&quot;: &quot;a1c7ea9b-1698-4ada-b15f-5342bf1ed2fa&quot;,
+      &quot;product_key&quot;: &quot;3e60dd05-c365-467b-90fa-dfebf7db22ef&quot;,
       &quot;name&quot;: &quot;Tesouro Prefixado 2029&quot;,
       &quot;type&quot;: &quot;PUBLIC_BOND&quot;,
       &quot;issuer&quot;: &quot;Tesouro Nacional&quot;,
@@ -1109,12 +1109,12 @@ td:first-child { white-space: nowrap; }
 <h2 id="consultar-produto-caminho">Parâmetros de caminho</h2>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>product_key</code></td><td>Identificador do produto (UUID).</td></tr></tbody></table></div>
 <h2 id="consultar-produto-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/product/f16309eb-2899-4fe5-9610-765679a7d977&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/product/cdf625c2-ce65-4211-890b-712c49cb8c8d&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="consultar-produto-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Produto com o preço do dia.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Fundo com o preço do dia</span></div><pre class="code"><code>{
-  &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+  &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
   &quot;name&quot;: &quot;FGV Quant Capital FIM&quot;,
   &quot;type&quot;: &quot;FUND&quot;,
   &quot;issuer&quot;: &quot;FGV Quant Capital&quot;,
@@ -1151,14 +1151,14 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>from</code></td><td>string</td><td>Data inicial do período (<code>AAAA-MM-DD</code>), inclusive, no calendário do banco (data de movimento).</td><td>data <code>AAAA-MM-DD</code></td></tr><tr><td><code>to</code></td><td>string</td><td>Data final do período (<code>AAAA-MM-DD</code>), inclusive, no calendário do banco (data de movimento).</td><td>data <code>AAAA-MM-DD</code></td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="historico-precos-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/product/f16309eb-2899-4fe5-9610-765679a7d977/prices&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/product/cdf625c2-ce65-4211-890b-712c49cb8c8d/prices&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="historico-precos-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Preços.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Preços do fundo</span></div><pre class="code"><code>{
   &quot;items&quot;: [
     {
-      &quot;price_date&quot;: &quot;2026-10-09&quot;,
+      &quot;price_date&quot;: &quot;2026-10-11&quot;,
       &quot;unit_price&quot;: &quot;105.33466498&quot;
     },
     {
@@ -1248,7 +1248,7 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>amount</code><span class="req">*</span></td><td>string</td><td>Valor a dividir pela carteira, em centavos. Mínimo R$ 1.000,00 (<code>100000</code>).</td><td>inteiro, só dígitos</td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="sugestao-carteira-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/portfolio_suggestion?amount=100000&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/portfolio_suggestion?amount=100000&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="sugestao-carteira-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Sugestão.</p>
@@ -1257,31 +1257,31 @@ td:first-child { white-space: nowrap; }
   &quot;amount&quot;: 100000,
   &quot;items&quot;: [
     {
-      &quot;product_key&quot;: &quot;04f89dd4-87b2-4baa-8f1f-4dd25233a877&quot;,
+      &quot;product_key&quot;: &quot;681c7fed-81ea-483f-8a5f-caef127c411c&quot;,
       &quot;name&quot;: &quot;Tesouro Selic 2031&quot;,
       &quot;weight_bps&quot;: 2500,
       &quot;amount&quot;: 25000
     },
     {
-      &quot;product_key&quot;: &quot;e16b9ae8-c1cf-45ce-9ecb-827160b511d2&quot;,
-      &quot;name&quot;: &quot;Tesouro IPCA+ 2035&quot;,
-      &quot;weight_bps&quot;: 2000,
-      &quot;amount&quot;: 20000
-    },
-    {
-      &quot;product_key&quot;: &quot;a1c7ea9b-1698-4ada-b15f-5342bf1ed2fa&quot;,
-      &quot;name&quot;: &quot;Tesouro Prefixado 2029&quot;,
-      &quot;weight_bps&quot;: 2000,
-      &quot;amount&quot;: 20000
-    },
-    {
-      &quot;product_key&quot;: &quot;09784de3-7192-42b0-ba1f-f94963d01e8a&quot;,
+      &quot;product_key&quot;: &quot;6bcbbf83-3789-4d74-8f99-f944b569d36e&quot;,
       &quot;name&quot;: &quot;CDB Triple P Bank Liquidez&quot;,
       &quot;weight_bps&quot;: 2000,
       &quot;amount&quot;: 20000
     },
     {
-      &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+      &quot;product_key&quot;: &quot;3e60dd05-c365-467b-90fa-dfebf7db22ef&quot;,
+      &quot;name&quot;: &quot;Tesouro Prefixado 2029&quot;,
+      &quot;weight_bps&quot;: 2000,
+      &quot;amount&quot;: 20000
+    },
+    {
+      &quot;product_key&quot;: &quot;eff42ff3-f013-440d-9ea2-760ecc9e3fa6&quot;,
+      &quot;name&quot;: &quot;Tesouro IPCA+ 2035&quot;,
+      &quot;weight_bps&quot;: 2000,
+      &quot;amount&quot;: 20000
+    },
+    {
+      &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
       &quot;name&quot;: &quot;FGV Quant Capital FIM&quot;,
       &quot;weight_bps&quot;: 1500,
       &quot;amount&quot;: 15000
@@ -1311,17 +1311,17 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>product_key</code><span class="req">*</span></td><td>string</td><td>Identificador do produto (UUID).</td><td>até 36 caracteres</td></tr><tr><td><code>side</code><span class="req">*</span></td><td>string</td><td><code>APPLY</code> (aplicação) ou <code>REDEEM</code> (resgate).</td><td><code>APPLY</code> · <code>REDEEM</code></td></tr><tr><td><code>amount</code></td><td>integer</td><td>Valor em centavos. Obrigatório na aplicação; no resgate, use <code>amount</code> (resgate por valor) ou <code>redeem_all</code> (resgate total).</td><td></td></tr><tr><td><code>redeem_all</code></td><td>boolean</td><td>Resgate total: vende todas as cotas. Use <code>true</code> no lugar de <code>amount</code>.</td><td>só <code>true</code></td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="ordem-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X POST &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account/d7579ea5-de3a-4eb1-9169-69574d6f489b/investment_order&#x27; \
+<pre class="code"><code>curl -X POST &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account/b043541b-19bc-4c23-a079-b18cbff9354c/investment_order&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27; \
-  -H &#x27;Idempotency-Key: b6290552-6dac-4d18-a589-0db07e31fe7b&#x27; \
+  -H &#x27;Idempotency-Key: ecad6b89-2c4a-4ce2-9762-d8728aeaacae&#x27; \
   -H &#x27;Content-Type: application/json&#x27; \
-  -d &#x27;{&quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;, &quot;side&quot;: &quot;APPLY&quot;, &quot;amount&quot;: 100000}&#x27;</code></pre>
+  -d &#x27;{&quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;, &quot;side&quot;: &quot;APPLY&quot;, &quot;amount&quot;: 100000}&#x27;</code></pre>
 <h2 id="ordem-respostas">Respostas</h2>
 <p><span class="status s-ok">201</span> Ordem executada.</p>
 <p><span class="status s-ok">200</span> Repetição do mesmo pedido: devolve a ordem original sem aplicar ou resgatar de novo.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 201</span><span>Aplicação de R$ 1.000,00 no fundo</span></div><pre class="code"><code>{
-  &quot;order_key&quot;: &quot;b4b4007b-f13e-40b5-87b2-f42688e6d32b&quot;,
-  &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+  &quot;investment_order_key&quot;: &quot;a2b5b62b-fd40-421a-bf37-7c3b3808895a&quot;,
+  &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
   &quot;side&quot;: &quot;APPLY&quot;,
   &quot;source&quot;: &quot;CUSTOMER&quot;,
   &quot;amount&quot;: 100000,
@@ -1329,11 +1329,11 @@ td:first-child { white-space: nowrap; }
   &quot;quantity&quot;: &quot;9.80392156&quot;,
   &quot;maturity_date&quot;: null,
   &quot;status&quot;: &quot;EXECUTED&quot;,
-  &quot;transaction_key&quot;: &quot;d65673cd-854a-4e43-a0c6-d511cb21182d&quot;
+  &quot;transaction_key&quot;: &quot;5beee41e-48dd-400a-afb7-21a32b5d870f&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 201</span><span>Aplicação de R$ 100,00 na LCI (com vencimento)</span></div><pre class="code"><code>{
-  &quot;order_key&quot;: &quot;9e84dfa0-72ae-475e-b8a5-e508e7f7661c&quot;,
-  &quot;product_key&quot;: &quot;a2515924-c37c-484f-b9b6-9e560a84c684&quot;,
+  &quot;investment_order_key&quot;: &quot;be2b11b2-d793-4f30-84a4-caa70db8271c&quot;,
+  &quot;product_key&quot;: &quot;cf85fbe3-a0b0-4e7b-b534-a8a602641c41&quot;,
   &quot;side&quot;: &quot;APPLY&quot;,
   &quot;source&quot;: &quot;CUSTOMER&quot;,
   &quot;amount&quot;: 10000,
@@ -1341,11 +1341,11 @@ td:first-child { white-space: nowrap; }
   &quot;quantity&quot;: &quot;0.89427309&quot;,
   &quot;maturity_date&quot;: &quot;2027-11-03&quot;,
   &quot;status&quot;: &quot;EXECUTED&quot;,
-  &quot;transaction_key&quot;: &quot;d323d635-8144-4376-bbc3-55d1eb718c5a&quot;
+  &quot;transaction_key&quot;: &quot;0346f1fb-72e2-43fb-8b52-334658341ac8&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 201</span><span>Resgate de R$ 300,00 do fundo</span></div><pre class="code"><code>{
-  &quot;order_key&quot;: &quot;438c1c2f-05d9-4b1a-b6f5-fd0f5dfc8c8c&quot;,
-  &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+  &quot;investment_order_key&quot;: &quot;880df567-a99c-4f5f-9b55-244c0aed464c&quot;,
+  &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
   &quot;side&quot;: &quot;REDEEM&quot;,
   &quot;source&quot;: &quot;CUSTOMER&quot;,
   &quot;amount&quot;: 30000,
@@ -1353,7 +1353,7 @@ td:first-child { white-space: nowrap; }
   &quot;quantity&quot;: &quot;2.94117647&quot;,
   &quot;maturity_date&quot;: null,
   &quot;status&quot;: &quot;EXECUTED&quot;,
-  &quot;transaction_key&quot;: &quot;d661e705-49ee-4832-97be-fd94d79bb855&quot;,
+  &quot;transaction_key&quot;: &quot;4bd7a432-2b2c-49d0-a497-f0cd5b6755ec&quot;,
   &quot;acquisition_cost_amount&quot;: 30000,
   &quot;result_amount&quot;: 0,
   &quot;return_bps&quot;: 0
@@ -1371,26 +1371,26 @@ td:first-child { white-space: nowrap; }
   &quot;code&quot;: &quot;PPP007005&quot;
 }</code></pre></div>
 <h3 id="ordem-campos-resposta">Campos da resposta</h3>
-<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>order_key</code></td><td>Identificador da ordem de investimento (UUID).</td></tr><tr><td><code>product_key</code></td><td>Identificador do produto (UUID).</td></tr><tr><td><code>side</code></td><td><code>APPLY</code> (aplicação) ou <code>REDEEM</code> (resgate).</td></tr><tr><td><code>source</code></td><td>Quem pediu a ordem: <code>CUSTOMER</code> ou <code>MATURITY</code> (o fechamento do dia, pagando uma aplicação vencida).</td></tr><tr><td><code>amount</code></td><td>Valor em centavos, inteiro e maior que zero (R$ 10,50 = <code>1050</code>).</td></tr><tr><td><code>unit_price</code></td><td>Preço de uma cota, como texto com 8 casas decimais (<code>"1.25000000"</code>), para não ser lido como float.</td></tr><tr><td><code>quantity</code></td><td>Quantidade de cotas, como texto com 8 casas decimais.</td></tr><tr><td><code>maturity_date</code></td><td>Vencimento desta aplicação (só em produto com prazo). Nulo nos outros casos.</td></tr><tr><td><code>status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>transaction_key</code></td><td>Identificador da movimentação (UUID).</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>investment_order_key</code></td><td>Identificador da ordem de investimento (UUID).</td></tr><tr><td><code>product_key</code></td><td>Identificador do produto (UUID).</td></tr><tr><td><code>side</code></td><td><code>APPLY</code> (aplicação) ou <code>REDEEM</code> (resgate).</td></tr><tr><td><code>source</code></td><td>Quem pediu a ordem: <code>CUSTOMER</code> ou <code>MATURITY</code> (o fechamento do dia, pagando uma aplicação vencida).</td></tr><tr><td><code>amount</code></td><td>Valor em centavos, inteiro e maior que zero (R$ 10,50 = <code>1050</code>).</td></tr><tr><td><code>unit_price</code></td><td>Preço de uma cota, como texto com 8 casas decimais (<code>"1.25000000"</code>), para não ser lido como float.</td></tr><tr><td><code>quantity</code></td><td>Quantidade de cotas, como texto com 8 casas decimais.</td></tr><tr><td><code>maturity_date</code></td><td>Vencimento desta aplicação (só em produto com prazo). Nulo nos outros casos.</td></tr><tr><td><code>status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>transaction_key</code></td><td>Identificador da movimentação (UUID).</td></tr></tbody></table></div>
 <h2 id="ordem-erros">Erros</h2>
 <div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">400</span></td><td><code>PPP000001</code></td><td>Bad Request</td><td>(varia: diz o que está errado)</td><td>Payload Inválido</td></tr><tr><td><span class="status s-warn">400</span></td><td><code>PPP000003</code></td><td>Missing Idempotency Key</td><td>This route moves money and requires the Idempotency-Key header with a UUID.</td><td>Esta operação exige o cabeçalho Idempotency-Key com um UUID.</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP002001</code></td><td>Account Not Found</td><td>The account_key does not exist for this customer.</td><td>Conta não encontrada.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP005001</code></td><td>Product Not Found</td><td>The product_key does not exist.</td><td>Produto não encontrado.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP000004</code></td><td>Idempotency Key Reused</td><td>This Idempotency-Key was already used by another request.</td><td>Esta Idempotency-Key já foi usada em outro pedido.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP002005</code></td><td>Account Not Active</td><td>The account is blocked or closed and cannot move money.</td><td>A conta está bloqueada ou encerrada e não pode movimentar dinheiro.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP003003</code></td><td>Insufficient Balance</td><td>The account does not have enough balance for amount plus fee.</td><td>Saldo insuficiente para o valor mais a tarifa.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP004004</code></td><td>Suitability Expired</td><td>The investor profile is more than 24 months old and must be answered again.</td><td>O perfil de investidor tem mais de 24 meses e precisa ser refeito.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP004005</code></td><td>Suitability Required</td><td>The customer needs an investor profile before this operation.</td><td>O cliente precisa responder o questionário de perfil de investidor antes desta operação.</td></tr><tr><td><span class="status s-warn">409</span></td><td><code>PPP007004</code></td><td>Insufficient Position</td><td>The redemption is larger than the customer&#x27;s position in this product.</td><td>O resgate é maior do que o que você tem aplicado neste produto.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP003004</code></td><td>Invalid Amount</td><td>The amount must be an integer greater than zero, in cents.</td><td>O valor precisa ser maior que zero, em centavos.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007002</code></td><td>Below Minimum Application</td><td>The amount is below the product&#x27;s minimum application.</td><td>O valor está abaixo da aplicação mínima do produto.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007003</code></td><td>Product Not Suitable</td><td>The product&#x27;s risk level is above what the investor profile allows.</td><td>O risco do produto está acima do permitido para o seu perfil de investidor.</td></tr><tr><td><span class="status s-warn">422</span></td><td><code>PPP007005</code></td><td>Redemption Not Allowed</td><td>This product can only be redeemed at maturity.</td><td>Este produto só pode ser resgatado no vencimento.</td></tr></tbody></table></div>
 <nav class="pager"><a class="prev" href="#sugestao-carteira"><span>Anterior</span>Sugestão de carteira</a><a class="next" href="#consultar-ordem"><span>Próxima</span>Consultar ordem</a></nav></section>
 <section class="page" id="p-consultar-ordem" data-title="Consultar ordem"><p class="crumb">Ordens e posição</p>
 <h1>Consultar ordem</h1>
 <p class="lede">A ordem, com o mesmo corpo da resposta de criação. Ordem de outra conta ou de outro cliente responde 404.</p>
-<div class="endpoint"><div><span class="label">Endpoint</span><code class="path">/customer/<span class="param">{customer_key}</span>/account/<span class="param">{account_key}</span>/investment_order/<span class="param">{order_key}</span></code></div><div><span class="label">Método</span><span class="method m-get">GET</span></div></div>
+<div class="endpoint"><div><span class="label">Endpoint</span><code class="path">/customer/<span class="param">{customer_key}</span>/account/<span class="param">{account_key}</span>/investment_order/<span class="param">{investment_order_key}</span></code></div><div><span class="label">Método</span><span class="method m-get">GET</span></div></div>
 <h2 id="consultar-ordem-cabecalhos">Cabeçalhos</h2>
 <div class="table"><table><thead><tr><th>Cabeçalho</th><th>Obrigatório</th><th>Descrição</th></tr></thead><tbody><tr><td><code>INTERNAL-TOKEN</code></td><td>sim</td><td>Token interno da API (variável <code>INTERNAL_TOKEN</code>).</td></tr></tbody></table></div>
 <h2 id="consultar-ordem-caminho">Parâmetros de caminho</h2>
-<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr><tr><td><code>account_key</code></td><td>Identificador da conta (UUID).</td></tr><tr><td><code>order_key</code></td><td>Identificador da ordem de investimento (UUID).</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>customer_key</code></td><td>Identificador do cliente (UUID). É ele que vai no caminho das rotas <code>/customer/...</code>.</td></tr><tr><td><code>account_key</code></td><td>Identificador da conta (UUID).</td></tr><tr><td><code>investment_order_key</code></td><td>Identificador da ordem de investimento (UUID).</td></tr></tbody></table></div>
 <h2 id="consultar-ordem-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account/d7579ea5-de3a-4eb1-9169-69574d6f489b/investment_order/b4b4007b-f13e-40b5-87b2-f42688e6d32b&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account/b043541b-19bc-4c23-a079-b18cbff9354c/investment_order/a2b5b62b-fd40-421a-bf37-7c3b3808895a&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="consultar-ordem-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Ordem.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Ordem de aplicação</span></div><pre class="code"><code>{
-  &quot;order_key&quot;: &quot;b4b4007b-f13e-40b5-87b2-f42688e6d32b&quot;,
-  &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+  &quot;investment_order_key&quot;: &quot;a2b5b62b-fd40-421a-bf37-7c3b3808895a&quot;,
+  &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
   &quot;side&quot;: &quot;APPLY&quot;,
   &quot;source&quot;: &quot;CUSTOMER&quot;,
   &quot;amount&quot;: 100000,
@@ -1398,12 +1398,12 @@ td:first-child { white-space: nowrap; }
   &quot;quantity&quot;: &quot;9.80392156&quot;,
   &quot;maturity_date&quot;: null,
   &quot;status&quot;: &quot;EXECUTED&quot;,
-  &quot;transaction_key&quot;: &quot;d65673cd-854a-4e43-a0c6-d511cb21182d&quot;
+  &quot;transaction_key&quot;: &quot;5beee41e-48dd-400a-afb7-21a32b5d870f&quot;
 }</code></pre></div>
 <h3 id="consultar-ordem-campos-resposta">Campos da resposta</h3>
-<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>order_key</code></td><td>Identificador da ordem de investimento (UUID).</td></tr><tr><td><code>product_key</code></td><td>Identificador do produto (UUID).</td></tr><tr><td><code>side</code></td><td><code>APPLY</code> (aplicação) ou <code>REDEEM</code> (resgate).</td></tr><tr><td><code>source</code></td><td>Quem pediu a ordem: <code>CUSTOMER</code> ou <code>MATURITY</code> (o fechamento do dia, pagando uma aplicação vencida).</td></tr><tr><td><code>amount</code></td><td>Valor em centavos, inteiro e maior que zero (R$ 10,50 = <code>1050</code>).</td></tr><tr><td><code>unit_price</code></td><td>Preço de uma cota, como texto com 8 casas decimais (<code>"1.25000000"</code>), para não ser lido como float.</td></tr><tr><td><code>quantity</code></td><td>Quantidade de cotas, como texto com 8 casas decimais.</td></tr><tr><td><code>maturity_date</code></td><td>Vencimento desta aplicação (só em produto com prazo). Nulo nos outros casos.</td></tr><tr><td><code>status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>transaction_key</code></td><td>Identificador da movimentação (UUID).</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>investment_order_key</code></td><td>Identificador da ordem de investimento (UUID).</td></tr><tr><td><code>product_key</code></td><td>Identificador do produto (UUID).</td></tr><tr><td><code>side</code></td><td><code>APPLY</code> (aplicação) ou <code>REDEEM</code> (resgate).</td></tr><tr><td><code>source</code></td><td>Quem pediu a ordem: <code>CUSTOMER</code> ou <code>MATURITY</code> (o fechamento do dia, pagando uma aplicação vencida).</td></tr><tr><td><code>amount</code></td><td>Valor em centavos, inteiro e maior que zero (R$ 10,50 = <code>1050</code>).</td></tr><tr><td><code>unit_price</code></td><td>Preço de uma cota, como texto com 8 casas decimais (<code>"1.25000000"</code>), para não ser lido como float.</td></tr><tr><td><code>quantity</code></td><td>Quantidade de cotas, como texto com 8 casas decimais.</td></tr><tr><td><code>maturity_date</code></td><td>Vencimento desta aplicação (só em produto com prazo). Nulo nos outros casos.</td></tr><tr><td><code>status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>transaction_key</code></td><td>Identificador da movimentação (UUID).</td></tr></tbody></table></div>
 <h2 id="consultar-ordem-erros">Erros</h2>
-<div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP002001</code></td><td>Account Not Found</td><td>The account_key does not exist for this customer.</td><td>Conta não encontrada.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP007001</code></td><td>Order Not Found</td><td>The order_key does not exist for this customer.</td><td>Ordem não encontrada.</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP002001</code></td><td>Account Not Found</td><td>The account_key does not exist for this customer.</td><td>Conta não encontrada.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP007001</code></td><td>Order Not Found</td><td>The investment_order_key does not exist for this customer.</td><td>Ordem não encontrada.</td></tr></tbody></table></div>
 <nav class="pager"><a class="prev" href="#ordem"><span>Anterior</span>Aplicar ou resgatar</a><a class="next" href="#listar-ordens"><span>Próxima</span>Histórico de ordens</a></nav></section>
 <section class="page" id="p-listar-ordens" data-title="Histórico de ordens"><p class="crumb">Ordens e posição</p>
 <h1>Histórico de ordens</h1>
@@ -1417,15 +1417,15 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>page</code></td><td>string</td><td>Número da página, a partir de 1 (padrão 1).</td><td>inteiro a partir de 1</td></tr><tr><td><code>limit</code></td><td>string</td><td>Itens por página, de 1 a 100 (padrão 20).</td><td>de 1 a 100</td></tr><tr><td><code>product_key</code></td><td>string</td><td>Identificador do produto (UUID).</td><td>até 36 caracteres</td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="listar-ordens-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account/d7579ea5-de3a-4eb1-9169-69574d6f489b/investment_orders&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account/b043541b-19bc-4c23-a079-b18cbff9354c/investment_orders&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="listar-ordens-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Uma página de ordens.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Ordens da conta</span></div><pre class="code"><code>{
   &quot;items&quot;: [
     {
-      &quot;order_key&quot;: &quot;438c1c2f-05d9-4b1a-b6f5-fd0f5dfc8c8c&quot;,
-      &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+      &quot;investment_order_key&quot;: &quot;880df567-a99c-4f5f-9b55-244c0aed464c&quot;,
+      &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
       &quot;side&quot;: &quot;REDEEM&quot;,
       &quot;source&quot;: &quot;CUSTOMER&quot;,
       &quot;amount&quot;: 30000,
@@ -1433,14 +1433,14 @@ td:first-child { white-space: nowrap; }
       &quot;quantity&quot;: &quot;2.94117647&quot;,
       &quot;maturity_date&quot;: null,
       &quot;status&quot;: &quot;EXECUTED&quot;,
-      &quot;transaction_key&quot;: &quot;d661e705-49ee-4832-97be-fd94d79bb855&quot;,
+      &quot;transaction_key&quot;: &quot;4bd7a432-2b2c-49d0-a497-f0cd5b6755ec&quot;,
       &quot;acquisition_cost_amount&quot;: 30000,
       &quot;result_amount&quot;: 0,
       &quot;return_bps&quot;: 0
     },
     {
-      &quot;order_key&quot;: &quot;9e84dfa0-72ae-475e-b8a5-e508e7f7661c&quot;,
-      &quot;product_key&quot;: &quot;a2515924-c37c-484f-b9b6-9e560a84c684&quot;,
+      &quot;investment_order_key&quot;: &quot;be2b11b2-d793-4f30-84a4-caa70db8271c&quot;,
+      &quot;product_key&quot;: &quot;cf85fbe3-a0b0-4e7b-b534-a8a602641c41&quot;,
       &quot;side&quot;: &quot;APPLY&quot;,
       &quot;source&quot;: &quot;CUSTOMER&quot;,
       &quot;amount&quot;: 10000,
@@ -1448,11 +1448,11 @@ td:first-child { white-space: nowrap; }
       &quot;quantity&quot;: &quot;0.89427309&quot;,
       &quot;maturity_date&quot;: &quot;2027-11-03&quot;,
       &quot;status&quot;: &quot;EXECUTED&quot;,
-      &quot;transaction_key&quot;: &quot;d323d635-8144-4376-bbc3-55d1eb718c5a&quot;
+      &quot;transaction_key&quot;: &quot;0346f1fb-72e2-43fb-8b52-334658341ac8&quot;
     },
     {
-      &quot;order_key&quot;: &quot;b4b4007b-f13e-40b5-87b2-f42688e6d32b&quot;,
-      &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+      &quot;investment_order_key&quot;: &quot;a2b5b62b-fd40-421a-bf37-7c3b3808895a&quot;,
+      &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
       &quot;side&quot;: &quot;APPLY&quot;,
       &quot;source&quot;: &quot;CUSTOMER&quot;,
       &quot;amount&quot;: 100000,
@@ -1460,7 +1460,7 @@ td:first-child { white-space: nowrap; }
       &quot;quantity&quot;: &quot;9.80392156&quot;,
       &quot;maturity_date&quot;: null,
       &quot;status&quot;: &quot;EXECUTED&quot;,
-      &quot;transaction_key&quot;: &quot;d65673cd-854a-4e43-a0c6-d511cb21182d&quot;
+      &quot;transaction_key&quot;: &quot;5beee41e-48dd-400a-afb7-21a32b5d870f&quot;
     }
   ],
   &quot;page&quot;: 1,
@@ -1468,7 +1468,7 @@ td:first-child { white-space: nowrap; }
   &quot;total&quot;: 3
 }</code></pre></div>
 <h3 id="listar-ordens-campos-resposta">Campos da resposta</h3>
-<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>items</code></td><td>A lista de resultados.</td></tr><tr><td><code>items[].order_key</code></td><td>Identificador da ordem de investimento (UUID).</td></tr><tr><td><code>items[].product_key</code></td><td>Identificador do produto (UUID).</td></tr><tr><td><code>items[].side</code></td><td><code>APPLY</code> (aplicação) ou <code>REDEEM</code> (resgate).</td></tr><tr><td><code>items[].source</code></td><td>Quem pediu a ordem: <code>CUSTOMER</code> ou <code>MATURITY</code> (o fechamento do dia, pagando uma aplicação vencida).</td></tr><tr><td><code>items[].amount</code></td><td>Valor em centavos, inteiro e maior que zero (R$ 10,50 = <code>1050</code>).</td></tr><tr><td><code>items[].unit_price</code></td><td>Preço de uma cota, como texto com 8 casas decimais (<code>"1.25000000"</code>), para não ser lido como float.</td></tr><tr><td><code>items[].quantity</code></td><td>Quantidade de cotas, como texto com 8 casas decimais.</td></tr><tr><td><code>items[].maturity_date</code></td><td>Vencimento desta aplicação (só em produto com prazo). Nulo nos outros casos.</td></tr><tr><td><code>items[].status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>items[].transaction_key</code></td><td>Identificador da movimentação (UUID).</td></tr><tr><td><code>items[].acquisition_cost_amount</code></td><td>Custo de aquisição das cotas, em centavos. Na posição: quanto custaram as cotas que a conta tem. No resgate: o custo das cotas vendidas (custo médio).</td></tr><tr><td><code>items[].result_amount</code></td><td>Resultado em centavos: valor menos custo de aquisição. Pode ser negativo.</td></tr><tr><td><code>items[].return_bps</code></td><td>Rentabilidade em pontos-base: resultado ÷ custo (<code>400</code> = 4%).</td></tr><tr><td><code>page</code></td><td>Número da página, a partir de 1 (padrão 1).</td></tr><tr><td><code>limit</code></td><td>Itens por página, de 1 a 100 (padrão 20).</td></tr><tr><td><code>total</code></td><td>Total de itens que passam pelos filtros, somando todas as páginas.</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>items</code></td><td>A lista de resultados.</td></tr><tr><td><code>items[].investment_order_key</code></td><td>Identificador da ordem de investimento (UUID).</td></tr><tr><td><code>items[].product_key</code></td><td>Identificador do produto (UUID).</td></tr><tr><td><code>items[].side</code></td><td><code>APPLY</code> (aplicação) ou <code>REDEEM</code> (resgate).</td></tr><tr><td><code>items[].source</code></td><td>Quem pediu a ordem: <code>CUSTOMER</code> ou <code>MATURITY</code> (o fechamento do dia, pagando uma aplicação vencida).</td></tr><tr><td><code>items[].amount</code></td><td>Valor em centavos, inteiro e maior que zero (R$ 10,50 = <code>1050</code>).</td></tr><tr><td><code>items[].unit_price</code></td><td>Preço de uma cota, como texto com 8 casas decimais (<code>"1.25000000"</code>), para não ser lido como float.</td></tr><tr><td><code>items[].quantity</code></td><td>Quantidade de cotas, como texto com 8 casas decimais.</td></tr><tr><td><code>items[].maturity_date</code></td><td>Vencimento desta aplicação (só em produto com prazo). Nulo nos outros casos.</td></tr><tr><td><code>items[].status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>items[].transaction_key</code></td><td>Identificador da movimentação (UUID).</td></tr><tr><td><code>items[].acquisition_cost_amount</code></td><td>Custo de aquisição das cotas, em centavos. Na posição: quanto custaram as cotas que a conta tem. No resgate: o custo das cotas vendidas (custo médio).</td></tr><tr><td><code>items[].result_amount</code></td><td>Resultado em centavos: valor menos custo de aquisição. Pode ser negativo.</td></tr><tr><td><code>items[].return_bps</code></td><td>Rentabilidade em pontos-base: resultado ÷ custo (<code>400</code> = 4%).</td></tr><tr><td><code>page</code></td><td>Número da página, a partir de 1 (padrão 1).</td></tr><tr><td><code>limit</code></td><td>Itens por página, de 1 a 100 (padrão 20).</td></tr><tr><td><code>total</code></td><td>Total de itens que passam pelos filtros, somando todas as páginas.</td></tr></tbody></table></div>
 <h2 id="listar-ordens-erros">Erros</h2>
 <div class="table"><table><thead><tr><th>HTTP</th><th>Código</th><th>Título</th><th>Descrição (en)</th><th>Descrição (pt)</th></tr></thead><tbody><tr><td><span class="status s-warn">400</span></td><td><code>PPP000001</code></td><td>Bad Request</td><td>(varia: diz o que está errado)</td><td>Payload Inválido</td></tr><tr><td><span class="status s-warn">403</span></td><td><code>PPP000002</code></td><td>Forbidden</td><td>Request must be internal</td><td>Requisição precisa ser interna</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP001001</code></td><td>Customer Not Found</td><td>The customer_key does not exist.</td><td>Cliente não encontrado.</td></tr><tr><td><span class="status s-warn">404</span></td><td><code>PPP002001</code></td><td>Account Not Found</td><td>The account_key does not exist for this customer.</td><td>Conta não encontrada.</td></tr></tbody></table></div>
 <nav class="pager"><a class="prev" href="#consultar-ordem"><span>Anterior</span>Consultar ordem</a><a class="next" href="#posicao"><span>Próxima</span>Posição e capital total</a></nav></section>
@@ -1484,14 +1484,14 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>include_closed</code></td><td>string</td><td><code>true</code> para incluir posições zeradas.</td><td><code>true</code> · <code>false</code></td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="posicao-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/9e67ce08-92c1-415b-814a-ca571e3ec008/account/d7579ea5-de3a-4eb1-9169-69574d6f489b/positions&#x27; \
+<pre class="code"><code>curl -X GET &#x27;http://localhost:3000/customer/4f9a35d6-e269-4e84-a9f6-b50552c5ce56/account/b043541b-19bc-4c23-a079-b18cbff9354c/positions&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27;</code></pre>
 <h2 id="posicao-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Posições e total.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Posições e capital total</span></div><pre class="code"><code>{
   &quot;items&quot;: [
     {
-      &quot;product_key&quot;: &quot;a2515924-c37c-484f-b9b6-9e560a84c684&quot;,
+      &quot;product_key&quot;: &quot;cf85fbe3-a0b0-4e7b-b534-a8a602641c41&quot;,
       &quot;quantity&quot;: &quot;0.89427309&quot;,
       &quot;unit_price&quot;: &quot;111.82266423&quot;,
       &quot;current_amount&quot;: 9999,
@@ -1500,7 +1500,7 @@ td:first-child { white-space: nowrap; }
       &quot;return_bps&quot;: -1
     },
     {
-      &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+      &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
       &quot;quantity&quot;: &quot;6.86274509&quot;,
       &quot;unit_price&quot;: &quot;102.00000000&quot;,
       &quot;current_amount&quot;: 69999,
@@ -1537,7 +1537,7 @@ td:first-child { white-space: nowrap; }
 <div class="table"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th><th>Valores aceitos</th></tr></thead><tbody><tr><td><code>status</code><span class="req">*</span></td><td>string</td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td><td><code>ACTIVE</code> · <code>BLOCKED</code> · <code>CLOSED</code></td></tr><tr><td><code>reason</code></td><td>string</td><td>Motivo da mudança de status, até 255 caracteres. Obrigatório para bloquear e encerrar.</td><td>até 255 caracteres</td></tr></tbody></table></div>
 <p class="note"><span class="req">*</span> obrigatório.</p>
 <h2 id="status-conta-banco-exemplo">Exemplo de requisição</h2>
-<pre class="code"><code>curl -X PATCH &#x27;http://localhost:3000/internal/account/3c2f9866-bb47-4052-8a7a-40dc8106f0c5/status&#x27; \
+<pre class="code"><code>curl -X PATCH &#x27;http://localhost:3000/internal/account/4ec7839a-1587-4d71-99de-7b2576e03be5/status&#x27; \
   -H &#x27;INTERNAL-TOKEN: &lt;INTERNAL_TOKEN&gt;&#x27; \
   -H &#x27;OPERATOR-TOKEN: &lt;OPERATOR_TOKEN&gt;&#x27; \
   -H &#x27;Content-Type: application/json&#x27; \
@@ -1545,22 +1545,22 @@ td:first-child { white-space: nowrap; }
 <h2 id="status-conta-banco-respostas">Respostas</h2>
 <p><span class="status s-ok">200</span> Status alterado.</p>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Banco bloqueia a conta</span></div><pre class="code"><code>{
-  &quot;account_key&quot;: &quot;3c2f9866-bb47-4052-8a7a-40dc8106f0c5&quot;,
+  &quot;account_key&quot;: &quot;4ec7839a-1587-4d71-99de-7b2576e03be5&quot;,
   &quot;status&quot;: &quot;BLOCKED&quot;,
   &quot;balance&quot;: 20000,
   &quot;investments_amount&quot;: 0,
   &quot;net_worth_amount&quot;: 20000,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;,
-  &quot;updated_at&quot;: &quot;2026-10-09T22:03:19Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;,
+  &quot;updated_at&quot;: &quot;2026-10-11T19:44:00Z&quot;
 }</code></pre></div>
 <div class="example"><div class="example-head"><span class="status s-ok">STATUS 200</span><span>Banco desbloqueia a conta</span></div><pre class="code"><code>{
-  &quot;account_key&quot;: &quot;3c2f9866-bb47-4052-8a7a-40dc8106f0c5&quot;,
+  &quot;account_key&quot;: &quot;4ec7839a-1587-4d71-99de-7b2576e03be5&quot;,
   &quot;status&quot;: &quot;ACTIVE&quot;,
   &quot;balance&quot;: 20000,
   &quot;investments_amount&quot;: 0,
   &quot;net_worth_amount&quot;: 20000,
-  &quot;created_at&quot;: &quot;2026-10-09T22:03:18Z&quot;,
-  &quot;updated_at&quot;: &quot;2026-10-09T22:03:19Z&quot;
+  &quot;created_at&quot;: &quot;2026-10-11T19:43:59Z&quot;,
+  &quot;updated_at&quot;: &quot;2026-10-11T19:44:00Z&quot;
 }</code></pre></div>
 <h3 id="status-conta-banco-campos-resposta">Campos da resposta</h3>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>account_key</code></td><td>Identificador da conta (UUID).</td></tr><tr><td><code>status</code></td><td>Status da conta: <code>ACTIVE</code> (movimenta), <code>BLOCKED</code> (não movimenta, só consulta) ou <code>CLOSED</code> (encerrada).</td></tr><tr><td><code>balance</code></td><td>Saldo da conta (só o dinheiro parado nela, sem os investimentos), em centavos. Na resposta de uma movimentação, é o saldo logo depois dela.</td></tr><tr><td><code>investments_amount</code></td><td>Valor de todas as posições ao preço do dia, em centavos. Fica fora do balance: o que foi aplicado saiu do saldo.</td></tr><tr><td><code>net_worth_amount</code></td><td>Capital total do cliente no banco: caixa + investimentos ao preço do dia, em centavos.</td></tr><tr><td><code>created_at</code></td><td>Quando o registro foi criado, em UTC (<code>AAAA-MM-DDTHH:MM:SSZ</code>).</td></tr><tr><td><code>updated_at</code></td><td>Quando o registro mudou pela última vez, em UTC.</td></tr></tbody></table></div>
@@ -1614,32 +1614,32 @@ td:first-child { white-space: nowrap; }
   &quot;business_date&quot;: &quot;2026-11-04&quot;,
   &quot;prices&quot;: [
     {
-      &quot;product_key&quot;: &quot;04f89dd4-87b2-4baa-8f1f-4dd25233a877&quot;,
+      &quot;product_key&quot;: &quot;681c7fed-81ea-483f-8a5f-caef127c411c&quot;,
       &quot;name&quot;: &quot;Tesouro Selic 2031&quot;,
       &quot;unit_price&quot;: &quot;112.91439545&quot;
     },
     {
-      &quot;product_key&quot;: &quot;09784de3-7192-42b0-ba1f-f94963d01e8a&quot;,
+      &quot;product_key&quot;: &quot;6bcbbf83-3789-4d74-8f99-f944b569d36e&quot;,
       &quot;name&quot;: &quot;CDB Triple P Bank Liquidez&quot;,
       &quot;unit_price&quot;: &quot;112.15034516&quot;
     },
     {
-      &quot;product_key&quot;: &quot;a2515924-c37c-484f-b9b6-9e560a84c684&quot;,
+      &quot;product_key&quot;: &quot;cf85fbe3-a0b0-4e7b-b534-a8a602641c41&quot;,
       &quot;name&quot;: &quot;LCI Triple P Bank 12 meses&quot;,
       &quot;unit_price&quot;: &quot;111.87999782&quot;
     },
     {
-      &quot;product_key&quot;: &quot;a1c7ea9b-1698-4ada-b15f-5342bf1ed2fa&quot;,
+      &quot;product_key&quot;: &quot;3e60dd05-c365-467b-90fa-dfebf7db22ef&quot;,
       &quot;name&quot;: &quot;Tesouro Prefixado 2029&quot;,
       &quot;unit_price&quot;: &quot;111.20586561&quot;
     },
     {
-      &quot;product_key&quot;: &quot;e16b9ae8-c1cf-45ce-9ecb-827160b511d2&quot;,
+      &quot;product_key&quot;: &quot;eff42ff3-f013-440d-9ea2-760ecc9e3fa6&quot;,
       &quot;name&quot;: &quot;Tesouro IPCA+ 2035&quot;,
       &quot;unit_price&quot;: &quot;109.29617633&quot;
     },
     {
-      &quot;product_key&quot;: &quot;f16309eb-2899-4fe5-9610-765679a7d977&quot;,
+      &quot;product_key&quot;: &quot;cdf625c2-ce65-4211-890b-712c49cb8c8d&quot;,
       &quot;name&quot;: &quot;FGV Quant Capital FIM&quot;,
       &quot;unit_price&quot;: &quot;110.61135282&quot;
     }
@@ -1680,7 +1680,7 @@ td:first-child { white-space: nowrap; }
   &quot;to&quot;: &quot;2026-11-30&quot;,
   &quot;days&quot;: 1,
   &quot;realized&quot;: {
-    &quot;fee_amount&quot;: 2200
+    &quot;fee_amount&quot;: 2600
   },
   &quot;estimated&quot;: {
     &quot;fund_administration_fee&quot;: {
@@ -1708,19 +1708,19 @@ td:first-child { white-space: nowrap; }
       ]
     },
     &quot;float&quot;: {
-      &quot;amount&quot;: 48988,
+      &quot;amount&quot;: 56821,
       &quot;daily&quot;: [
         {
           &quot;date&quot;: &quot;2026-11-02&quot;,
           &quot;calendar_days&quot;: 1,
-          &quot;base_amount&quot;: 119204900,
+          &quot;base_amount&quot;: 138266700,
           &quot;annual_rate_bps&quot;: 1500,
-          &quot;amount&quot;: 48988
+          &quot;amount&quot;: 56821
         }
       ]
     }
   },
-  &quot;total_amount&quot;: 51190
+  &quot;total_amount&quot;: 59423
 }</code></pre></div>
 <h3 id="receita-campos-resposta">Campos da resposta</h3>
 <div class="table"><table><thead><tr><th>Campo</th><th>Descrição</th></tr></thead><tbody><tr><td><code>from</code></td><td>Data inicial do período (<code>AAAA-MM-DD</code>), inclusive, no calendário do banco (data de movimento).</td></tr><tr><td><code>to</code></td><td>Data final do período (<code>AAAA-MM-DD</code>), inclusive, no calendário do banco (data de movimento).</td></tr><tr><td><code>days</code></td><td>Quantos dias fechados do período têm provisão (o dia aberto ainda não tem).</td></tr><tr><td><code>realized</code></td><td>A receita que de fato entrou na conta do banco no período.</td></tr><tr><td><code>realized.fee_amount</code></td><td>Soma das tarifas que entraram na conta do banco no período, em centavos.</td></tr><tr><td><code>estimated</code></td><td>O que o banco estima ter ganho no período com o dinheiro sob sua guarda: as provisões gravadas no fechamento de cada dia. Não movimenta dinheiro.</td></tr><tr><td><code>estimated.fund_administration_fee</code></td><td>Taxa de administração do fundo: por dia, patrimônio do fundo no fim do dia × taxa × dias corridos / 365.</td></tr><tr><td><code>estimated.fund_administration_fee.amount</code></td><td>Valor estimado, em centavos (truncado para baixo em cada provisão). Na estimativa, é a soma dos dias. Pode ser zero.</td></tr><tr><td><code>estimated.fund_administration_fee.daily</code></td><td>O detalhe da estimativa: a provisão de cada dia fechado do período.</td></tr><tr><td><code>estimated.fund_administration_fee.daily[].date</code></td><td>O dia de movimento que fechou.</td></tr><tr><td><code>estimated.fund_administration_fee.daily[].calendar_days</code></td><td>Dias corridos que a provisão cobre, até o próximo dia de movimento: 1 de segunda a quinta, 3 na sexta (o fim de semana rende).</td></tr><tr><td><code>estimated.fund_administration_fee.daily[].base_amount</code></td><td>Base do dia, em centavos: o patrimônio do fundo ao preço do dia, o custo em carteira de CDB e LCI ou a soma dos saldos de cliente, no fim do dia.</td></tr><tr><td><code>estimated.fund_administration_fee.daily[].annual_rate_bps</code></td><td>Taxa anual do dia, em pontos-base: a taxa de administração do fundo ou a Selic vigente no dia.</td></tr><tr><td><code>estimated.fund_administration_fee.daily[].amount</code></td><td>Valor estimado, em centavos (truncado para baixo em cada provisão). Na estimativa, é a soma dos dias. Pode ser zero.</td></tr><tr><td><code>estimated.own_issue_spread</code></td><td>Spread do CDB e da LCI: por dia, custo em carteira × CDI do dia × (1 − percentual do CDI pago) × dias corridos / 365, somado entre os produtos.</td></tr><tr><td><code>estimated.own_issue_spread.amount</code></td><td>Valor estimado, em centavos (truncado para baixo em cada provisão). Na estimativa, é a soma dos dias. Pode ser zero.</td></tr><tr><td><code>estimated.own_issue_spread.daily</code></td><td>O detalhe da estimativa: a provisão de cada dia fechado do período.</td></tr><tr><td><code>estimated.own_issue_spread.daily[].date</code></td><td>O dia de movimento que fechou.</td></tr><tr><td><code>estimated.own_issue_spread.daily[].calendar_days</code></td><td>Dias corridos que a provisão cobre, até o próximo dia de movimento: 1 de segunda a quinta, 3 na sexta (o fim de semana rende).</td></tr><tr><td><code>estimated.own_issue_spread.daily[].base_amount</code></td><td>Base do dia, em centavos: o patrimônio do fundo ao preço do dia, o custo em carteira de CDB e LCI ou a soma dos saldos de cliente, no fim do dia.</td></tr><tr><td><code>estimated.own_issue_spread.daily[].cdi_annual_rate_bps</code></td><td>CDI anual vigente no dia, em pontos-base.</td></tr><tr><td><code>estimated.own_issue_spread.daily[].amount</code></td><td>Valor estimado, em centavos (truncado para baixo em cada provisão). Na estimativa, é a soma dos dias. Pode ser zero.</td></tr><tr><td><code>estimated.float</code></td><td>Float: por dia, saldo das contas de cliente no fim do dia (sem a conta do banco) × Selic do dia × dias corridos / 365.</td></tr><tr><td><code>estimated.float.amount</code></td><td>Valor estimado, em centavos (truncado para baixo em cada provisão). Na estimativa, é a soma dos dias. Pode ser zero.</td></tr><tr><td><code>estimated.float.daily</code></td><td>O detalhe da estimativa: a provisão de cada dia fechado do período.</td></tr><tr><td><code>estimated.float.daily[].date</code></td><td>O dia de movimento que fechou.</td></tr><tr><td><code>estimated.float.daily[].calendar_days</code></td><td>Dias corridos que a provisão cobre, até o próximo dia de movimento: 1 de segunda a quinta, 3 na sexta (o fim de semana rende).</td></tr><tr><td><code>estimated.float.daily[].base_amount</code></td><td>Base do dia, em centavos: o patrimônio do fundo ao preço do dia, o custo em carteira de CDB e LCI ou a soma dos saldos de cliente, no fim do dia.</td></tr><tr><td><code>estimated.float.daily[].annual_rate_bps</code></td><td>Taxa anual do dia, em pontos-base: a taxa de administração do fundo ou a Selic vigente no dia.</td></tr><tr><td><code>estimated.float.daily[].amount</code></td><td>Valor estimado, em centavos (truncado para baixo em cada provisão). Na estimativa, é a soma dos dias. Pode ser zero.</td></tr><tr><td><code>total_amount</code></td><td>Receita total do período: realizada + estimadas, em centavos.</td></tr></tbody></table></div>

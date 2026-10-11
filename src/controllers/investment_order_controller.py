@@ -218,9 +218,9 @@ class InvestmentOrderController(BaseController):
         maturity = InvestmentOrderRepository.latest_open_maturity(self.context, account_id, product.id)
         return maturity is not None and maturity <= business_date
 
-    def get(self, customer_key: str, account_key: str, order_key: str) -> dict:
+    def get(self, customer_key: str, account_key: str, investment_order_key: str) -> dict:
         account = self.get_owned_account(customer_key, account_key)
-        order = InvestmentOrderRepository.get_by_key(self.context, account.id, order_key)
+        order = InvestmentOrderRepository.get_by_key(self.context, account.id, investment_order_key)
 
         if order is None:
             raise OrderNotFound()

@@ -8,7 +8,7 @@ class InvestmentOrder(Base):
     __tablename__ = "investment_order"
 
     id = Column(Integer, primary_key=True)
-    order_key = Column(CHAR(36), nullable=False, unique=True)
+    investment_order_key = Column(CHAR(36), nullable=False, unique=True)
     transaction_id = Column(Integer, ForeignKey("transaction.id"), nullable=False, unique=True)
     product_id = Column(Integer, ForeignKey("product.id"), nullable=False)
     quantity = Column(Numeric(24, 8), nullable=False)

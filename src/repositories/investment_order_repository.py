@@ -13,7 +13,7 @@ from models import InvestmentOrder, Position, Transaction
 class InvestmentOrderRepository:
     @staticmethod
     def create(context: Context, **fields) -> InvestmentOrder:
-        order = InvestmentOrder(order_key=str(uuid.uuid4()), **fields)
+        order = InvestmentOrder(investment_order_key=str(uuid.uuid4()), **fields)
         context.db_session.add(order)
         context.db_session.flush()
 
@@ -28,10 +28,10 @@ class InvestmentOrderRepository:
         )
 
     @staticmethod
-    def get_by_key(context: Context, account_id: int, order_key: str) -> Optional[InvestmentOrder]:
+    def get_by_key(context: Context, account_id: int, investment_order_key: str) -> Optional[InvestmentOrder]:
         return (
             InvestmentOrderRepository.of_account(context, account_id)
-            .filter(InvestmentOrder.order_key == order_key)
+            .filter(InvestmentOrder.investment_order_key == investment_order_key)
             .first()
         )
 

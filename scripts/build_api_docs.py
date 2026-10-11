@@ -379,7 +379,7 @@ def capture() -> int:
              body={"product_key": cdb["product_key"], "side": "APPLY", "amount": 1000})
     api.call("ordem", "Resgate da LCI antes do vencimento", "POST", order_path, key=key(), expect=422,
              body={"product_key": lci["product_key"], "side": "REDEEM", "redeem_all": True})
-    api.call("consultar-ordem", "Ordem de aplicação", "GET", f"{order_path}/{applied['order_key']}")
+    api.call("consultar-ordem", "Ordem de aplicação", "GET", f"{order_path}/{applied['investment_order_key']}")
     api.call("listar-ordens", "Ordens da conta", "GET", f"/customer/{ck}/account/{ak}/investment_orders")
     api.call("posicao", "Posições e capital total", "GET", f"/customer/{ck}/account/{ak}/positions")
     api.call("consultar-conta", "Conta com investimentos", "GET", f"/customer/{ck}/account/{ak}")

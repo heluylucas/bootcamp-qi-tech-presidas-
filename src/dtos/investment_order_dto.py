@@ -8,7 +8,7 @@ def order_to_dict(order: InvestmentOrder) -> dict:
     transaction = order.transaction
     side = "APPLY" if transaction.type == "INVESTMENT_APPLY" else "REDEEM"
     response = {
-        "order_key": order.order_key,
+        "investment_order_key": order.investment_order_key,
         "product_key": order.product.product_key,
         "side": side,
         "source": "CUSTOMER" if order.matured_investment_order_id is None else "MATURITY",

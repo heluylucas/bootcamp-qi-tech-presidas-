@@ -315,7 +315,7 @@ class OrderNotFound(QIException):
     def __init__(self) -> None:
         title = "Order Not Found"
         http_status = 404
-        description = "The order_key does not exist for this customer."
+        description = "The investment_order_key does not exist for this customer."
         translation = "Ordem não encontrada."
         super().__init__(title, self.code, http_status, description, translation)
 

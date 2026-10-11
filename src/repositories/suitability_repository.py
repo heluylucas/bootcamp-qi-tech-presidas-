@@ -20,7 +20,7 @@ class SuitabilityRepository:
     @staticmethod
     def create_assessment(context: Context, customer_id: int, investor_profile: str, score: int) -> SuitabilityAssessment:
         assessment = SuitabilityAssessment(
-            assessment_key=str(uuid.uuid4()), customer_id=customer_id, investor_profile=investor_profile, score=score
+            suitability_assessment_key=str(uuid.uuid4()), customer_id=customer_id, investor_profile=investor_profile, score=score
         )
         context.db_session.add(assessment)
         context.db_session.flush()

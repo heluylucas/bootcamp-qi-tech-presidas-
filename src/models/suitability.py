@@ -60,7 +60,7 @@ class SuitabilityAssessment(Base):
     __tablename__ = "suitability_assessment"
 
     id = Column(Integer, primary_key=True)
-    assessment_key = Column(CHAR(36), nullable=False, unique=True)
+    suitability_assessment_key = Column(CHAR(36), nullable=False, unique=True)
     customer_id = Column(Integer, ForeignKey("customer.id"), nullable=False)
     investor_profile = Column(InvestorProfile, nullable=False)
     score = Column(SmallInteger, nullable=False)

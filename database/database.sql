@@ -96,7 +96,7 @@ CREATE TYPE investor_profile AS ENUM ('CONSERVATIVE', 'MODERATE', 'AGGRESSIVE');
 
 CREATE TABLE suitability_assessment(
     id                              SERIAL PRIMARY KEY,
-    assessment_key                  CHAR(36) NOT NULL UNIQUE,
+    suitability_assessment_key      CHAR(36) NOT NULL UNIQUE,
     customer_id                     INTEGER NOT NULL REFERENCES customer(id),
     investor_profile                investor_profile NOT NULL,
     score                           SMALLINT NOT NULL,
@@ -264,7 +264,7 @@ JOIN product p ON p.name = v.product_name;
 
 CREATE TABLE investment_order(
     id                              SERIAL PRIMARY KEY,
-    order_key                       CHAR(36) NOT NULL UNIQUE,
+    investment_order_key            CHAR(36) NOT NULL UNIQUE,
     transaction_id                  INTEGER NOT NULL UNIQUE REFERENCES transaction(id),
     product_id                      INTEGER NOT NULL REFERENCES product(id),
     quantity                        NUMERIC(24,8) NOT NULL CHECK (quantity > 0),
