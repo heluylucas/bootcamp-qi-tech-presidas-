@@ -38,12 +38,14 @@ docker compose up
 Não precisa criar nem copiar arquivo nenhum antes: as configurações já
 vêm com valor padrão dentro do `docker-compose.yml`.
 
-São dois serviços de pé:
+Sobem quatro serviços:
 
 | Serviço | O que é |
 |---|---|
 | `api` | a API do banco |
 | `db` | o PostgreSQL, com as tabelas e os dados iniciais de `database/database.sql` |
+| `mock` | finge ser as fontes de preço de fora (administradora do fundo, Tesouro e Banco Central) |
+| `mock-init` | roda uma vez e termina: ensina ao `mock` os preços dos próximos 300 dias úteis |
 
 Quando aparecer `Application startup complete`, a API está no ar. Abra
 http://localhost:3000 no navegador e ela responde quem é:
@@ -124,8 +126,8 @@ tests/` não volta nada). A única exceção é o `tests/utils/db_utils.py`,
 que fala com o banco direto, só para **zerar** o banco antes de um teste
 que conta linhas. O cenário sempre nasce pela API.
 
-Toda resposta que um teste recebe passa também pela conferência da R5
-(`tests/utils/internal_id.py`): se aparecer uma chave `id` ou terminada em
+Toda resposta que um teste recebe passa também pela conferência de que
+nenhum id interno vaza (`tests/utils/internal_id.py`): se aparecer uma chave `id` ou terminada em
 `_id` em qualquer parte do JSON, o teste falha apontando o campo.
 
 O conferidor de estilo roda assim:
@@ -141,7 +143,7 @@ python3 -m flake8 .
 ### `port is already allocated`
 
 Outro programa da sua máquina já usa aquela porta. Copie o
-`.env.example` para `.env` e troque `API_PORT` / `DB_PORT` por portas
+`.env.example` para `.env` e troque `API_PORT` / `DB_PORT` / `MOCK_PORT` por portas
 livres. Mexeu no `DB_PORT`? Mude **também** a porta da `DATABASE_URL`, no
 mesmo arquivo: é por ela que os testes chegam no banco de fora do Docker.
 
@@ -212,11 +214,16 @@ src/
   dtos/            ← traduz o objeto do banco no JSON que sai
   errors/          ← os erros da API, cada um com seu código
   middlewares/     ← o que acontece com TODA requisição
-  connectors/      ← as conversas com outros serviços (vazio no MVP)
+  connectors/      ← as conversas com outros serviços (as fontes de preço)
   utils/           ← as ferramentas que não são de nenhuma camada
 
 database/
   database.sql     ← as tabelas e os dados iniciais, em SQL puro
+
+mock/
+  mock_init.py     ← ensina ao mock os preços dos próximos dias úteis
+
+docs/api/          ← a documentação da API (gerada por scripts/build_api_docs.py)
 
 tests/             ← os testes (black box, só HTTP)
 ```
@@ -262,7 +269,7 @@ OPERATOR-TOKEN: default_operator_token
 
 Sem ele, ou com o valor errado, a API responde **403** (`PPP000007`). A
 ideia é que o cliente tenha só o primeiro token, nunca o segundo: é isso
-que impede um cliente bloqueado de se desbloquear sozinho (RN-CON-11).
+que impede um cliente bloqueado de se desbloquear sozinho.
 
 ```bash
 # rota de cliente: só o INTERNAL-TOKEN
@@ -298,6 +305,8 @@ que toda rota pode devolver, moram em `src/errors/base_error.py`:
 |-------------|------|-----------------------------------------------------------------------------|
 | `PPP000001` | 400  | o JSON ou a query string estão fora do formato (schema)                     |
 | `PPP000002` | 403  | faltou o `INTERNAL-TOKEN`, ou ele está errado                               |
+| `PPP000003` | 400  | rota que mexe em dinheiro sem o cabeçalho `Idempotency-Key` (um UUID)       |
+| `PPP000004` | 409  | essa `Idempotency-Key` já foi usada em outro pedido                         |
 | `PPP000005` | 400  | parâmetros no formato certo que se contradizem (ex.: `from` depois de `to`) |
 | `PPP000007` | 403  | rota `/internal/...` sem o `OPERATOR-TOKEN`, ou com ele errado              |
 | `PPP000404` | 404  | essa rota não existe                                                        |
