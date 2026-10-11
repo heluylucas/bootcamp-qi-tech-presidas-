@@ -64,9 +64,8 @@ coverage.xml
 .DS_Store
 
 # --- Ferramentas de IA -------------------------------------
-# Só o settings.json é do time; o resto (settings.local.json etc.) é pessoal.
-.claude/*
-!.claude/settings.json
+.claude/
+CLAUDE.md
 
 # --- Empacotamento / binários ------------------------------
 *.zip

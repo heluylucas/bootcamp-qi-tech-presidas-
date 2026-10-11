@@ -8,11 +8,8 @@ aplicação e resgate em renda fixa e no fundo fictício FGV Quant Capital.
 em **Docker**. A API e o banco sobem no Docker, então você não instala
 nenhum dos dois na sua máquina. Os **testes** rodam no seu Python (seção 2).
 
-As regras de negócio, as rotas e o catálogo de erros completos estão em
-[`docs/regras_de_negocio.tex`](docs/regras_de_negocio.tex). Os fluxos passo
-a passo estão em [`docs/rfc_fluxos.tex`](docs/rfc_fluxos.tex). A documentação
-da API, com todas as rotas, exemplos de requisição e resposta e os erros, está
-em [`docs/api/index.html`](docs/api/index.html): abra o arquivo no navegador.
+A documentação da API, com todas as rotas, exemplos de requisição e resposta
+e os erros, está em [`docs/api/index.html`](docs/api/index.html): abra o arquivo no navegador.
 
 ---
 
@@ -304,8 +301,8 @@ que toda rota pode devolver, moram em `src/errors/base_error.py`:
 | `PPP000405` | 405  | a rota existe, mas não aceita esse método                                   |
 | `PPP000500` | 500  | erro inesperado                                                             |
 
-Os de cada módulo moram em `src/errors/custom_errors.py`, e o catálogo
-completo está na seção "Catálogo de erros" de `docs/regras_de_negocio.tex`.
+Os de cada módulo moram em `src/errors/custom_errors.py`, e os erros de
+cada rota estão em [`docs/api/index.html`](docs/api/index.html).
 
 Quem integra com a API programa em cima do `code`, não do texto. Não
 repita um número: a checagem `error_verification` derruba a API no start

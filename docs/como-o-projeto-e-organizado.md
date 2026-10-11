@@ -159,7 +159,7 @@ encerradas e grava a nova — e a trava só vale enquanto a transação estiver
 aberta. Um `commit` no meio do caminho soltaria a trava antes da
 gravação, e duas requisições ao mesmo tempo poderiam abrir duas contas
 para o mesmo cliente. O mesmo vale, com mais peso, para tudo que mexe em
-saldo (veja `docs/rfc_fluxos.tex`).
+saldo.
 
 Abra os dois arquivos na ordem — o middleware primeiro, o `database.py`
 depois. São poucas linhas de código cada um, e juntas elas dizem o
