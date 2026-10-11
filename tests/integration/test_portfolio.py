@@ -35,11 +35,21 @@ def amounts_by_name(body: dict) -> dict:
 
 class TestPortfolioSuggestion:
     @pytest.mark.parametrize(
-        "option, profile, amount",
-        [(CONSERVATIVE, "CONSERVATIVE", 100000), (MODERATE, "MODERATE", 123457), (AGGRESSIVE, "AGGRESSIVE", 999999)],
+        "option, profile, amount, expected",
+        [
+            # R$ 10.000,00: a divisão sai redonda.
+            (CONSERVATIVE, "CONSERVATIVE", 1000000, {SELIC: 500000, CDB: 300000, LCI: 200000}),
+            (MODERATE, "MODERATE", 1000000, {SELIC: 250000, CDB: 200000, PREFIXED: 200000, IPCA: 200000, FUND: 150000}),
+            # R$ 1.000,01: sobra 1 centavo do arredondamento, que vai para o maior peso (Selic).
+            (MODERATE, "MODERATE", 100001, {SELIC: 25001, CDB: 20000, PREFIXED: 20000, IPCA: 20000, FUND: 15000}),
+            # 100.003 centavos: os pisos somam 100.001 e os 2 que sobram vão para o fundo (40%, o maior peso).
+            (AGGRESSIVE, "AGGRESSIVE", 100003, {SELIC: 10000, PREFIXED: 20000, IPCA: 30000, FUND: 40003}),
+        ],
+        ids=["conservative_round", "moderate_round", "moderate_leftover", "aggressive_leftover"],
     )
-    def test_weights_and_amounts_add_up(self, option, profile, amount):
-        """A carteira-modelo soma 10.000 pb, e os valores somam exatamente o pedido (RN-CAR-03)."""
+    def test_distribution(self, option, profile, amount, expected):
+        """Cada perfil tem os seus produtos, a carteira-modelo soma 10.000 pb e os valores
+        somam exatamente o pedido, com a sobra indo para o maior peso (RN-CAR-03)."""
         customer_key, _ = customer_with_profile(option)
 
         status, body = suggest(customer_key, amount)
@@ -49,49 +59,7 @@ class TestPortfolioSuggestion:
         assert body["amount"] == amount
         assert sum(item["weight_bps"] for item in body["items"]) == 10000
         assert sum(item["amount"] for item in body["items"]) == amount
-
-    def test_moderate_round_amount_splits_exactly(self):
-        """Moderado, R$ 10.000,00: a divisão sai redonda."""
-        customer_key, _ = customer_with_profile(MODERATE)
-
-        _, body = suggest(customer_key, 1000000)
-
-        assert amounts_by_name(body) == {
-            SELIC: 250000,
-            CDB: 200000,
-            PREFIXED: 200000,
-            IPCA: 200000,
-            FUND: 150000,
-        }
-
-    def test_moderate_leftover_cent_goes_to_largest_weight(self):
-        """Moderado, R$ 1.000,01: sobra 1 centavo do arredondamento, que vai para o maior peso (Selic)."""
-        customer_key, _ = customer_with_profile(MODERATE)
-
-        _, body = suggest(customer_key, 100001)
-
-        assert amounts_by_name(body) == {
-            SELIC: 25001,
-            CDB: 20000,
-            PREFIXED: 20000,
-            IPCA: 20000,
-            FUND: 15000,
-        }
-
-    def test_conservative_portfolio(self):
-        customer_key, _ = customer_with_profile(CONSERVATIVE)
-
-        _, body = suggest(customer_key, 1000000)
-
-        assert amounts_by_name(body) == {SELIC: 500000, CDB: 300000, LCI: 200000}
-
-    def test_aggressive_leftover_goes_to_largest_weight(self):
-        # 100.003 centavos: os pisos somam 100.001 e os 2 que sobram vão para o fundo (40%, o maior peso).
-        customer_key, _ = customer_with_profile(AGGRESSIVE)
-
-        _, body = suggest(customer_key, 100003)
-
-        assert amounts_by_name(body) == {SELIC: 10000, PREFIXED: 20000, IPCA: 30000, FUND: 40003}
+        assert amounts_by_name(body) == expected
 
     def test_items_from_largest_weight(self):
         customer_key, _ = customer_with_profile(MODERATE)

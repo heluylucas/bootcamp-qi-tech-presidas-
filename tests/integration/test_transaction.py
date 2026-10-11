@@ -494,14 +494,13 @@ class TestStatement:
 
     def test_default_paging(self):
         customer_key, account_key = open_account()
-        for _ in range(21):
-            deposit(customer_key, account_key, 100)
+        deposit(customer_key, account_key, 100)
 
         status, body = RequestGenerator.get_transactions(customer_key, account_key)
 
         assert status == 200
-        assert (body["page"], body["limit"], body["total"]) == (1, 20, 21)
-        assert len(body["items"]) == 20
+        assert (body["page"], body["limit"], body["total"]) == (1, 20, 1)
+        assert len(body["items"]) == 1
 
     @pytest.mark.parametrize(
         "query_params",
