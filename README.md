@@ -9,7 +9,9 @@ em **Docker**. A API e o banco sobem no Docker, então você não instala
 nenhum dos dois na sua máquina. Os **testes** rodam no seu Python (seção 2).
 
 A documentação da API, com todas as rotas, exemplos de requisição e resposta
-e os erros, está em [`docs/api/index.html`](docs/api/index.html): abra o arquivo no navegador.
+e os erros, está publicada em
+**<https://bootcamp-qi-tech-presidas-api.vercel.app>**. O código-fonte dela é o
+[`docs/api/index.html`](docs/api/index.html), que também abre direto no navegador.
 
 ---
 
@@ -70,7 +72,8 @@ docker compose logs api | grep <o seu x-request-id>
 | `GET /` | diz qual serviço é este | `200` |
 | `GET /health_check` | diz se a API está de pé | `204` |
 
-As rotas do banco estão todas em [`docs/api/index.html`](docs/api/index.html),
+As rotas do banco estão todas em <https://bootcamp-qi-tech-presidas-api.vercel.app>
+([`docs/api/index.html`](docs/api/index.html)),
 com parâmetros, exemplos reais e erros. O site é gerado do código por
 `scripts/build_api_docs.py`:
 
@@ -302,7 +305,7 @@ que toda rota pode devolver, moram em `src/errors/base_error.py`:
 | `PPP000500` | 500  | erro inesperado                                                             |
 
 Os de cada módulo moram em `src/errors/custom_errors.py`, e os erros de
-cada rota estão em [`docs/api/index.html`](docs/api/index.html).
+cada rota estão em <https://bootcamp-qi-tech-presidas-api.vercel.app>.
 
 Quem integra com a API programa em cima do `code`, não do texto. Não
 repita um número: a checagem `error_verification` derruba a API no start
