@@ -23,7 +23,7 @@ e os erros, está publicada em
 |---|---|---|
 | **Docker** (com o Docker Desktop no Mac/Windows) | roda a API e o banco | `docker compose version` |
 | **Git** | só no Windows: ele traz junto o Git Bash, o terminal onde os comandos abaixo funcionam | `git --version` |
-| **Python 3.11 ou mais novo** | rodar os testes (seção 2) | `python3 --version` |
+| **Python 3.11 ou 3.12** | rodar os testes (seção 2) | `python3.11 --version` (no Windows, `py -3.11 --version`) |
 
 > **`docker compose version` deu erro?** Sua instalação do Docker é
 > antiga demais (ou o Docker não está ligado). No Mac e no Windows,
@@ -100,12 +100,20 @@ Docker.
 **Uma vez só — instalar as dependências de teste:**
 
 ```bash
-python3 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-No Windows, a segunda linha é `.venv\Scripts\activate`.
+No Windows, a primeira linha é `py -3.11 -m venv .venv` e a segunda é
+`.venv\Scripts\activate`.
+
+> **Por que não o Python mais novo?** As versões fixadas no
+> `requirements.txt` são anteriores ao Python 3.13: no 3.13 ou 3.14, o
+> `psycopg2-binary` não instala e o SQLAlchemy quebra no `import`
+> (`AssertionError: ... directly inherits TypingOnly`). Se a sua máquina só
+> tem um Python mais novo, `uv venv --python 3.11` cria o `.venv` baixando o
+> 3.11 sozinho.
 
 > **O `pip install` falhou no `httptools` ou no `greenlet`?** Acontece com
 > Python de 32 bits no Windows, que não tem versão pronta desses pacotes.
