@@ -1,7 +1,3 @@
-"""Os passos que vários arquivos de teste repetem, escritos uma vez só.
-
-Tudo pela porta da frente (HTTP), como o resto dos testes (R1).
-"""
 import uuid
 from datetime import date, timedelta
 
@@ -10,19 +6,16 @@ from tests.utils.random_generator import RandomGenerator
 from tests.utils.request_generator import RequestGenerator
 
 
-# Tarifa de transferência (RN-MOV-10), em centavos.
 TRANSFER_FEE = 200
 
-# Questionário inteiro com a mesma opção: 1 dá Conservador (risco até 2),
-# 2 dá Moderado (até 3) e 4 dá Arrojado (até 5).
 CONSERVATIVE, MODERATE, AGGRESSIVE = 1, 2, 4
 
-SELIC = "Tesouro Selic 2031"  # risco 1, mínimo R$ 50,00
+SELIC = "Tesouro Selic 2031"
 PREFIXED = "Tesouro Prefixado 2029"
 IPCA = "Tesouro IPCA+ 2035"
-CDB = "CDB Triple P Bank Liquidez"  # risco 2, mínimo R$ 50,00
-LCI = "LCI Triple P Bank 12 meses"  # risco 2, mínimo R$ 100,00, prazo de 12 meses
-FUND = "FGV Quant Capital FIM"  # risco 3, mínimo R$ 100,00
+CDB = "CDB Triple P Bank Liquidez"
+LCI = "LCI Triple P Bank 12 meses"
+FUND = "FGV Quant Capital FIM"
 
 
 def create_customer() -> str:
@@ -32,14 +25,12 @@ def create_customer() -> str:
 
 
 def open_account() -> tuple:
-    """Cliente novo com uma conta vazia. Devolve (customer_key, account_key)."""
     customer_key = create_customer()
     _, account = RequestGenerator.post_account(customer_key)
     return customer_key, account["account_key"]
 
 
 def send(customer_key: str, account_key: str, payload: dict):
-    """Cada chamada usa uma Idempotency-Key nova: é um pedido novo, não uma repetição."""
     return RequestGenerator.post_transaction(customer_key, account_key, payload, str(uuid.uuid4()))
 
 
@@ -53,14 +44,12 @@ def balance_of(customer_key: str, account_key: str) -> int:
 
 
 def answer_profile(customer_key: str, option: int) -> dict:
-    """Responde as sete perguntas com a mesma opção. Devolve a avaliação."""
     answers = [{"question_code": f"Q{number}", "option_code": option} for number in range(1, 8)]
     _, assessment = RequestGenerator.post_suitability(customer_key, {"answers": answers})
     return assessment
 
 
 def investor(option: int = MODERATE, balance: int = 1_000_000) -> tuple:
-    """Cliente com perfil, conta ativa e saldo. Devolve (customer_key, account_key)."""
     customer_key, account_key = open_account()
     answer_profile(customer_key, option)
     deposit(customer_key, account_key, balance)
@@ -73,7 +62,6 @@ def product_key(name: str) -> str:
 
 
 def product(name: str) -> dict:
-    """O detalhe do produto, com o preço do dia."""
     _, body = RequestGenerator.get_product(product_key(name))
     return body
 
@@ -96,7 +84,6 @@ def next_business_day(day: date) -> date:
 
 
 def close_day(**teach) -> tuple:
-    """Ensina o próximo dia ao mock e fecha a data de movimento atual."""
     today = business_date()
     PriceSourceMock.teach_day(next_business_day(today), **teach)
     return RequestGenerator.post_day_close({"close_date": today.isoformat()})

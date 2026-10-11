@@ -21,7 +21,6 @@ class AccountResource:
 
     @SchemaHandler.validate("patch_internal_account.json")
     def on_patch_internal(self, account_key: str, payload: dict) -> JSONResponse:
-        # Rota do banco (RN-CON-11). O token de operador já foi conferido no middleware.
         account = AccountController().change_status_by_bank(account_key, payload)
         return JSONResponse(content=account, status_code=status.HTTP_200_OK)
 

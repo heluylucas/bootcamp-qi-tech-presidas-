@@ -32,14 +32,12 @@ def unit_price(name: str) -> Decimal:
 
 
 def redeem(customer_key: str, account_key: str, name: str, amount: int = None, idempotency_key: str = None):
-    """Sem amount, é o resgate total (redeem_all)."""
     payload = {"product_key": product_key(name), "side": "REDEEM"}
     payload.update({"amount": amount} if amount is not None else {"redeem_all": True})
     return RequestGenerator.post_investment_order(customer_key, account_key, payload, idempotency_key or str(uuid.uuid4()))
 
 
 def closed_account() -> tuple:
-    """Cliente com perfil e a conta já encerrada (vazia). Devolve (customer_key, account_key)."""
     customer_key = create_customer()
     answer_profile(customer_key, MODERATE)
     _, account = RequestGenerator.post_account(customer_key)
@@ -70,13 +68,11 @@ class TestApply:
         assert body["status"] == "EXECUTED"
         assert body["source"] == "CUSTOMER"
         assert body["unit_price"] == f"{price:.8f}"
-        # RN-ORD-06: R$ 100,00 / preço, truncado em 8 casas. Texto, nunca float.
         assert body["quantity"] == f"{(Decimal(100) / price).quantize(EIGHT_PLACES, ROUND_DOWN):.8f}"
         assert body["maturity_date"] is None
         assert balance_of(customer_key, account_key) == 1_000_000 - 10000
 
     def test_lci_records_maturity_date(self):
-        """RN-ORD-17: aplicação em produto com prazo vence na data de movimento + 12 meses."""
         customer_key, account_key = investor(CONSERVATIVE)
 
         status, body = apply(customer_key, account_key, LCI, 10000)
@@ -100,7 +96,6 @@ class TestApply:
         assert balance_of(customer_key, account_key) == 0
 
     def test_product_at_profile_risk_limit_is_accepted(self):
-        """O fundo tem risco 3, o máximo do Moderado: risco igual ao limite passa."""
         customer_key, account_key = investor(MODERATE)
 
         status, _ = apply(customer_key, account_key, FUND, 10000)
@@ -144,7 +139,6 @@ class TestApplyIdempotency:
         assert balance_of(customer_key, account_key) == 1_000_000 - 10000
 
     def test_key_already_used_in_a_deposit_is_refused(self):
-        """A mesma chave não serve para dois pedidos, nem em rotas diferentes."""
         customer_key, account_key = investor()
         key = str(uuid.uuid4())
         RequestGenerator.post_transaction(customer_key, account_key, {"type": "DEPOSIT", "amount": 5000}, key)
@@ -228,7 +222,6 @@ class TestApplyRefusals:
         assert body["code"] == "PPP002001"
 
     def test_account_of_another_customer(self):
-        """R8: a conta de outro cliente responde igual a uma que não existe, e nada é debitado."""
         owner, owner_account = investor()
         stranger, _ = investor()
 
@@ -276,7 +269,6 @@ class TestApplyRefusals:
         assert body["code"] == "PPP005001"
 
     def test_product_above_profile_risk(self):
-        """RN-ORD-04: o fundo tem risco 3; o Conservador vai até 2."""
         customer_key, account_key = investor(CONSERVATIVE)
 
         status, body = apply(customer_key, account_key, FUND, 10000)
@@ -286,7 +278,6 @@ class TestApplyRefusals:
         assert balance_of(customer_key, account_key) == 1_000_000
 
     def test_below_minimum_application(self):
-        """RN-ORD-05: R$ 49,99, um centavo abaixo do mínimo do CDB."""
         customer_key, account_key = investor()
 
         status, body = apply(customer_key, account_key, CDB, 4999)
@@ -353,7 +344,6 @@ class TestApplyRefusals:
 
 
 def investor_with_fund_quote_up() -> tuple:
-    """Aplica R$ 1.500,00 no fundo com a cota a 1,23456789 e fecha o dia com a cota a 1,24."""
     assert close_day(fund="1.23456789")[0] == 201
     customer_key, account_key = investor(MODERATE, balance=150000)
     status, applied = apply(customer_key, account_key, FUND, 150000)
@@ -365,7 +355,6 @@ def investor_with_fund_quote_up() -> tuple:
 
 class TestRedeem:
     def test_partial_redeem_credits_account_at_average_cost(self):
-        """RN-ORD-12, 13 e 16: resgata R$ 500,00 com a cota a 1,24."""
         customer_key, account_key = investor_with_fund_quote_up()
 
         status, body = redeem(customer_key, account_key, FUND, 50000)
@@ -376,7 +365,6 @@ class TestRedeem:
         assert body["amount"] == 50000
         assert body["unit_price"] == "1.24000000"
         assert body["quantity"] == "403.22580645"
-        # floor(150000 × 403,22580645 / 1215,00001105): o custo médio da parte que saiu.
         assert body["acquisition_cost_amount"] == 49780
         assert body["result_amount"] == 220
         assert body["return_bps"] == 44
@@ -384,7 +372,6 @@ class TestRedeem:
         assert balance_of(customer_key, account_key) == 50000
 
     def test_redeem_all_zeroes_position(self):
-        """RN-ORD-12 e 14: o total resgata o que sobrou; depois disso não há mais o que resgatar."""
         customer_key, account_key = investor_with_fund_quote_up()
         redeem(customer_key, account_key, FUND, 50000)
 
@@ -392,7 +379,6 @@ class TestRedeem:
 
         assert status == 201
         assert body["quantity"] == "811.77420460"
-        # floor(811,7742046 × 1,24 = 1006,6000137) em centavos; sai todo o custo que restava (150000 − 49780).
         assert body["amount"] == 100660
         assert body["acquisition_cost_amount"] == 100220
         assert body["result_amount"] == 440
@@ -431,7 +417,6 @@ class TestRedeemIdempotency:
         assert balance_of(customer_key, account_key) == 1_000_000 - 10000 + 4000
 
     def test_partial_redeem_key_reused_in_redeem_all(self):
-        """O resgate total não manda valor: o que diferencia os dois pedidos é o redeem_all gravado."""
         customer_key, account_key = investor()
         apply(customer_key, account_key, CDB, 10000)
         key = str(uuid.uuid4())
@@ -503,7 +488,6 @@ class TestRedeemRefusals:
 
     @pytest.mark.parametrize("amount", [4000, None], ids=["by_amount", "redeem_all"])
     def test_without_position(self, amount):
-        """RN-ORD-10: nunca aplicou neste produto."""
         customer_key, account_key = investor()
 
         status, body = redeem(customer_key, account_key, CDB, amount)
@@ -512,7 +496,6 @@ class TestRedeemRefusals:
         assert body["code"] == "PPP007004"
 
     def test_more_than_position(self):
-        """Um centavo a mais do que foi aplicado, no mesmo preço, passa da quantidade."""
         customer_key, account_key = investor()
         apply(customer_key, account_key, CDB, 10000)
 
@@ -524,7 +507,6 @@ class TestRedeemRefusals:
 
     @pytest.mark.parametrize("amount", [5000, None], ids=["by_amount", "redeem_all"])
     def test_lci_before_maturity(self, amount):
-        """RN-ORD-11: a LCI aplicada hoje só vence daqui a 12 meses."""
         customer_key, account_key = investor(CONSERVATIVE)
         apply(customer_key, account_key, LCI, 10000)
 
@@ -566,7 +548,6 @@ class TestGetOrder:
         assert body["code"] == "PPP007001"
 
     def test_order_of_another_customer(self):
-        """R8: responde igual a uma ordem que não existe."""
         owner, owner_account = investor()
         _, order = apply(owner, owner_account, CDB, 10000)
         stranger, stranger_account = investor()
@@ -669,7 +650,6 @@ class TestListOrders:
 
 class TestPositions:
     def test_current_value_and_return(self):
-        """RN-POS-01: 1215,00001105 cotas a 1,24 valem floor(1506,6000137) = R$ 1.506,60."""
         customer_key, account_key = investor_with_fund_quote_up()
 
         status, body = RequestGenerator.get_positions(customer_key, account_key)
@@ -686,7 +666,6 @@ class TestPositions:
                 "return_bps": 44,
             }
         ]
-        # Aplicou o saldo inteiro: nada em caixa, tudo investido.
         assert body["total"] == {
             "investments_amount": 150660,
             "acquisition_cost_amount": 150000,
@@ -713,7 +692,6 @@ class TestPositions:
         assert total["result_amount"] == total["investments_amount"] - 30000
 
     def test_closed_position_only_when_asked(self):
-        """RN-POS-03: a posição zerada some da lista, mas continua existindo (RN-ORD-14)."""
         customer_key, account_key = investor()
         apply(customer_key, account_key, CDB, 10000)
         redeem(customer_key, account_key, CDB)
@@ -729,7 +707,6 @@ class TestPositions:
         assert closed["return_bps"] == 0
 
     def test_capital_split_between_cash_and_investments(self):
-        """O capital no banco é o caixa (saldo da conta) mais os investimentos ao preço do dia."""
         customer_key, account_key = investor(balance=1_000_000)
         apply(customer_key, account_key, CDB, 250000)
 
@@ -741,12 +718,10 @@ class TestPositions:
         assert status == 200
         assert total["cash_amount"] == cash == 750000
         assert total["net_worth_amount"] == net_worth
-        # Pontos-base inteiros, arredondados para baixo; o investido completa os 10.000.
         assert total["cash_bps"] == cash * 10000 // net_worth
         assert total["cash_bps"] + total["investments_bps"] == 10000
 
     def test_account_shows_the_same_capital(self):
-        """A consulta da conta traz o mesmo capital da posição: saldo + investimentos ao preço do dia."""
         customer_key, account_key = investor(balance=1_000_000)
         apply(customer_key, account_key, CDB, 250000)
 
@@ -808,7 +783,6 @@ class TestPositions:
 
 class TestCloseAccountWithPosition:
     def test_open_position_blocks_closing(self):
-        """RN-CON-08: saldo zero não basta; a conta precisa estar sem investimento."""
         customer_key, account_key = investor(balance=10000)
         apply(customer_key, account_key, CDB, 10000)
 

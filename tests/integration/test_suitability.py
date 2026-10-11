@@ -11,7 +11,6 @@ QUESTION_CODES = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"]
 
 
 def answers(default: int, **overrides) -> dict:
-    """As sete respostas com a mesma opção, trocando só as que vierem em overrides (ex.: Q3=1)."""
     items = []
     for code in QUESTION_CODES:
         items.append({"question_code": code, "option_code": overrides.get(code, default)})
@@ -19,7 +18,6 @@ def answers(default: int, **overrides) -> dict:
 
 
 def add_two_years(moment: datetime) -> datetime:
-    # Mantém a hora. 29/02 + 24 meses cai num ano sem 29/02: vira 28/02.
     try:
         return moment.replace(year=moment.year + 2)
     except ValueError:
@@ -27,7 +25,6 @@ def add_two_years(moment: datetime) -> datetime:
 
 
 def parse_utc(text: str) -> datetime:
-    """'2026-10-05T14:12:00Z', o formato de data com hora da API."""
     return datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -66,7 +63,6 @@ class TestSubmitSuitability:
         assert body["forced_by_rule"] is False
 
     def test_upper_limit_of_conservative(self):
-        # Q1 = 1 e o resto 2: 13 pontos, ainda Conservador (sem a trava, que é só Q3/Q5).
         customer_key = create_customer()
 
         status, body = RequestGenerator.post_suitability(customer_key, answers(2, Q1=1))
@@ -76,7 +72,6 @@ class TestSubmitSuitability:
         assert body["profile"] == "CONSERVATIVE"
 
     def test_upper_limit_of_moderate(self):
-        # Seis respostas 3 e a Q7 = 2: 20 pontos, ainda Moderado.
         customer_key = create_customer()
 
         status, body = RequestGenerator.post_suitability(customer_key, answers(3, Q7=2))
@@ -87,7 +82,6 @@ class TestSubmitSuitability:
 
     @pytest.mark.parametrize("question_code", ["Q3", "Q5"])
     def test_safety_lock_forces_conservative(self, question_code):
-        """RN-SUI-04: 'resgataria tudo' (Q3) ou 'preciso a qualquer momento' (Q5) vira Conservador."""
         customer_key = create_customer()
 
         status, body = RequestGenerator.post_suitability(customer_key, answers(4, **{question_code: 1}))
@@ -95,7 +89,6 @@ class TestSubmitSuitability:
         assert status == 201
         assert body["score"] == 25
         assert body["profile"] == "CONSERVATIVE"
-        # O risco máximo segue o perfil final, não os pontos (que dariam Arrojado, 5).
         assert body["maximum_risk_level"] == 2
         assert body["forced_by_rule"] is True
 
@@ -110,18 +103,12 @@ class TestSubmitSuitability:
         assert body["answers"] == answers(2)["answers"]
 
     def test_valid_for_24_months(self):
-        """RN-SUI-05: hora real da resposta + 24 meses, com hora (não a data de movimento, RN-GER-13).
-
-        A suíte deixa a data de movimento semanas à frente do calendário: se a
-        validade usasse ela, sairia adiantada e este teste pegaria.
-        """
         customer_key = create_customer()
 
         _, body = RequestGenerator.post_suitability(customer_key, answers(2))
 
         valid_until = parse_utc(body["valid_until"])
         expected = add_two_years(parse_utc(body["created_at"]))
-        # O created_at é gravado pelo banco e a validade calculada na API: alguns milissegundos.
         assert abs((valid_until - expected).total_seconds()) <= 5
 
     @pytest.mark.parametrize(
@@ -227,7 +214,6 @@ class TestCurrentSuitability:
 
 class TestSuitabilityHistory:
     def test_retake_keeps_history(self):
-        """RN-SUI-06: refazer cria uma avaliação nova e a antiga continua guardada (R4)."""
         customer_key = create_customer()
         _, first = RequestGenerator.post_suitability(customer_key, answers(1))
         _, second = RequestGenerator.post_suitability(customer_key, answers(4))

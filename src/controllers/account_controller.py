@@ -15,8 +15,6 @@ from repositories import AccountRepository, CustomerRepository, PositionReposito
 from utils.money import amount_for
 
 
-# A tabela de transições do Módulo 2: de cada status, para onde se pode ir.
-# CLOSED é final. Ir para o mesmo status também é proibido (409).
 ALLOWED_TRANSITIONS = {
     "ACTIVE": {"BLOCKED", "CLOSED"},
     "BLOCKED": {"ACTIVE", "CLOSED"},
@@ -25,10 +23,8 @@ ALLOWED_TRANSITIONS = {
 
 REASON_REQUIRED = {"BLOCKED", "CLOSED"}
 
-# RN-CON-11: pela rota do cliente, só encerrar. Bloquear e desbloquear são do banco.
 CUSTOMER_ALLOWED_TARGETS = {"CLOSED"}
 
-# Quem fez a mudança, gravado no evento (RN-CON-05).
 ACTOR_CUSTOMER = "CUSTOMER"
 ACTOR_BANK = "BANK"
 
@@ -38,8 +34,6 @@ class AccountController(BaseController):
         super().__init__(__name__)
 
     def create(self, customer_key: str) -> dict:
-        # A trava na linha do cliente enfileira aberturas simultâneas: a
-        # segunda só conta depois que a primeira fez commit, e vê a conta nova.
         customer = CustomerRepository.get_by_key_for_update(self.context, customer_key)
 
         if customer is None:
@@ -59,9 +53,6 @@ class AccountController(BaseController):
         return self.account_response(account)
 
     def change_status(self, customer_key: str, account_key: str, payload: dict) -> dict:
-        """Rota do cliente (RN-CON-11): ele só encerra a própria conta."""
-        # Travada: o status e o saldo lidos aqui decidem a mudança. O dono vem
-        # antes de tudo (R8): conta de outro cliente dá 404, nem o 403 vaza.
         account = self.get_owned_account(customer_key, account_key, for_update=True)
 
         if payload["status"] not in CUSTOMER_ALLOWED_TARGETS:
@@ -70,7 +61,6 @@ class AccountController(BaseController):
         return self.apply_status_change(account, payload, ACTOR_CUSTOMER)
 
     def change_status_by_bank(self, account_key: str, payload: dict) -> dict:
-        """Rota do banco (RN-CON-11): bloqueia, desbloqueia e encerra. O token de operador já foi conferido na porta."""
         account = AccountRepository.get_by_key_any_owner_for_update(self.context, account_key)
 
         if account is None:
@@ -79,10 +69,8 @@ class AccountController(BaseController):
         return self.apply_status_change(account, payload, ACTOR_BANK)
 
     def apply_status_change(self, account: Account, payload: dict, actor: str) -> dict:
-        """As regras que valem nas duas rotas: transição, motivo, conta vazia e o evento com quem fez."""
         current = account.status
         target = payload["status"]
-        # Motivo só com espaços conta como motivo nenhum.
         reason = payload.get("reason", "").strip() or None
 
         if target not in ALLOWED_TRANSITIONS[current]:
@@ -91,8 +79,6 @@ class AccountController(BaseController):
         if target in REASON_REQUIRED and reason is None:
             raise StatusReasonRequired()
 
-        # RN-CON-08: só fecha vazia, sem saldo e sem investimento. A conta já está
-        # travada, e toda ordem trava a conta antes da posição: não há aplicação no meio.
         if target == "CLOSED" and (
             account.balance > 0 or PositionRepository.has_open_position(self.context, account.id)
         ):
@@ -105,7 +91,6 @@ class AccountController(BaseController):
         return self.account_response(account)
 
     def account_response(self, account: Account) -> dict:
-        """A conta com o valor dos investimentos dela ao preço do dia (calculado, não gravado)."""
         priced = InvestmentOrderController().priced_positions(PositionRepository.list_by_account(self.context, account.id))
         investments_amount = sum(amount_for(position.quantity, unit_price) for position, unit_price in priced)
         return account_to_dict(account, investments_amount)

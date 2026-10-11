@@ -22,8 +22,6 @@ class CustomerController(BaseController):
         super().__init__(__name__)
 
     def create(self, payload: dict) -> dict:
-        # O schema só confere a cara AAAA-MM-DD; "2000-02-30" passa por lá
-        # e só aqui se descobre que o dia não existe.
         try:
             birth_date = date.fromisoformat(payload["birth_date"])
         except ValueError:
@@ -40,8 +38,6 @@ class CustomerController(BaseController):
         if CustomerRepository.get_by_document_number(self.context, document_number) is not None:
             raise DocumentAlreadyRegistered()
 
-        # Dois cadastros do mesmo CPF ao mesmo tempo passam os dois pela
-        # busca acima; o UNIQUE do banco recusa o segundo no flush.
         try:
             customer = CustomerRepository.create(self.context, payload["name"], document_number, birth_date)
         except IntegrityError:
@@ -55,6 +51,5 @@ class CustomerController(BaseController):
 
 
 def age_on(today: date, birth_date: date) -> int:
-    """Anos completos. Nascimento no futuro dá idade negativa, e cai na mesma recusa."""
     birthday_not_reached = (today.month, today.day) < (birth_date.month, birth_date.day)
     return today.year - birth_date.year - birthday_not_reached

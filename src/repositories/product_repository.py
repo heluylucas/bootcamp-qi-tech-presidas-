@@ -24,7 +24,6 @@ class ProductRepository:
 
     @staticmethod
     def get_price_on(context: Context, product_id: int, day: date) -> Optional[ProductPrice]:
-        # O último preço publicado até o dia pedido (RN-PRO-04).
         return (
             context.db_session.query(ProductPrice)
             .filter(ProductPrice.product_id == product_id, ProductPrice.price_date <= day)

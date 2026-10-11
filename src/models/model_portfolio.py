@@ -7,8 +7,6 @@ from models.suitability import InvestorProfile
 
 
 class ModelPortfolioItem(Base):
-    """Um produto da carteira-modelo de um perfil e o peso dele, em pontos-base (a carteira soma 10.000)."""
-
     __tablename__ = "model_portfolio_item"
 
     id = Column(Integer, primary_key=True)

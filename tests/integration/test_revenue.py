@@ -21,7 +21,6 @@ from tests.utils.requisition import ClientRequisition
 
 
 def revenue(from_date: date, to_date: date) -> dict:
-    """O relatório de um período em datas de movimento (RN-REC-09)."""
     _, body = RequestGenerator.get_revenue({"from": from_date.isoformat(), "to": to_date.isoformat()})
     return body
 
@@ -33,7 +32,6 @@ def fee_revenue_today() -> int:
 
 class TestFeeRevenue:
     def test_transfer_fee_goes_to_the_bank(self):
-        """A tarifa sai da origem e entra na conta do banco: nenhum centavo some (RN-REC-03)."""
         origin_customer, origin_account = open_account()
         destination_customer, destination_account = open_account()
         send(origin_customer, origin_account, {"type": "DEPOSIT", "amount": 100000})
@@ -59,7 +57,6 @@ class TestFeeRevenue:
         assert fee_revenue_today() == before
 
     def test_fee_belongs_to_the_business_day_of_the_transfer(self):
-        """A tarifa conta no dia de movimento em que a transferência aconteceu, não no dia seguinte."""
         origin_customer, origin_account = open_account()
         _, destination_account = open_account()
         send(origin_customer, origin_account, {"type": "DEPOSIT", "amount": 100000})
@@ -78,12 +75,10 @@ class TestFeeRevenue:
 
 
 def accrual_of(day: date) -> dict:
-    """As estimativas de um único dia de movimento."""
     return revenue(day, day)["estimated"]
 
 
 def close_and_accrual() -> dict:
-    """Fecha o dia atual e devolve a provisão que o fechamento gravou para ele."""
     day = business_date()
     close_day()
     return accrual_of(day)
@@ -94,13 +89,11 @@ def base_of(accrual: dict, name: str) -> int:
 
 
 def by_formula(day: dict) -> int:
-    """RN-REC-05 e 07: base × taxa anual × dias corridos / 365, em centavos para baixo."""
     return int(Decimal(day["base_amount"]) * day["annual_rate_bps"] * day["calendar_days"] / (10000 * 365))
 
 
 class TestEstimatedRevenue:
     def test_open_day_has_no_accrual(self):
-        """Só dia fechado tem provisão: o dia aberto ainda não tem a foto do fim do dia."""
         today = business_date()
 
         body = revenue(today, today)
@@ -130,7 +123,6 @@ class TestEstimatedRevenue:
         )
 
     def test_friday_accrual_covers_the_weekend(self):
-        """O dinheiro parado no fim de semana continua aplicado: a provisão de sexta vale 3 dias."""
         while business_date().weekday() != 4:
             close_day()
 
@@ -139,7 +131,6 @@ class TestEstimatedRevenue:
         assert accrual["float"]["daily"][0]["calendar_days"] == 3
 
     def test_closed_day_never_changes(self):
-        """A provisão é gravada no fechamento e nunca alterada (R4)."""
         customer_key, account_key = open_account()
         day = business_date()
         close_day()
@@ -158,7 +149,6 @@ class TestEstimatedRevenue:
         assert base_of(close_and_accrual(), "float") == base_of(before, "float") + 10000
 
     def test_transfer_fee_leaves_the_float(self):
-        """A tarifa vai para a conta do banco, que não entra no float (RN-REC-07)."""
         origin_customer, origin_account = open_account()
         _, destination_account = open_account()
         send(origin_customer, origin_account, {"type": "DEPOSIT", "amount": 100000})
@@ -184,14 +174,12 @@ class TestEstimatedRevenue:
 
     def test_fund_application_raises_the_fund_base(self):
         customer_key, account_key = investor()
-        # Um fechamento antes: os dois dias comparados ficam com a mesma cota (a padrão do mock).
         close_day()
         before = close_and_accrual()
 
         apply(customer_key, account_key, FUND, 50000)
 
         after = base_of(close_and_accrual(), "fund_administration_fee")
-        # As cotas são truncadas em 8 casas: o patrimônio ao preço do dia pode ficar 1 centavo abaixo.
         assert base_of(before, "fund_administration_fee") + 49999 <= after
         assert after <= base_of(before, "fund_administration_fee") + 50000
 

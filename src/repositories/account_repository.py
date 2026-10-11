@@ -18,8 +18,6 @@ class AccountRepository:
 
     @staticmethod
     def get_by_key(context: Context, customer_id: int, account_key: str) -> Optional[Account]:
-        # Filtrar pelo dono na própria query: a conta de outro cliente
-        # volta None, igual à inexistente (R8).
         return (
             context.db_session.query(Account)
             .filter(Account.account_key == account_key, Account.customer_id == customer_id)
@@ -83,9 +81,6 @@ class AccountRepository:
 
     @staticmethod
     def get_by_key_any_owner(context: Context, account_key: str) -> Optional[Account]:
-        # Sem filtro de dono: só para o DESTINO de uma transferência, que pode
-        # ser de outro cliente (RN-MOV-05). Nunca use para a conta do caminho.
-        # A conta do banco (sem cliente) fica de fora: ela só recebe tarifa.
         return (
             context.db_session.query(Account)
             .filter(Account.account_key == account_key, Account.customer_id.isnot(None))
@@ -94,9 +89,6 @@ class AccountRepository:
 
     @staticmethod
     def get_by_key_any_owner_for_update(context: Context, account_key: str) -> Optional[Account]:
-        # Sem filtro de dono: só para a rota do banco (RN-CON-11), que não é
-        # aninhada em cliente. Travada, porque o status e o saldo lidos decidem a mudança.
-        # A conta do banco (sem cliente) fica de fora: ninguém a bloqueia nem encerra.
         return (
             context.db_session.query(Account)
             .filter(Account.account_key == account_key, Account.customer_id.isnot(None))
@@ -107,9 +99,6 @@ class AccountRepository:
 
     @staticmethod
     def get_by_id_for_update(context: Context, account_id: int) -> Optional[Account]:
-        # populate_existing: se a conta já foi lida antes nesta sessão, o
-        # SQLAlchemy devolveria o objeto com o saldo ANTIGO, lido antes da
-        # trava. Com ele, os valores são relidos depois que a trava é concedida.
         return (
             context.db_session.query(Account)
             .filter(Account.id == account_id)
@@ -120,12 +109,10 @@ class AccountRepository:
 
     @staticmethod
     def get_bank(context: Context) -> Account:
-        """A conta do próprio banco, a única sem cliente (seed do database.sql)."""
         return context.db_session.query(Account).filter(Account.customer_id.is_(None)).one()
 
     @staticmethod
     def sum_customer_balances(context: Context) -> int:
-        """Soma dos saldos das contas de cliente, sem a conta do banco. Conta encerrada tem saldo 0."""
         total = context.db_session.query(func.sum(Account.balance)).filter(Account.customer_id.isnot(None)).scalar()
         return int(total or 0)
 

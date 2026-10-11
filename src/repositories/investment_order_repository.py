@@ -21,7 +21,6 @@ class InvestmentOrderRepository:
 
     @staticmethod
     def of_account(context: Context, account_id: int):
-        """As ordens da conta: o dono da ordem é a conta da transação dela."""
         return (
             context.db_session.query(InvestmentOrder)
             .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
@@ -30,7 +29,6 @@ class InvestmentOrderRepository:
 
     @staticmethod
     def get_by_key(context: Context, account_id: int, order_key: str) -> Optional[InvestmentOrder]:
-        # Filtrar pelo dono na própria query: a ordem de outra conta volta None (R8).
         return (
             InvestmentOrderRepository.of_account(context, account_id)
             .filter(InvestmentOrder.order_key == order_key)
@@ -58,10 +56,6 @@ class InvestmentOrderRepository:
 
     @staticmethod
     def list_due_applications(context: Context, day: date) -> List[InvestmentOrder]:
-        """Aplicações com vencimento até o dia e que nenhuma liquidação devolveu ainda (RN-FEC-09).
-
-        Só a aplicação em produto com prazo tem maturity_date, então o filtro de data já basta.
-        """
         return (
             context.db_session.query(InvestmentOrder)
             .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
@@ -72,7 +66,6 @@ class InvestmentOrderRepository:
 
     @staticmethod
     def latest_open_maturity(context: Context, account_id: int, product_id: int) -> Optional[date]:
-        """O vencimento mais distante entre as aplicações deste produto ainda não liquidadas."""
         return (
             context.db_session.query(func.max(InvestmentOrder.maturity_date))
             .join(Transaction, InvestmentOrder.transaction_id == Transaction.id)
@@ -86,7 +79,6 @@ class InvestmentOrderRepository:
 
     @staticmethod
     def not_settled(context: Context):
-        """Filtro: a aplicação ainda não foi devolvida por nenhuma liquidação de vencimento."""
         settlement = aliased(InvestmentOrder)
         already_settled = context.db_session.query(settlement.id).filter(
             settlement.matured_investment_order_id == InvestmentOrder.id
@@ -97,7 +89,6 @@ class InvestmentOrderRepository:
 class PositionRepository:
     @staticmethod
     def get_for_update(context: Context, account_id: int, product_id: int) -> Optional[Position]:
-        # populate_existing: relê quantidade e custo depois que a trava é concedida.
         return (
             context.db_session.query(Position)
             .filter(Position.account_id == account_id, Position.product_id == product_id)
@@ -125,7 +116,6 @@ class PositionRepository:
 
     @staticmethod
     def list_by_account(context: Context, account_id: int, include_closed: bool = False) -> List[Position]:
-        """As posições da conta; as zeradas só com include_closed."""
         query = context.db_session.query(Position).filter(Position.account_id == account_id)
 
         if not include_closed:
@@ -135,7 +125,6 @@ class PositionRepository:
 
     @staticmethod
     def sum_by_product(context: Context) -> List[Tuple[int, Decimal, int]]:
-        """Por produto, as cotas e o custo somados de todas as contas: a foto do fechamento (RN-REC-05 e 06)."""
         rows = (
             context.db_session.query(
                 Position.product_id, func.sum(Position.quantity), func.sum(Position.acquisition_cost_amount)

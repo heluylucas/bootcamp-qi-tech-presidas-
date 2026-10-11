@@ -3,13 +3,10 @@ from sqlalchemy import Column, Date, DateTime, Enum, Integer, func
 from models.base import Base
 
 
-# Espelho do tipo ENUM do database.sql.
 ReferenceRateCode = Enum("CDI", "SELIC", name="reference_rate_code")
 
 
 class ReferenceRate(Base):
-    """CDI ou Selic de um dia, em pontos-base ao ano (RN-REC-08). Nunca alterada."""
-
     __tablename__ = "reference_rate"
 
     id = Column(Integer, primary_key=True)

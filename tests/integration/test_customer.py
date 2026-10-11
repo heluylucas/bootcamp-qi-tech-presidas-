@@ -17,7 +17,6 @@ def customer_payload(**overrides) -> dict:
 
 
 def masked(cpf: str) -> str:
-    """'123.456.789-09' vira '***.456.789-**' (RN-GER-10)."""
     return f"***{cpf[3:11]}-**"
 
 
@@ -84,8 +83,6 @@ class TestCreateCustomer:
         assert body["code"] == "PPP001002"
 
     def test_underage(self):
-        # Dia 1 do mês, 17 anos atrás: menor de idade em qualquer dia do ano,
-        # e sem o risco de cair num 29 de fevereiro que não existe.
         birth_date = date.today().replace(year=date.today().year - 17, day=1)
 
         status, body = RequestGenerator.post_customer(customer_payload(birth_date=birth_date.isoformat()))

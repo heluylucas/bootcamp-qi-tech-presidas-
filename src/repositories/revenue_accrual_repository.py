@@ -16,7 +16,6 @@ class RevenueAccrualRepository:
 
     @staticmethod
     def list_between(context: Context, from_date: date, to_date: date) -> List[RevenueAccrual]:
-        """As provisões dos dias fechados no período, do mais antigo para o mais novo."""
         return (
             context.db_session.query(RevenueAccrual)
             .filter(RevenueAccrual.business_date >= from_date, RevenueAccrual.business_date <= to_date)

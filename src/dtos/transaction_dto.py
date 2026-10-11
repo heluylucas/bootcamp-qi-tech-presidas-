@@ -4,12 +4,10 @@ from models import Account, LedgerEntry, Transaction
 from utils.dates import to_utc_text
 
 
-# Nestes tipos o dinheiro entra na conta dona vindo "de fora": ela é o destino, e não há origem.
 INCOMING_TYPES = ("DEPOSIT", "INVESTMENT_REDEEM")
 
 
 def transaction_to_dict(transaction: Transaction, balance: int) -> dict:
-    """`balance` é o saldo da conta do caminho logo depois desta transação."""
     return {
         "transaction_key": transaction.transaction_key,
         "type": transaction.type,
@@ -22,7 +20,6 @@ def transaction_to_dict(transaction: Transaction, balance: int) -> dict:
 
 
 def entry_to_dict(entry: LedgerEntry) -> dict:
-    """Uma linha do extrato, do ponto de vista da conta do lançamento (RN-MOV-12)."""
     transaction = entry.transaction
     return {
         "transaction_key": transaction.transaction_key,
@@ -39,7 +36,6 @@ def entry_to_dict(entry: LedgerEntry) -> dict:
 
 
 def receipt_to_dict(transaction: Transaction) -> dict:
-    """O comprovante (RN-MOV-13). Sem saldo: o destino não pode ver o saldo da origem."""
     if transaction.type in INCOMING_TYPES:
         origin, destination = None, transaction.owner_account
     else:
@@ -59,7 +55,6 @@ def receipt_to_dict(transaction: Transaction) -> dict:
 
 
 def counterparty_key(transaction: Transaction, account_id: int) -> Optional[str]:
-    """A OUTRA conta da transação; None quando o dinheiro veio ou foi para fora (depósito, saque)."""
     if transaction.owner_account_id == account_id:
         return account_key_or_none(transaction.destination_account)
 

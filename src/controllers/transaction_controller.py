@@ -24,18 +24,14 @@ from repositories import AccountRepository, BusinessDayRepository, TransactionRe
 from utils.dates import parse_date
 
 
-# Limite por operação, em centavos (RN-MOV-02).
 AMOUNT_LIMITS = {
     "DEPOSIT": 100_000_000,
     "WITHDRAWAL": 500_000,
     "TRANSFER": 5_000_000,
 }
 
-# Tarifa fixa da transferência, em centavos (RN-MOV-10). O valor cobrado fica
-# gravado em transaction.fee_amount: se mudar aqui, o histórico não muda.
 TRANSFER_FEE = 200
 
-# Paginação do extrato (RN-GER-11). O máximo de 100 fica no schema.
 DEFAULT_PAGE = 1
 DEFAULT_LIMIT = 20
 
@@ -45,7 +41,6 @@ class TransactionController(BaseController):
         super().__init__(__name__)
 
     def create(self, customer_key: str, account_key: str, payload: dict, idempotency_key: Optional[str]) -> Tuple[dict, bool]:
-        """Devolve (resposta, criada). criada=False é a repetição de um pedido já feito."""
         idempotency_key = parse_idempotency_key(idempotency_key)
         transaction_type = payload["type"]
         amount = payload["amount"]
@@ -69,15 +64,11 @@ class TransactionController(BaseController):
             if destination.id == origin.id:
                 raise SameAccountTransfer()
 
-            # A tarifa entra na conta do banco, que também é escrita e por isso também é travada.
             bank = AccountRepository.get_bank(self.context)
 
-        # Daqui em diante, status e saldo são lidos com as contas travadas (RN-MOV-08).
         origin, destination, bank = self.lock_accounts(origin, destination, bank)
 
-        # Idempotência DEPOIS da trava (rfc_fluxos): um reenvio que chega enquanto o
-        # original roda espera a trava e encontra a transação já gravada, em vez de
-        # ver o saldo debitado e levar um falso "saldo insuficiente".
+        # Depois da trava: um reenvio simultâneo espera o original e o encontra gravado.
         previous = self.find_repetition(idempotency_key, origin)
 
         if previous is not None:
@@ -110,7 +101,6 @@ class TransactionController(BaseController):
         return transaction_to_dict(transaction, balance), True
 
     def list_statement(self, customer_key: str, account_key: str, query_params: dict) -> dict:
-        """Extrato (RN-MOV-12). Conta bloqueada ou encerrada continua consultando (RN-CON-09)."""
         from_date = parse_date(query_params.get("from"), "from")
         to_date = parse_date(query_params.get("to"), "to")
 
@@ -121,14 +111,12 @@ class TransactionController(BaseController):
         limit = int(query_params.get("limit", DEFAULT_LIMIT))
         account = self.get_owned_account(customer_key, account_key)
 
-        # Datas do calendário do banco (o dia de movimento de cada transação), com as duas pontas inclusas.
         entries, total = TransactionRepository.list_entries(
             self.context, account.id, query_params.get("type"), from_date, to_date, (page - 1) * limit, limit
         )
         return {"items": [entry_to_dict(entry) for entry in entries], "page": page, "limit": limit, "total": total}
 
     def get_receipt(self, customer_key: str, account_key: str, transaction_key: str) -> dict:
-        """Comprovante (RN-MOV-13): só para a origem ou o destino da transação."""
         account = self.get_owned_account(customer_key, account_key)
         transaction = TransactionRepository.get_by_key_for_account(self.context, transaction_key, account.id)
 
@@ -138,13 +126,6 @@ class TransactionController(BaseController):
         return receipt_to_dict(transaction)
 
     def lock_accounts(self, *accounts: Optional[Account]) -> List[Optional[Account]]:
-        """Trava as contas sempre em ordem crescente de id e as devolve na ordem recebida (None fica None).
-
-        Se A -> B e B -> A chegassem juntas e cada uma travasse primeiro a
-        própria origem, cada uma seguraria uma conta esperando a outra para
-        sempre (deadlock). Na mesma ordem, as duas disputam a mesma primeira trava.
-        A conta do banco tem o menor id, então é sempre a primeira.
-        """
         locked = {}
         for account in sorted((account for account in accounts if account), key=lambda account: account.id):
             locked[account.id] = AccountRepository.get_by_id_for_update(self.context, account.id)
@@ -172,8 +153,6 @@ class TransactionController(BaseController):
         description: Optional[str],
         idempotency_key: str,
     ) -> Tuple[Transaction, int]:
-        """Um pedido, quatro lançamentos: principal e tarifa saem da origem, o principal entra
-        no destino e a tarifa entra na conta do banco. Cada débito tem o seu crédito."""
         transaction = self.create_transaction(
             "TRANSFER", origin, destination, amount, TRANSFER_FEE, description, idempotency_key
         )
@@ -187,11 +166,6 @@ class TransactionController(BaseController):
         return transaction, after_fee
 
     def find_repetition(self, idempotency_key: str, account: Account) -> Optional[Transaction]:
-        """A transação já gravada com esta chave nesta conta; None se a chave é nova.
-
-        A chave é única no banco inteiro. Achada em outra conta, é pedido de outro: 409, sem
-        mostrar nada dele (R8). Quem chama ainda confere se o pedido é idêntico ao gravado.
-        """
         previous = TransactionRepository.get_by_idempotency_key(self.context, idempotency_key)
 
         if previous is not None and previous.owner_account_id != account.id:
@@ -210,13 +184,9 @@ class TransactionController(BaseController):
         idempotency_key: Optional[str],
         business_date: Optional[date] = None,
     ) -> Transaction:
-        # O dia da transação no calendário do banco: a data de movimento atual, salvo quando quem
-        # chama já sabe o dia (a liquidação no fechamento grava no dia que está abrindo).
         if business_date is None:
             business_date = BusinessDayRepository.get_current(self.context).business_date
 
-        # Dois pedidos com a mesma chave em contas diferentes, ao mesmo tempo, passam os dois
-        # pelo find_repetition (cada um trava só a sua conta); o UNIQUE recusa o segundo aqui.
         try:
             return TransactionRepository.create(
                 self.context,
@@ -229,11 +199,11 @@ class TransactionController(BaseController):
                 idempotency_key=idempotency_key,
                 business_date=business_date,
             )
+        # Mesma chave em contas diferentes ao mesmo tempo: o UNIQUE barra a segunda.
         except IntegrityError:
             raise IdempotencyKeyReused()
 
     def add_entry(self, transaction: Transaction, account: Account, direction: str, category: str, amount: int, balance_after: int) -> None:
-        """Grava o lançamento e leva o saldo da conta junto: os dois nunca se separam."""
         TransactionRepository.create_ledger_entry(
             self.context, transaction.id, account.id, direction, category, amount, balance_after
         )
@@ -241,10 +211,6 @@ class TransactionController(BaseController):
 
 
 def is_same_transaction(previous: Transaction, payload: dict, destination: Optional[Account]) -> bool:
-    """O pedido repetido é idêntico ao gravado? Compara o corpo com as colunas da transação.
-
-    Faz o papel do antigo hash do corpo sem guardar nada a mais: o pedido original já está gravado.
-    """
     return (
         previous.type == payload["type"]
         and previous.amount == payload["amount"]
@@ -254,11 +220,6 @@ def is_same_transaction(previous: Transaction, payload: dict, destination: Optio
 
 
 def parse_idempotency_key(idempotency_key: Optional[str]) -> str:
-    """A chave em formato canônico. Ausente, vazia ou fora do formato UUID: 400.
-
-    Quem gera a chave é quem chama a API, um UUID novo por pedido; reenviar o mesmo pedido
-    com a mesma chave é o que faz o banco devolver a resposta original em vez de repetir.
-    """
     try:
         return str(uuid.UUID(idempotency_key))
     except (TypeError, ValueError):

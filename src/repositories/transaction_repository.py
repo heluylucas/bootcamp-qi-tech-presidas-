@@ -12,12 +12,10 @@ from models import LedgerEntry, Transaction
 class TransactionRepository:
     @staticmethod
     def get_by_idempotency_key(context: Context, idempotency_key: str) -> Optional[Transaction]:
-        # A chave é única no banco inteiro: a busca não filtra por dono, quem confere é o controller.
         return context.db_session.query(Transaction).filter(Transaction.idempotency_key == idempotency_key).first()
 
     @staticmethod
     def get_balance_after(context: Context, transaction_id: int, account_id: int) -> Optional[int]:
-        """O saldo da conta logo depois desta transação: o do último lançamento dela ali."""
         entry = (
             context.db_session.query(LedgerEntry)
             .filter(LedgerEntry.transaction_id == transaction_id, LedgerEntry.account_id == account_id)
@@ -37,10 +35,6 @@ class TransactionRepository:
         offset: int,
         limit: int,
     ) -> Tuple[List[LedgerEntry], int]:
-        """Uma página do extrato e o total de lançamentos que passam pelos filtros.
-
-        As datas são do calendário do banco (o business_date da transação), com as duas pontas inclusas.
-        """
         query = (
             context.db_session.query(LedgerEntry)
             .join(Transaction, LedgerEntry.transaction_id == Transaction.id)
@@ -57,7 +51,6 @@ class TransactionRepository:
             query = query.filter(Transaction.business_date <= to_date)
 
         total = query.count()
-        # Os lançamentos de uma transação nascem com o mesmo NOW(); o id desempata.
         entries = (
             query.options(joinedload(LedgerEntry.transaction))
             .order_by(LedgerEntry.created_at.desc(), LedgerEntry.id.desc())
@@ -70,7 +63,6 @@ class TransactionRepository:
 
     @staticmethod
     def sum_credits(context: Context, account_id: int, category: str, from_date: date, to_date: date) -> int:
-        """Soma dos créditos da categoria na conta, nos dias de movimento do período (as duas pontas)."""
         total = (
             context.db_session.query(func.sum(LedgerEntry.amount))
             .join(Transaction, LedgerEntry.transaction_id == Transaction.id)
@@ -88,7 +80,6 @@ class TransactionRepository:
 
     @staticmethod
     def get_by_key_for_account(context: Context, transaction_key: str, account_id: int) -> Optional[Transaction]:
-        # Só se a conta participou (dona ou destino): a de fora volta None, igual à inexistente (R8).
         return (
             context.db_session.query(Transaction)
             .filter(

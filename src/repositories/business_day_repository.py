@@ -8,7 +8,6 @@ from models import BusinessDay
 class BusinessDayRepository:
     @staticmethod
     def get_current(context: Context) -> Optional[BusinessDay]:
-        # A data de movimento é a maior business_date (RN-GER-13).
         return context.db_session.query(BusinessDay).order_by(BusinessDay.business_date.desc()).first()
 
     @staticmethod

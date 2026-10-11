@@ -4,7 +4,6 @@ from sqlalchemy.orm import relationship
 from models.base import Base
 
 
-# Espelho dos tipos ENUM do database.sql: o banco recusa qualquer valor fora da lista.
 TransactionType = Enum(
     "DEPOSIT", "WITHDRAWAL", "TRANSFER", "INVESTMENT_APPLY", "INVESTMENT_REDEEM", name="transaction_type"
 )
@@ -13,23 +12,17 @@ EntryCategory = Enum("PRINCIPAL", "FEE", name="entry_category")
 
 
 class Transaction(Base):
-    """O pedido: o que o cliente pediu. Os efeitos em cada conta ficam no LedgerEntry."""
-
     __tablename__ = "transaction"
 
     id = Column(Integer, primary_key=True)
     transaction_key = Column(CHAR(36), nullable=False, unique=True)
     type = Column(TransactionType, nullable=False)
-    # A dona do pedido: a conta que pediu (no depósito e no resgate, a que recebe).
     owner_account_id = Column(Integer, ForeignKey("account.id"), nullable=False)
-    # Só na transferência, e nela sempre: a conta que recebe.
     destination_account_id = Column(Integer, ForeignKey("account.id"))
     amount = Column(BigInteger, nullable=False)
     fee_amount = Column(BigInteger, nullable=False, server_default="0")
     description = Column(String(140))
-    # Única no banco inteiro; nula quando o próprio banco cria a transação.
     idempotency_key = Column(Uuid(as_uuid=False), unique=True)
-    # O dia da transação no calendário do banco (a data de movimento).
     business_date = Column(Date, ForeignKey("business_day.business_date"), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -38,8 +31,6 @@ class Transaction(Base):
 
 
 class LedgerEntry(Base):
-    """O lançamento: o que aconteceu em UMA conta. Uma transferência gera quatro."""
-
     __tablename__ = "ledger_entry"
 
     id = Column(Integer, primary_key=True)

@@ -56,7 +56,6 @@ class ClientRequisition:
             response=response,
         )
 
-        # R5 em toda resposta de todo teste (ver tests/utils/internal_id.py).
         assert_no_internal_id(base_response.response_json, endpoint)
         return base_response
 
@@ -84,4 +83,3 @@ class BaseConnectorResponse:
         except Exception as ex:
             print(ex)
             ...
-            # logger warning

@@ -8,13 +8,10 @@ OPERATOR_TOKEN = environ.get("OPERATOR_TOKEN", "default_operator_token")
 
 HEADERS = {"INTERNAL-TOKEN": INTERNAL_TOKEN}
 
-# As rotas /internal/... são da operação do banco e pedem também o token de operador (RN-GER-14).
 OPERATOR_HEADERS = {**HEADERS, "OPERATOR-TOKEN": OPERATOR_TOKEN}
 
 
 class RequestGenerator:
-    """Uma chamada por rota da API, cada uma devolvendo (status, json)."""
-
     @staticmethod
     def get_business_date():
         response = ClientRequisition.send("GET", "/internal/business_date", headers=OPERATOR_HEADERS)
@@ -34,7 +31,6 @@ class RequestGenerator:
 
     @staticmethod
     def patch_internal_account_status(account_key: str, payload: dict, operator_token=OPERATOR_TOKEN):
-        """A rota do banco (RN-CON-11). operator_token=None não manda o cabeçalho: é assim que se testa o 403."""
         headers = dict(HEADERS)
         if operator_token is not None:
             headers["OPERATOR-TOKEN"] = operator_token
@@ -116,7 +112,6 @@ class RequestGenerator:
 
     @staticmethod
     def post_transaction(customer_key: str, account_key: str, payload: dict, idempotency_key):
-        """idempotency_key=None não manda o cabeçalho: é assim que se testa a falta dele."""
         endpoint = f"/customer/{customer_key}/account/{account_key}/transaction"
         headers = dict(HEADERS)
         if idempotency_key is not None:
@@ -138,7 +133,6 @@ class RequestGenerator:
 
     @staticmethod
     def post_investment_order(customer_key: str, account_key: str, payload: dict, idempotency_key):
-        """idempotency_key=None não manda o cabeçalho: é assim que se testa a falta dele."""
         endpoint = f"/customer/{customer_key}/account/{account_key}/investment_order"
         headers = dict(HEADERS)
         if idempotency_key is not None:

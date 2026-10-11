@@ -13,10 +13,8 @@ TREASURY_BONDS = {
 CDI_SERIES = 4389
 SELIC_SERIES = 1178
 
-# Ganha do cenário da demonstração, que o mock-init ensina sem prioridade.
 TEST_PRIORITY = 10
 
-# Os números redondos que o teste usa quando não pede outro.
 DEFAULT_FUND_QUOTE = "102.00"
 DEFAULT_TREASURY_PRICES = {name: "120.00" for name in TREASURY_BONDS}
 DEFAULT_CDI = "14.90"
@@ -26,9 +24,6 @@ SERVICES = ("fund", "treasury", "cdi", "selic")
 
 
 class PriceSourceMock:
-    # Toda resposta daqui vale para UMA chamada: depois que a API a consome,
-    # o mock volta ao cenário da demonstração.
-
     @staticmethod
     def teach_day(
         day: date,
@@ -38,10 +33,6 @@ class PriceSourceMock:
         selic: str = DEFAULT_SELIC,
         skip: Optional[str] = None,
     ) -> None:
-        # Não apaga nada: cada resposta de teste tem um id fixo por fonte e dia
-        # (expectation_id_for), e ensinar de novo SUBSTITUI a anterior. Assim a
-        # sobra de um teste que falhou no meio some, e o cenário da demonstração
-        # que o mock-init ensinou continua lá para as próximas rodadas da suíte.
         if skip != "fund":
             PriceSourceMock.fund_quote(day, fund)
         if skip != "treasury":
@@ -53,17 +44,14 @@ class PriceSourceMock:
 
     @staticmethod
     def fund_quote(day: date, unit_price: str, quote_date: Optional[date] = None) -> None:
-        """Administradora: a cota do FGV Quant Capital. `quote_date` diferente simula data errada."""
         PriceSourceMock.answer("fund", day, fund_quote_body(quote_date or day, unit_price))
 
     @staticmethod
     def treasury_prices(day: date, unit_prices: Dict[str, str]) -> None:
-        """Tesouro: o preço de cada título, pelo nome (o price_source_code do produto)."""
         PriceSourceMock.answer("treasury", day, treasury_body(day, unit_prices))
 
     @staticmethod
     def answer(service: str, day: date, body, status_code: int = 200) -> None:
-        """Qualquer corpo, inclusive um sem sentido, para um dos SERVICES."""
         path, query_params = request_of(service, day)
         expectation = BaseExpectation.generate_expectation(
             "GET",
@@ -79,12 +67,10 @@ class PriceSourceMock:
 
     @staticmethod
     def server_error(service: str, day: date) -> None:
-        """A fonte respondeu, e respondeu que quebrou (500)."""
         PriceSourceMock.answer(service, day, {"message": "internal error"}, status_code=500)
 
     @staticmethod
     def connection_dropped(service: str, day: date) -> None:
-        """A conexão cai sem resposta nenhuma: o mesmo caminho de fora do ar ou timeout."""
         path, query_params = request_of(service, day)
         expectation = BaseExpectation.generate_error(
             "GET",
@@ -99,12 +85,10 @@ class PriceSourceMock:
 
 
 def expectation_id_for(service: str, day: date) -> str:
-    """Um id por fonte e dia: o MockServer troca a expectativa de mesmo id em vez de empilhar."""
     return f"test-{service}-{day.isoformat()}"
 
 
 def request_of(service: str, day: date):
-    """Caminho e query que a API usa para perguntar a cada fonte."""
     if service == "fund":
         return f"/fund-admin/funds/{FUND_CNPJ}/quotes", {"date": [day.isoformat()]}
     if service == "treasury":
@@ -115,7 +99,6 @@ def request_of(service: str, day: date):
 
 
 def fund_quote_body(day: date, unit_price: str) -> dict:
-    # Campos do Informe Diário da CVM.
     return {
         "CNPJ_FUNDO": "12.345.678/0001-95",
         "DT_COMPTC": day.isoformat(),

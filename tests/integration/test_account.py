@@ -7,12 +7,10 @@ from tests.utils.helpers import create_customer, deposit, open_account
 
 
 def customer_change(customer_key: str, account_key: str, status: str, reason: str = "motivo de teste"):
-    """Rota do cliente: ele só pode encerrar (RN-CON-11)."""
     return RequestGenerator.patch_account(customer_key, account_key, {"status": status, "reason": reason})
 
 
 def bank_change(account_key: str, status: str, reason: str = "motivo de teste"):
-    """Rota do banco, com o token de operador: bloqueia, desbloqueia e encerra (RN-CON-11)."""
     return RequestGenerator.patch_internal_account_status(account_key, {"status": status, "reason": reason})
 
 
@@ -31,7 +29,6 @@ class TestOpenAccount:
         assert len(body["account_key"]) == 36
         assert body["status"] == "ACTIVE"
         assert body["balance"] == 0
-        # Conta nova: nada investido, o capital total é o próprio saldo.
         assert body["investments_amount"] == 0
         assert body["net_worth_amount"] == 0
         assert "created_at" in body
@@ -89,11 +86,6 @@ class TestGetAccount:
         assert body["code"] == "PPP002001"
 
     def test_account_of_another_customer(self):
-        """R8: a conta existe, mas não é deste cliente. Resposta igual à de inexistente.
-
-        O PATCH pede BLOCKED (ação do banco) e mesmo assim sai 404: o dono é
-        conferido antes de tudo (RN-CON-11), então nem o 403 vaza que a conta existe.
-        """
         _, account_key = open_account()
         other_customer_key = create_customer()
 
@@ -107,8 +99,6 @@ class TestGetAccount:
 
 
 class TestCustomerChangesStatus:
-    """RN-CON-11: pela rota do cliente, só encerrar."""
-
     def test_customer_closes_empty_account(self):
         customer_key, account_key = open_account()
 
@@ -136,7 +126,6 @@ class TestCustomerChangesStatus:
         assert status_of(customer_key, account_key) == "ACTIVE"
 
     def test_customer_cannot_unblock(self):
-        """O problema que motivou a regra: quem foi bloqueado pelo banco não se desbloqueia sozinho."""
         customer_key, account_key = open_account()
         bank_change(account_key, "BLOCKED", "suspeita de fraude")
 
@@ -147,7 +136,6 @@ class TestCustomerChangesStatus:
         assert status_of(customer_key, account_key) == "BLOCKED"
 
     def test_reserved_action_checked_before_reason(self):
-        """Pedir BLOCKED sem motivo: a ação reservada ao banco é o erro que sai, não a falta de motivo."""
         customer_key, account_key = open_account()
 
         status, body = RequestGenerator.patch_account(customer_key, account_key, {"status": "BLOCKED"})
@@ -203,8 +191,6 @@ class TestCustomerChangesStatus:
 
 
 class TestBankChangesStatus:
-    """RN-CON-11: a rota interna, com o token de operador, bloqueia, desbloqueia e encerra."""
-
     def test_block_and_unblock(self):
         _, account_key = open_account()
 
@@ -264,7 +250,6 @@ class TestBankChangesStatus:
         assert body["code"] == "PPP002006"
 
     def test_transition_checked_before_reason(self):
-        """Conta CLOSED e sem motivo: a transição proibida é o erro que sai."""
         _, account_key = open_account()
         bank_change(account_key, "CLOSED")
 
@@ -300,7 +285,6 @@ class TestBankChangesStatus:
 
     @pytest.mark.parametrize("operator_token", [None, "token-errado"], ids=["missing", "wrong"])
     def test_requires_operator_token(self, operator_token):
-        """RN-GER-14: sem o token de operador, quem tem só o INTERNAL-TOKEN (o cliente) não entra."""
         customer_key, account_key = open_account()
         RequestGenerator.patch_internal_account_status(account_key, {"status": "BLOCKED", "reason": "teste"})
 

@@ -1,51 +1,8 @@
-"""Os erros da API: o formato de toda resposta ruim, e a trava do start.
-
-Este arquivo define UMA coisa e protege OUTRA.
-
-A coisa que ele define é o `QIException`, lá embaixo: o formato de toda
-resposta de erro que sai desta API. Qualquer erro — 400, 403, 404, 409,
-422, 500 — sai com os mesmos cinco campos, sempre:
-
-    title        o nome do erro, em inglês, pra quem programa
-    description  o que aconteceu, com detalhe
-    translation  a frase em português, pronta pra mostrar ao usuário
-    code         o identificador estável (PPP000001, PPP001002, ...)
-    http_status  o número do HTTP
-
-Cinco campos e não um texto solto porque quem integra com a API precisa
-programar em cima de ALGO. Se o combinado fosse a mensagem, mudar uma
-palavra quebraria o cliente de alguém. O `code` existe pra ser o
-contrato: ele nunca muda, e o texto pode melhorar à vontade.
-
-Os erros genéricos (PPP000...) moram aqui — os que toda API tem. Os das
-regras deste projeto (PPP001...) moram em custom_errors.py, ao lado.
-"""
 import sys
 import inspect
 
 
 def error_verification():
-    """Derruba a aplicação no start se dois erros usarem o mesmo código.
-
-    A coisa que este arquivo PROTEGE. Ela roda uma vez, na subida da
-    API (veja src/app.py), e faz uma coisa incomum: olha o próprio
-    código de dentro. O `inspect.getmembers` lista todas as classes já
-    carregadas do pacote `errors`, separa as que herdam de QIException
-    e confere se algum `code` aparece duas vezes. Se aparecer, levanta
-    e a API NÃO SOBE.
-
-    Parece exagero derrubar tudo por causa disso. Não é. Código
-    repetido é o pior tipo de bug de contrato: nada quebra, nada
-    reclama, e um cliente lá fora passa a tratar dois erros diferentes
-    como se fossem o mesmo — descobrindo só quando o comportamento dele
-    estiver errado em produção. Falhar no start é a forma mais barata
-    de descobrir: custa trinta segundos de quem escreveu o código, em
-    vez de uma investigação de quem nem sabia do problema.
-
-    Experimente: dê a um erro de custom_errors.py um código que já
-    existe e suba a API. Ela não sobe, e a mensagem diz quais duas
-    classes brigaram.
-    """
     clsmembers = inspect.getmembers(sys.modules["errors"], inspect.isclass)
 
     errors_dict = dict()
@@ -66,14 +23,6 @@ def error_verification():
 
 
 class QIException(Exception):
-    """A mãe de todo erro desta API — o formato descrito lá em cima.
-
-    Ninguém levanta esta classe direto. Cada erro concreto herda dela,
-    fixa o próprio `code` como atributo de classe e preenche os outros
-    quatro campos no __init__. Veja os exemplos aqui embaixo e, para os
-    erros de negócio, o custom_errors.py.
-    """
-
     def __init__(self, title, code, http_status, description, translation) -> None:
         self.title = title
         self.description = description

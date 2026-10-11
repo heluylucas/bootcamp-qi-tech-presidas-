@@ -10,8 +10,6 @@ from models import SuitabilityAnswer, SuitabilityAssessment, SuitabilityQuestion
 class SuitabilityRepository:
     @staticmethod
     def list_questions(context: Context) -> List[SuitabilityQuestion]:
-        # selectinload: as opções de todas as perguntas vêm numa segunda
-        # consulta só, em vez de uma consulta por pergunta.
         return (
             context.db_session.query(SuitabilityQuestion)
             .options(selectinload(SuitabilityQuestion.options))
@@ -39,8 +37,6 @@ class SuitabilityRepository:
 
     @staticmethod
     def get_latest(context: Context, customer_id: int) -> Optional[SuitabilityAssessment]:
-        # Pelo id e não pelo created_at: duas respostas no mesmo instante
-        # empatariam na hora, mas o id sempre cresce.
         return (
             context.db_session.query(SuitabilityAssessment)
             .filter(SuitabilityAssessment.customer_id == customer_id)

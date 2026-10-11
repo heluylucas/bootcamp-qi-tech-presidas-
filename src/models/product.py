@@ -16,7 +16,6 @@ from sqlalchemy import (
 from models.base import Base
 
 
-# Espelho dos tipos ENUM do database.sql: o banco recusa qualquer valor fora da lista.
 ProductType = Enum("PUBLIC_BOND", "PRIVATE_BOND", "FUND", name="product_type")
 ProductIndexer = Enum("SELIC", "CDI", "PREFIXED", "IPCA", "QUOTA", name="product_indexer")
 
@@ -46,6 +45,5 @@ class ProductPrice(Base):
     id = Column(Integer, primary_key=True)
     product_id = Column(Integer, ForeignKey("product.id"), nullable=False)
     price_date = Column(Date, nullable=False)
-    # NUMERIC volta como Decimal, nunca float (R6).
     unit_price = Column(Numeric(20, 8), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

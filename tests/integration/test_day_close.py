@@ -20,7 +20,6 @@ class TestDayClose:
         assert current["business_date"] == body["business_date"]
 
     def test_friday_closes_to_monday(self):
-        # A data de movimento é uma só e só anda: fecha até cair numa sexta.
         while business_date().weekday() != 4:
             assert close_day()[0] == 201
 
@@ -49,15 +48,12 @@ class TestDayClose:
         assert selic["price"]["unit_price"] == "123.45000000"
 
     def test_own_issue_grows_by_cdi_of_the_closing_day(self):
-        # O primeiro fechamento abre um dia com CDI de 12%; o segundo fecha esse dia
-        # e abre outro com 20%. O CDB do segundo fechamento rende pelos 12%.
         assert close_day(cdi="12.00")[0] == 201
         previous = Decimal(product(CDB)["price"]["unit_price"])
 
         status, _ = close_day(cdi="20.00")
 
         assert status == 201
-        # CDB = preço anterior × (1 + c × 95%), c = CDI de um dia útil (RN-FEC-05).
         daily_cdi = (Decimal("1.12") ** (Decimal(1) / Decimal(252))) - 1
         expected = (previous * (1 + daily_cdi * Decimal("0.95"))).quantize(Decimal("0.00000001"), ROUND_HALF_UP)
         assert Decimal(product(CDB)["price"]["unit_price"]) == expected
@@ -92,8 +88,6 @@ class TestDayCloseRefused:
 
 
 class TestPriceSourceFailure:
-    """Tudo ou nada (RN-FEC-06): nada é gravado e a data não anda."""
-
     def assert_nothing_changed(self, today: date, fund_price: dict) -> None:
         assert business_date() == today
         assert product(FUND)["price"] == fund_price

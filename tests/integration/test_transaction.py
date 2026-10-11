@@ -16,7 +16,6 @@ from tests.utils.helpers import (
 )
 
 
-# Limites por operação (RN-MOV-02), em centavos.
 DEPOSIT_LIMIT = 100_000_000
 WITHDRAWAL_LIMIT = 500_000
 TRANSFER_LIMIT = 5_000_000
@@ -81,7 +80,6 @@ class TestWithdrawal:
 
 class TestTransfer:
     def test_transfer_charges_fee_only_from_origin(self):
-        """Exemplo do doc: A com R$ 1.000 e B com R$ 500; A transfere R$ 200."""
         origin_customer, origin_account = open_account()
         destination_customer, destination_account = open_account()
         deposit(origin_customer, origin_account, 100000)
@@ -98,7 +96,6 @@ class TestTransfer:
         assert balance_of(destination_customer, destination_account) == 70000
 
     def test_transfer_of_whole_balance_with_fee(self):
-        """O saque passa pela mesma conta de saldo (com tarifa zero): este limite vale pelos dois."""
         origin_customer, origin_account = open_account()
         _, destination_account = open_account()
         deposit(origin_customer, origin_account, 10000 + TRANSFER_FEE)
@@ -109,7 +106,6 @@ class TestTransfer:
         assert body["balance"] == 0
 
     def test_insufficient_balance_for_fee_changes_nothing(self):
-        """Tem o valor, mas não o valor mais a tarifa (RN-MOV-04)."""
         origin_customer, origin_account = open_account()
         destination_customer, destination_account = open_account()
         deposit(origin_customer, origin_account, 10000)
@@ -177,7 +173,6 @@ class TestTransfer:
         assert balance_of(destination_customer, destination_account) == TRANSFER_LIMIT
 
     def test_destination_of_other_customer_cannot_be_used_as_origin(self):
-        """R8: pagar alguém pode; mover dinheiro da conta de outro cliente, não."""
         _, victim_account = open_account()
         attacker_customer, attacker_account = open_account()
 
@@ -188,8 +183,6 @@ class TestTransfer:
 
 
 class TestIdempotency:
-    """RN-GER-08 e RN-MOV-09: repetir o mesmo pedido não repete o efeito."""
-
     def test_repeated_transfer_moves_money_once(self):
         origin_customer, origin_account = open_account()
         destination_customer, destination_account = open_account()
@@ -206,7 +199,6 @@ class TestIdempotency:
         assert balance_of(destination_customer, destination_account) == 20000
 
     def test_repetition_returns_balance_of_that_moment(self):
-        """A resposta repetida é a original, mesmo que a conta tenha mexido depois."""
         customer_key, account_key = open_account()
         key = str(uuid.uuid4())
         payload = {"type": "DEPOSIT", "amount": 10000}
@@ -220,7 +212,6 @@ class TestIdempotency:
         assert balance_of(customer_key, account_key) == 15000
 
     def test_key_used_by_another_account_is_refused(self):
-        """A chave é única no banco inteiro; a de outra conta dá 409 sem mostrar nada dela."""
         first_customer, first_account = open_account()
         second_customer, second_account = open_account()
         key = str(uuid.uuid4())
@@ -244,7 +235,6 @@ class TestIdempotency:
         ids=["other_amount", "other_destination", "other_type"],
     )
     def test_same_key_with_another_request(self, second_request):
-        """Repetição é o MESMO pedido: mesma chave com outro valor, destino ou tipo é outro pedido (409)."""
         origin_customer, origin_account = open_account()
         _, destination = open_account()
         _, other_destination = open_account()
@@ -274,7 +264,6 @@ class TestIdempotency:
         assert balance_of(customer_key, account_key) == 10000
 
     def test_refused_request_does_not_use_up_the_key(self):
-        """Recusa não grava nada; a mesma chave pode ser usada depois que der para executar."""
         customer_key, account_key = open_account()
         key = str(uuid.uuid4())
         payload = {"type": "WITHDRAWAL", "amount": 3000}
@@ -288,7 +277,6 @@ class TestIdempotency:
         assert body["balance"] == 7000
 
     def test_repetition_after_account_was_blocked(self):
-        """A repetição é conferida antes do status: devolve a original em vez de 409 (rfc_fluxos)."""
         customer_key, account_key = open_account()
         key = str(uuid.uuid4())
         payload = {"type": "DEPOSIT", "amount": 10000}
@@ -386,7 +374,6 @@ class TestTransactionRefusals:
         assert body["code"] == "PPP002005"
 
     def test_account_of_another_customer(self):
-        """R8: a conta existe, mas não é deste cliente. Resposta igual à de inexistente."""
         _, account_key = open_account()
         other_customer_key = create_customer()
 
@@ -417,10 +404,7 @@ def statement(customer_key: str, account_key: str, **query_params) -> list:
 
 
 class TestStatement:
-    """RN-MOV-12: o extrato lista os lançamentos da conta, do mais novo para o mais antigo."""
-
     def test_statement_rebuilds_balance(self):
-        """O invariante: saldo = soma dos créditos - soma dos débitos do extrato."""
         customer_key, account_key = open_account()
         other_customer, other_account = open_account()
         deposit(customer_key, account_key, 100000)
@@ -545,7 +529,6 @@ class TestStatement:
         assert [(item["type"], item["amount"]) for item in items] == [("WITHDRAWAL", 1000)]
 
     def test_filter_by_date(self):
-        """Datas de movimento (o calendário do banco), com as duas pontas inclusas."""
         customer_key, account_key = open_account()
         deposit(customer_key, account_key, 1000)
         today = business_date()
@@ -558,7 +541,6 @@ class TestStatement:
         assert statement(customer_key, account_key, to=yesterday) == []
 
     def test_statement_follows_the_business_day(self):
-        """O lançamento fica no dia de movimento em que aconteceu, mesmo depois do fechamento."""
         customer_key, account_key = open_account()
         deposit(customer_key, account_key, 1000)
         first_day = business_date()
@@ -572,7 +554,6 @@ class TestStatement:
         assert [(item["amount"], item["business_date"]) for item in second] == [(2000, second_day.isoformat())]
 
     def test_blocked_account_still_sees_statement(self):
-        """RN-CON-09: conta bloqueada não movimenta, mas consulta."""
         customer_key, account_key = open_account()
         deposit(customer_key, account_key, 1000)
         RequestGenerator.patch_internal_account_status(account_key, {"status": "BLOCKED", "reason": "teste"})
@@ -590,8 +571,6 @@ class TestStatement:
 
 
 class TestReceipt:
-    """RN-MOV-13: o comprovante só aparece para as contas que participaram da transação."""
-
     def test_origin_and_destination_see_the_receipt(self):
         origin_customer, origin_account = open_account()
         destination_customer, destination_account = open_account()
@@ -634,7 +613,6 @@ class TestReceipt:
         assert receipt["destination_account_key"] == account_key
 
     def test_account_not_involved(self):
-        """R8: a transação existe, mas não envolve esta conta. Resposta igual à de inexistente."""
         customer_key, account_key = open_account()
         _, created = deposit(customer_key, account_key, 1000)
         other_customer, other_account = open_account()

@@ -17,7 +17,6 @@ class TransactionResource:
         idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     ) -> JSONResponse:
         transaction, created = TransactionController().create(customer_key, account_key, payload, idempotency_key)
-        # Repetição idempotente: a resposta original, com 200 em vez de 201 (nada foi criado agora).
         status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
         return JSONResponse(content=transaction, status_code=status_code)
 

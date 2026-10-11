@@ -4,8 +4,6 @@ import requests
 
 
 class BaseExpectation:
-    """Monta uma "expectativa" do MockServer: quando chegar esta requisição, responda isto."""
-
     @staticmethod
     def generate_expectation(
         method: str,
@@ -33,7 +31,6 @@ class BaseExpectation:
         number_of_calls: int = None,
         priority: int = None,
     ) -> dict:
-        """Sem resposta nenhuma: por exemplo {"dropConnection": True} derruba a conexão."""
         expectation = BaseExpectation.general_configs(method, endpoint, query_params, number_of_calls, priority)
         expectation["httpError"] = error_json
         return expectation
@@ -53,14 +50,6 @@ class BaseExpectation:
 
 
 class Mock:
-    """Fala com o MockServer pela porta que o compose abriu na sua máquina.
-
-    De propósito, não existe `clear()` do mock inteiro: apagaria também o
-    cenário da demonstração que o mock-init ensinou. Os testes ensinam as
-    próprias respostas com prioridade maior, e elas ganham; uma resposta
-    ensinada com o mesmo `id` substitui a anterior em vez de empilhar.
-    """
-
     def __init__(self) -> None:
         host = os.environ.get("MOCK_HOST", os.environ.get("SERVER_LOCALHOST", "localhost"))
         port = os.environ.get("MOCK_PORT", "1080")
@@ -73,5 +62,4 @@ class Mock:
             raise Exception(f"O mock em {self.url} recusou a expectativa: {response.text}")
 
     def get(self, endpoint: str, query_params: dict = None) -> requests.Response:
-        """Chama o mock como a API vai chamar: serve para conferir o que ele responde."""
         return requests.get(f"{self.base_url}{endpoint}", params=query_params)

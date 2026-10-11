@@ -18,10 +18,6 @@ def business_days_ahead(day: date, count: int) -> date:
     return day
 
 
-# O mock-init ensina 60 dias úteis a partir da data real em que o compose
-# subiu. Os testes ensinam respostas próprias por cima (com id fixo, sem
-# apagar o cenário), então qualquer dia dessa janela serve: 30 dias úteis
-# depois de hoje.
 FAR_DAY = business_days_ahead(date.today(), 30)
 
 
@@ -30,8 +26,6 @@ def fund_quote(day: date):
 
 
 class TestDemoScenario:
-    """O que o mock-init deixou ensinado quando o compose subiu."""
-
     def test_fund_quote(self):
         response = fund_quote(FAR_DAY)
 

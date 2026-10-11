@@ -19,13 +19,11 @@ from tests.utils.helpers import (
 
 
 def customer_with_profile(option: int) -> tuple:
-    """Cliente que respondeu o questionário inteiro com a mesma opção. Devolve a key e a avaliação."""
     customer_key = create_customer()
     return customer_key, answer_profile(customer_key, option)
 
 
 def suggest(customer_key: str, amount: int):
-    # Na query string tudo é texto: o 1000000 viaja como "1000000".
     return RequestGenerator.get_portfolio_suggestion(customer_key, {"amount": str(amount)})
 
 
@@ -37,19 +35,14 @@ class TestPortfolioSuggestion:
     @pytest.mark.parametrize(
         "option, profile, amount, expected",
         [
-            # R$ 10.000,00: a divisão sai redonda.
             (CONSERVATIVE, "CONSERVATIVE", 1000000, {SELIC: 500000, CDB: 300000, LCI: 200000}),
             (MODERATE, "MODERATE", 1000000, {SELIC: 250000, CDB: 200000, PREFIXED: 200000, IPCA: 200000, FUND: 150000}),
-            # R$ 1.000,01: sobra 1 centavo do arredondamento, que vai para o maior peso (Selic).
             (MODERATE, "MODERATE", 100001, {SELIC: 25001, CDB: 20000, PREFIXED: 20000, IPCA: 20000, FUND: 15000}),
-            # 100.003 centavos: os pisos somam 100.001 e os 2 que sobram vão para o fundo (40%, o maior peso).
             (AGGRESSIVE, "AGGRESSIVE", 100003, {SELIC: 10000, PREFIXED: 20000, IPCA: 30000, FUND: 40003}),
         ],
         ids=["conservative_round", "moderate_round", "moderate_leftover", "aggressive_leftover"],
     )
     def test_distribution(self, option, profile, amount, expected):
-        """Cada perfil tem os seus produtos, a carteira-modelo soma 10.000 pb e os valores
-        somam exatamente o pedido, com a sobra indo para o maior peso (RN-CAR-03)."""
         customer_key, _ = customer_with_profile(option)
 
         status, body = suggest(customer_key, amount)
@@ -71,7 +64,6 @@ class TestPortfolioSuggestion:
 
     @pytest.mark.parametrize("option", [CONSERVATIVE, MODERATE, AGGRESSIVE])
     def test_every_product_fits_the_profile(self, option):
-        """Nenhuma sugestão tem produto com risco acima do que o perfil aceita (CVM 30)."""
         customer_key, assessment = customer_with_profile(option)
 
         _, body = suggest(customer_key, 1000000)
@@ -91,7 +83,6 @@ class TestPortfolioSuggestion:
             assert len(item["product_key"]) == 36
 
     def test_works_without_account_or_balance(self):
-        """RN-CAR-05: é simulação; quem barra falta de saldo é a ordem. Este cliente nem tem conta."""
         customer_key, _ = customer_with_profile(AGGRESSIVE)
 
         status, _ = suggest(customer_key, 100000000)
@@ -99,13 +90,11 @@ class TestPortfolioSuggestion:
         assert status == 200
 
     def test_suggestion_is_not_recorded(self):
-        """RN-CAR-04: pedir de novo dá a mesma resposta; nada foi gravado entre uma e outra."""
         customer_key, _ = customer_with_profile(MODERATE)
 
         first_status, first = suggest(customer_key, 1000000)
         second_status, second = suggest(customer_key, 1000000)
 
-        # Sem conferir o 200, dois erros iguais também passariam aqui.
         assert first_status == second_status == 200
         assert first == second
 
@@ -127,7 +116,6 @@ class TestPortfolioSuggestionRefusals:
         assert body["code"] == "PPP004005"
 
     def test_below_minimum_amount(self):
-        """RN-CAR-02: R$ 999,99, um centavo abaixo do mínimo."""
         customer_key, _ = customer_with_profile(MODERATE)
 
         status, body = suggest(customer_key, 99999)
@@ -136,7 +124,6 @@ class TestPortfolioSuggestionRefusals:
         assert body["code"] == "PPP006001"
 
     def test_profile_is_checked_before_amount(self):
-        """Sem perfil e com valor baixo: a falta de perfil vem primeiro (RN-CAR-01 antes da RN-CAR-02)."""
         customer_key = create_customer()
 
         status, body = suggest(customer_key, 99999)

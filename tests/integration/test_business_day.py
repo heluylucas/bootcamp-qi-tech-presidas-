@@ -4,7 +4,6 @@ from tests.utils import INTERNAL_TOKEN, RequestGenerator
 from tests.utils.requisition import ClientRequisition
 
 
-# Só o INTERNAL-TOKEN, sem o OPERATOR-TOKEN: é o que o cliente teria (RN-GER-14).
 WITHOUT_OPERATOR_TOKEN = {"INTERNAL-TOKEN": INTERNAL_TOKEN}
 
 
@@ -14,8 +13,6 @@ class TestBusinessDate:
 
         assert status == 200
         assert list(body) == ["business_date"]
-        # Nunca conferir uma data fixa: ela só anda para frente (RN-GER-13).
-        # Basta ser uma data de verdade no formato AAAA-MM-DD.
         date.fromisoformat(body["business_date"])
 
     def test_business_date_without_operator_token(self):
@@ -25,7 +22,6 @@ class TestBusinessDate:
         assert response.response_json["code"] == "PPP000007"
 
     def test_day_close_without_operator_token(self):
-        # Data antiga de propósito: se o pedido passasse do porteiro, daria 409 e nada mudaria.
         _, before = RequestGenerator.get_business_date()
 
         response = ClientRequisition.send(
