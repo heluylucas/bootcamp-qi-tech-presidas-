@@ -624,6 +624,7 @@ def build(fragment_path) -> int:
     page = template.replace("{{NAV}}", "\n".join(nav)).replace("{{PAGES}}", "\n".join(sections))
     document = ('<!doctype html>\n<html lang="pt-BR">\n<head>\n<meta charset="utf-8">\n'
                 '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+                '<link rel="icon" type="image/svg+xml" href="logo.svg">\n'
                 "</head>\n<body>\n" + page + "\n</body>\n</html>\n")
     (API_DOCS / "index.html").write_text(document, encoding="utf-8", newline="\n")
     if fragment_path:

@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/api/logo.svg" alt="Triple P Bank" width="160"></p>
+
 # Triple P Bank — Desafio Bootcamp QI Tech 2026
 
 API de um banco digital com módulo de investimentos simulado: clientes,
